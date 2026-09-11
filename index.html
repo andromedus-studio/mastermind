@@ -48,7 +48,7 @@
     background-image: var(--bg-landscape);
     background-size: cover;
     background-position: center;
-    filter: blur(7px) brightness(0.55);
+    filter: blur(4px) brightness(0.75);
     transform: scale(1.05);
     z-index: -2;
   }
@@ -59,7 +59,7 @@
   .bg-overlay {
     position: fixed;
     inset: 0;
-    background: radial-gradient(circle at 50% 35%, rgba(36,26,48,0.55) 0%, rgba(36,26,48,0.88) 60%, rgba(20,14,28,0.96) 100%);
+    background: radial-gradient(circle at 50% 35%, rgba(36,26,48,0.32) 0%, rgba(36,26,48,0.55) 60%, rgba(20,14,28,0.72) 100%);
     z-index: -1;
   }
 
@@ -1229,6 +1229,7 @@ let duelHistory = [];
 let duelFinished = false;
 let matchListenerRef = null;
 let duelListenerRef = null;
+let duelDisconnectRef = null;
 let storageAvailable = true;
 
 function getOrCreateDeviceId(){
@@ -1506,6 +1507,8 @@ function enterDuel(duelId){
 
   const duelRef = ref(db, 'duels/' + duelId);
   duelListenerRef = duelRef;
+  duelDisconnectRef = ref(db, `duels/${duelId}/finished/${myPseudo}`);
+  onDisconnect(duelDisconnectRef).set({ attempts: 99, timeMs: 999999, forfeited: true });
   onValue(duelRef, (snap) => {
     const data = snap.val();
     if(!data) return;
@@ -1598,6 +1601,7 @@ function submitDuelGuess(){
     duelFinished = true;
     const timeMs = Date.now() - duelStartedAt;
     set(ref(db, `duels/${currentDuelId}/finished/${myPseudo}`), { attempts: duelHistory.length, timeMs });
+    if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
     document.getElementById('duelSubmitBtn').disabled = true;
     document.getElementById('duelAbandonRow').classList.add('hidden');
   } else {
@@ -1658,12 +1662,16 @@ function confirmAbandon(){
   duelFinished = true;
   const timeMs = Date.now() - duelStartedAt;
   set(ref(db, `duels/${currentDuelId}/finished/${myPseudo}`), { attempts: duelHistory.length, timeMs, forfeited: true });
+  if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonConfirm').classList.add('hidden');
+  document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">🏳️ Tu as abandonné.</div>`;
+  document.getElementById('duelLeaveBtn').classList.remove('hidden');
 }
 
 function leaveDuel(){
   if(duelListenerRef) off(duelListenerRef);
+  if(duelDisconnectRef){ onDisconnect(duelDisconnectRef).cancel(); duelDisconnectRef = null; }
   document.getElementById('duelScreen').classList.add('hidden');
   currentDuelId = null;
 }
@@ -1680,6 +1688,8 @@ window.leaveDuel = leaveDuel;
 window.askAbandon = askAbandon;
 window.cancelAbandon = cancelAbandon;
 window.confirmAbandon = confirmAbandon;
+window.minimizeDuelSearch = minimizeDuelSearch;
+window.restoreDuelSearch = restoreDuelSearch;
 </script>
 </body>
 </html>
