@@ -414,6 +414,42 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  .online-icon-btn {
+    position: relative;
+    background: var(--panel-bg-light); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 10px; padding: 4px 10px; font-size: 15px;
+    cursor: pointer; color: inherit;
+  }
+  .online-badge {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--gold); color: #1a1420;
+    font-size: 10px; font-weight: 800; line-height: 1;
+    border-radius: 8px; padding: 2px 5px; min-width: 14px; text-align: center;
+  }
+  .online-players-list { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .online-players-empty { font-size: 12px; color: var(--ink-dim); text-align: center; padding: 8px 0; }
+  .online-player-row {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--panel-bg-light); border-radius: 10px; padding: 6px 10px;
+  }
+  .online-player-name { font-weight: 700; font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .online-player-status { font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
+  .challenge-btn {
+    background: none; border: 1px solid var(--gold); color: var(--gold);
+    border-radius: 8px; padding: 4px 9px; font-size: 12px; font-weight: 700;
+    cursor: pointer; white-space: nowrap;
+  }
+  .challenge-btn:hover { background: var(--gold); color: #1a1420; }
+
+  .duel-result-card { text-align: center; animation: popIn 0.25s ease; }
+  @keyframes popIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .duel-result-emoji { font-size: 60px; line-height: 1; margin-bottom: 4px; }
+  .duel-result-title { font-size: 28px; font-weight: 900; letter-spacing: 1px; margin-bottom: 8px; }
+  .duel-result-title.win { color: var(--gold); text-shadow: 0 0 18px rgba(255,199,79,0.5); }
+  .duel-result-title.lose { color: var(--ink-dim); }
+  .duel-result-winner { font-size: 19px; font-weight: 800; margin-bottom: 16px; }
+  .duel-result-recap { font-size: 14px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 18px; }
+
   .duel-vs { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 4px 0 14px; }
   .duel-player { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .duel-avatar {
@@ -453,6 +489,9 @@
     <span id="onlineCount">🟢 …</span>
     <span id="searchingCount" class="hidden">🔍 …</span>
     <span id="mySearchBadge" class="hidden search-badge" onclick="restoreDuelSearch()">🔍 Duel en recherche… (reprendre)</span>
+    <button class="online-icon-btn" id="onlinePlayersBtn" onclick="toggleOnlinePlayersPanel()" title="Joueurs en ligne">
+      👥<span class="online-badge hidden" id="onlinePlayersBadge">0</span>
+    </button>
   </div>
 
   <div class="card">
@@ -1151,6 +1190,46 @@ function undoLastMove(){
   </div>
 </div>
 
+<!-- Panneau des joueurs en ligne -->
+<div id="onlinePlayersScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">👥 Joueurs en ligne</div>
+    <div class="online-players-list" id="onlinePlayersList"></div>
+    <button class="btn secondary" onclick="toggleOnlinePlayersPanel()">Fermer</button>
+  </div>
+</div>
+
+<!-- Invitation à un duel reçue -->
+<div id="inviteScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🎯 Défi reçu !</div>
+    <p class="duel-sub" id="inviteFromText"></p>
+    <button class="btn" onclick="acceptInvite()">Accepter le duel</button>
+    <button class="btn secondary" onclick="declineInvite()">Refuser</button>
+  </div>
+</div>
+
+<!-- En attente de réponse à une invitation envoyée -->
+<div id="inviteWaitingScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">⏳ En attente…</div>
+    <p class="duel-sub" id="inviteWaitingText"></p>
+    <div class="duel-spinner"></div>
+    <button class="btn secondary" onclick="cancelInvite()">Annuler l'invitation</button>
+  </div>
+</div>
+
+<!-- Grande fenêtre de récap de fin de duel -->
+<div id="duelResultScreen" class="hidden duel-overlay" style="z-index: 2100;">
+  <div class="card duel-card duel-result-card">
+    <div class="duel-result-emoji" id="duelResultEmoji">🏆</div>
+    <div class="duel-result-title" id="duelResultTitle">VICTOIRE</div>
+    <div class="duel-result-winner" id="duelResultWinner"></div>
+    <div class="duel-result-recap" id="duelResultRecap"></div>
+    <button class="btn" onclick="closeDuelResultAndLeave()">Retour au menu</button>
+  </div>
+</div>
+
 <!-- Écran de duel -->
 <div id="duelScreen" class="hidden duel-overlay">
   <div class="card duel-card">
@@ -1227,9 +1306,16 @@ let duelGuess = [null,null,null,null];
 let duelSelectedSlot = 0;
 let duelHistory = [];
 let duelFinished = false;
+let duelResultShown = false;
 let matchListenerRef = null;
 let duelListenerRef = null;
 let duelDisconnectRef = null;
+let pendingInviteFrom = null;
+let currentInviteTarget = null;
+let inviteMatchRef = null;
+let inviteDeclineRef = null;
+let inviteTimeoutHandle = null;
+let pendingChallengeTarget = null;
 let storageAvailable = true;
 
 function getOrCreateDeviceId(){
@@ -1276,6 +1362,7 @@ window.addEventListener('load', () => {
   setupQueueWatch();
   if(myPseudo){
     document.getElementById('menu').classList.remove('hidden');
+    setupInviteListener();
   } else {
     pseudoScreenPurpose = 'startup';
     showPseudoScreen();
@@ -1288,7 +1375,7 @@ function setupPresence(){
     if(snap.val() === true){
       const myPresenceRef = ref(db, 'presence/' + deviceId);
       onDisconnect(myPresenceRef).remove();
-      set(myPresenceRef, true);
+      updatePresenceStatus('online');
     }
   });
 
@@ -1296,7 +1383,53 @@ function setupPresence(){
     const data = snap.val() || {};
     const count = Object.keys(data).length;
     document.getElementById('onlineCount').textContent = `🟢 ${count} joueur${count>1?'s':''} en ligne`;
+    renderOnlinePlayers(data);
   });
+}
+
+function updatePresenceStatus(status){
+  if(!deviceId) return;
+  set(ref(db, 'presence/' + deviceId), { pseudo: myPseudo || null, status, at: Date.now() });
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderOnlinePlayers(data){
+  const others = Object.values(data)
+    .filter(p => p && p.pseudo && p.pseudo !== myPseudo)
+    .sort((a,b) => a.pseudo.localeCompare(b.pseudo, 'fr', {sensitivity:'base'}));
+
+  const badge = document.getElementById('onlinePlayersBadge');
+  if(badge){
+    if(others.length > 0){
+      badge.textContent = others.length;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  const el = document.getElementById('onlinePlayersList');
+  if(!el) return;
+  if(others.length === 0){
+    el.innerHTML = `<div class="online-players-empty">Personne d'autre en ligne pour le moment.</div>`;
+    return;
+  }
+  el.innerHTML = others.map(p => {
+    const statusLabel = p.status === 'in_duel' ? '⚔️ en duel' : p.status === 'searching' ? '🔍 en recherche' : '';
+    const safePseudo = escapeHtml(p.pseudo);
+    return `<div class="online-player-row">
+      <span class="online-player-name">${safePseudo}</span>
+      ${statusLabel ? `<span class="online-player-status">${statusLabel}</span>` : ''}
+      <button class="challenge-btn" onclick="challengePlayer('${safePseudo.replace(/'/g, "\\'")}')">⚔️ Défier</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleOnlinePlayersPanel(){
+  document.getElementById('onlinePlayersScreen').classList.toggle('hidden');
 }
 
 function setupQueueWatch(){
@@ -1324,13 +1457,16 @@ function showPseudoScreen(){
   document.getElementById('pseudoError').textContent = '';
 
   const isDuel = pseudoScreenPurpose === 'duel';
-  document.getElementById('pseudoTitle').textContent = isDuel ? '⚔️ Duel en ligne' : '👋 Bienvenue sur BrainMind';
-  document.getElementById('pseudoSub').textContent = isDuel
+  const isChallenge = pseudoScreenPurpose === 'challenge';
+  document.getElementById('pseudoTitle').textContent = (isDuel || isChallenge) ? '⚔️ Duel en ligne' : '👋 Bienvenue sur BrainMind';
+  document.getElementById('pseudoSub').textContent = isChallenge
+    ? "Choisis un pseudo pour pouvoir défier cet adversaire."
+    : isDuel
     ? "Choisis un pseudo pour affronter un autre joueur (recherche automatique de l'adversaire)."
     : "Choisis un pseudo pour sauvegarder ta progression et pouvoir affronter d'autres joueurs.";
-  document.getElementById('pseudoSubmitBtn').textContent = isDuel ? 'Chercher un duel' : 'Continuer';
-  document.getElementById('pseudoCancelBtn').classList.toggle('hidden', !isDuel);
-  document.getElementById('pseudoSkipLink').classList.toggle('hidden', isDuel);
+  document.getElementById('pseudoSubmitBtn').textContent = isChallenge ? 'Défier' : isDuel ? 'Chercher un duel' : 'Continuer';
+  document.getElementById('pseudoCancelBtn').classList.toggle('hidden', !(isDuel || isChallenge));
+  document.getElementById('pseudoSkipLink').classList.toggle('hidden', isDuel || isChallenge);
 }
 
 function openDuelOverlay(){
@@ -1346,6 +1482,7 @@ function openDuelOverlay(){
 }
 
 function closeDuelOverlay(){
+  pendingChallengeTarget = null;
   document.getElementById('pseudoScreen').classList.add('hidden');
 }
 
@@ -1369,8 +1506,17 @@ function submitPseudo(){
     document.getElementById('duelSearching').classList.remove('hidden');
     document.getElementById('duelActive').classList.add('hidden');
     joinQueue();
+  } else if(pseudoScreenPurpose === 'challenge'){
+    document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
+    const target = pendingChallengeTarget;
+    pendingChallengeTarget = null;
+    if(target) challengePlayer(target);
   } else {
     document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
   }
 }
 
@@ -1395,6 +1541,7 @@ function restoreDuelSearch(){
 }
 
 function joinQueue(){
+  updatePresenceStatus('searching');
   myQueueRef = ref(db, 'queue/' + myPseudo);
   set(myQueueRef, { pseudo: myPseudo, joinedAt: Date.now() });
   onDisconnect(myQueueRef).remove();
@@ -1454,9 +1601,114 @@ function cancelQueue(){
     remove(myQueueRef);
     onDisconnect(myQueueRef).cancel();
   }
+  updatePresenceStatus('online');
   duelSearchMinimized = false;
   document.getElementById('mySearchBadge').classList.add('hidden');
   document.getElementById('duelScreen').classList.add('hidden');
+}
+
+// --- Défi direct entre joueurs (invitation) ---
+
+function challengePlayer(target){
+  if(currentDuelId || currentInviteTarget) return;
+  if(!myPseudo){
+    pendingChallengeTarget = target;
+    pseudoScreenPurpose = 'challenge';
+    showPseudoScreen();
+    return;
+  }
+  currentInviteTarget = target;
+  set(ref(db, 'invites/' + target), { from: myPseudo, at: Date.now() });
+  document.getElementById('onlinePlayersScreen').classList.add('hidden');
+  document.getElementById('inviteWaitingText').textContent = `En attente de la réponse de ${target}…`;
+  document.getElementById('inviteWaitingScreen').classList.remove('hidden');
+  listenForInviteResponse(target);
+}
+
+function listenForInviteResponse(target){
+  inviteMatchRef = ref(db, 'matchResults/' + myPseudo);
+  inviteDeclineRef = ref(db, 'inviteDeclined/' + myPseudo);
+
+  onValue(inviteMatchRef, (snap) => {
+    const duelId = snap.val();
+    if(duelId){
+      clearInviteWatchers();
+      remove(ref(db, 'matchResults/' + myPseudo));
+      document.getElementById('inviteWaitingScreen').classList.add('hidden');
+      currentInviteTarget = null;
+      enterDuel(duelId);
+    }
+  });
+
+  onValue(inviteDeclineRef, (snap) => {
+    if(snap.val()){
+      remove(ref(db, 'inviteDeclined/' + myPseudo));
+      document.getElementById('inviteWaitingText').textContent = `${target} a refusé le duel.`;
+      clearInviteWatchers();
+      setTimeout(() => {
+        document.getElementById('inviteWaitingScreen').classList.add('hidden');
+        currentInviteTarget = null;
+      }, 1800);
+    }
+  });
+
+  inviteTimeoutHandle = setTimeout(() => {
+    if(!currentInviteTarget) return;
+    document.getElementById('inviteWaitingText').textContent = `${target} n'a pas répondu à temps.`;
+    remove(ref(db, 'invites/' + target));
+    clearInviteWatchers();
+    setTimeout(() => {
+      document.getElementById('inviteWaitingScreen').classList.add('hidden');
+      currentInviteTarget = null;
+    }, 1800);
+  }, 30000);
+}
+
+function clearInviteWatchers(){
+  if(inviteMatchRef) off(inviteMatchRef);
+  if(inviteDeclineRef) off(inviteDeclineRef);
+  if(inviteTimeoutHandle) clearTimeout(inviteTimeoutHandle);
+  inviteMatchRef = null;
+  inviteDeclineRef = null;
+  inviteTimeoutHandle = null;
+}
+
+function cancelInvite(){
+  if(currentInviteTarget) remove(ref(db, 'invites/' + currentInviteTarget));
+  clearInviteWatchers();
+  currentInviteTarget = null;
+  document.getElementById('inviteWaitingScreen').classList.add('hidden');
+}
+
+function setupInviteListener(){
+  if(!myPseudo) return;
+  onValue(ref(db, 'invites/' + myPseudo), (snap) => {
+    const invite = snap.val();
+    if(invite && invite.from && !currentDuelId){
+      pendingInviteFrom = invite.from;
+      document.getElementById('inviteFromText').textContent = `${invite.from} te propose un duel !`;
+      document.getElementById('inviteScreen').classList.remove('hidden');
+    } else {
+      document.getElementById('inviteScreen').classList.add('hidden');
+    }
+  });
+}
+
+function acceptInvite(){
+  if(!pendingInviteFrom) return;
+  const from = pendingInviteFrom;
+  pendingInviteFrom = null;
+  remove(ref(db, 'invites/' + myPseudo));
+  document.getElementById('inviteScreen').classList.add('hidden');
+  createDuel(from);
+}
+
+function declineInvite(){
+  if(!pendingInviteFrom) return;
+  set(ref(db, 'inviteDeclined/' + pendingInviteFrom), Date.now());
+  pendingInviteFrom = null;
+  remove(ref(db, 'invites/' + myPseudo));
+  document.getElementById('inviteScreen').classList.add('hidden');
 }
 
 function createDuel(opponent){
@@ -1492,8 +1744,11 @@ function enterDuel(duelId){
   duelSelectedSlot = 0;
   duelHistory = [];
   duelFinished = false;
+  duelResultShown = false;
+  document.getElementById('duelResultScreen').classList.add('hidden');
 
   duelSearchMinimized = false;
+  updatePresenceStatus('in_duel');
   document.getElementById('mySearchBadge').classList.add('hidden');
   document.getElementById('duelScreen').classList.remove('hidden');
   document.getElementById('duelSearching').classList.add('hidden');
@@ -1604,6 +1859,7 @@ function submitDuelGuess(){
     if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
     document.getElementById('duelSubmitBtn').disabled = true;
     document.getElementById('duelAbandonRow').classList.add('hidden');
+    document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">🎉 Trouvé en ${duelHistory.length} coup(s), ${(timeMs/1000).toFixed(1)}s ! En attente de l'adversaire…</div>`;
   } else {
     duelGuess = [null,null,null,null];
     duelSelectedSlot = 0;
@@ -1613,28 +1869,44 @@ function submitDuelGuess(){
 }
 
 function checkDuelEnd(data){
-  if(!data.finished) return;
-  const myResult = data.finished[myPseudo];
-  const oppResult = data.finished[opponentPseudo];
-  if(!myResult || !oppResult) return;
+  if(duelResultShown) return;
+  const myResult = (data.finished && data.finished[myPseudo]) || null;
+  const oppResult = (data.finished && data.finished[opponentPseudo]) || null;
 
-  let winner;
-  if(myResult.forfeited && oppResult.forfeited){
-    winner = null;
-  } else if(myResult.forfeited){
-    winner = opponentPseudo;
-  } else if(oppResult.forfeited){
-    winner = myPseudo;
-  } else if(myResult.attempts !== oppResult.attempts){
-    winner = myResult.attempts < oppResult.attempts ? myPseudo : opponentPseudo;
-  } else {
-    winner = myResult.timeMs <= oppResult.timeMs ? myPseudo : opponentPseudo;
+  const myForfeit = !!(myResult && myResult.forfeited);
+  const oppForfeit = !!(oppResult && oppResult.forfeited);
+
+  // Dès qu'il y a un abandon (le mien ou celui de l'adversaire), le duel
+  // s'arrête tout de suite pour les deux — pas besoin d'attendre que
+  // l'autre ait lui aussi un résultat.
+  if(myForfeit || oppForfeit){
+    renderDuelResult(myResult, oppResult, myForfeit, oppForfeit);
+    return;
   }
 
+  if(!myResult || !oppResult) return;
+  renderDuelResult(myResult, oppResult, false, false);
+}
+
+function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
+  duelResultShown = true;
+  duelFinished = true;
+
+  let winner;
+  if(myForfeit && oppForfeit) winner = null;
+  else if(myForfeit) winner = opponentPseudo;
+  else if(oppForfeit) winner = myPseudo;
+  else if(myResult.attempts !== oppResult.attempts) winner = myResult.attempts < oppResult.attempts ? myPseudo : opponentPseudo;
+  else winner = myResult.timeMs <= oppResult.timeMs ? myPseudo : opponentPseudo;
+
   const won = winner === myPseudo;
-  const myLine = myResult.forfeited ? 'Toi : abandon' : `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s`;
-  const oppLine = oppResult.forfeited ? `${opponentPseudo} : abandon` : `${opponentPseudo} : ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s`;
+  const myLine = myForfeit ? 'Toi : abandon' : (myResult ? `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s` : 'Toi : partie arrêtée');
+  const oppLine = oppForfeit ? `${opponentPseudo} : abandon` : (oppResult ? `${opponentPseudo} : ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s` : `${opponentPseudo} : partie arrêtée`);
   const title = winner === null ? '🤝 Double abandon' : (won ? '🏆 Victoire !' : '😔 Défaite');
+
+  document.getElementById('duelSubmitBtn').disabled = true;
+  document.getElementById('duelAbandonRow').classList.add('hidden');
+  document.getElementById('duelAbandonConfirm').classList.add('hidden');
 
   const resultEl = document.getElementById('duelResult');
   resultEl.innerHTML = `<div class="analysis-panel" style="text-align:center;">
@@ -1643,8 +1915,21 @@ function checkDuelEnd(data){
     ${oppLine}
   </div>`;
   document.getElementById('duelLeaveBtn').classList.remove('hidden');
-  document.getElementById('duelAbandonRow').classList.add('hidden');
-  document.getElementById('duelAbandonConfirm').classList.add('hidden');
+
+  const bigEmoji = winner === null ? '🤝' : (won ? '🏆' : '💀');
+  const bigTitle = winner === null ? 'ÉGALITÉ' : (won ? 'VICTOIRE' : 'DÉFAITE');
+  document.getElementById('duelResultEmoji').textContent = bigEmoji;
+  const titleEl = document.getElementById('duelResultTitle');
+  titleEl.textContent = bigTitle;
+  titleEl.className = 'duel-result-title' + (winner === null ? '' : won ? ' win' : ' lose');
+  document.getElementById('duelResultWinner').textContent = winner === null ? '' : `${winner} remporte le duel !`;
+  document.getElementById('duelResultRecap').innerHTML = `${myLine}<br>${oppLine}`;
+  document.getElementById('duelResultScreen').classList.remove('hidden');
+}
+
+function closeDuelResultAndLeave(){
+  document.getElementById('duelResultScreen').classList.add('hidden');
+  leaveDuel();
 }
 
 function askAbandon(){
@@ -1659,19 +1944,17 @@ function cancelAbandon(){
 
 function confirmAbandon(){
   if(duelFinished || !currentDuelId) return;
-  duelFinished = true;
   const timeMs = Date.now() - duelStartedAt;
   set(ref(db, `duels/${currentDuelId}/finished/${myPseudo}`), { attempts: duelHistory.length, timeMs, forfeited: true });
   if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonConfirm').classList.add('hidden');
-  document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">🏳️ Tu as abandonné.</div>`;
-  document.getElementById('duelLeaveBtn').classList.remove('hidden');
 }
 
 function leaveDuel(){
   if(duelListenerRef) off(duelListenerRef);
   if(duelDisconnectRef){ onDisconnect(duelDisconnectRef).cancel(); duelDisconnectRef = null; }
+  updatePresenceStatus('online');
   document.getElementById('duelScreen').classList.add('hidden');
   currentDuelId = null;
 }
@@ -1690,6 +1973,12 @@ window.cancelAbandon = cancelAbandon;
 window.confirmAbandon = confirmAbandon;
 window.minimizeDuelSearch = minimizeDuelSearch;
 window.restoreDuelSearch = restoreDuelSearch;
+window.challengePlayer = challengePlayer;
+window.toggleOnlinePlayersPanel = toggleOnlinePlayersPanel;
+window.closeDuelResultAndLeave = closeDuelResultAndLeave;
+window.cancelInvite = cancelInvite;
+window.acceptInvite = acceptInvite;
+window.declineInvite = declineInvite;
 </script>
 </body>
 </html>
