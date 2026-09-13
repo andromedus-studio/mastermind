@@ -506,9 +506,9 @@
 
       <button class="cc-option toggle-btn" id="numberModeBtn" onclick="toggleNumberMode()" style="width:100%; max-width:none; margin-bottom:20px; padding:12px;">🔢 Chiffres au lieu de couleurs</button>
 
-      <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('computerGuesses')">
-        <span class="big">🧠 Je cache un code</span>
-        <span class="small">Tu penses à une combinaison, l'ordinateur essaie de la deviner.</span>
+      <button class="mode-btn" onclick="openDailyChallenge()">
+        <span class="big">🗓️ Défi du jour</span>
+        <span class="small">Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.</span>
       </button>
       <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
         <span class="big">🔍 L'ordinateur cache un code</span>
@@ -521,6 +521,10 @@
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="big">⚔️ Duel en ligne (bêta)</span>
         <span class="small">Affronte un autre joueur en temps réel : même code à deviner, le plus efficace (et le plus rapide en cas d'égalité) gagne.</span>
+      </button>
+      <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('computerGuesses')">
+        <span class="big">🧠 Je cache un code</span>
+        <span class="small">Tu penses à une combinaison, l'ordinateur essaie de la deviner.</span>
       </button>
 
       <div id="sessionHistory"></div>
@@ -690,6 +694,23 @@ function feedback(guess, secret){
   for(let c=0;c<NB_COULEURS;c++) white += Math.min(gCount[c], sCount[c]);
   return {black, white, code: black*10+white};
 }
+
+// Variante à nombre de couleurs fixe, indépendante du réglage perso du joueur
+// (nécessaire pour le duel et le défi du jour, qui utilisent toujours 8 couleurs
+// même si le joueur a changé ce réglage pour son mode solo).
+function feedbackFor(guess, secret, numColors){
+  let black = 0;
+  const gCount = new Array(numColors).fill(0);
+  const sCount = new Array(numColors).fill(0);
+  for(let i=0;i<guess.length;i++){
+    if(guess[i] === secret[i]) black++;
+    else { gCount[guess[i]]++; sCount[secret[i]]++; }
+  }
+  let white = 0;
+  for(let c=0;c<numColors;c++) white += Math.min(gCount[c], sCount[c]);
+  return {black, white, code: black*10+white};
+}
+window.feedbackFor = feedbackFor;
 
 function codeKey(c){ return c.join(','); }
 
@@ -1199,6 +1220,35 @@ function undoLastMove(){
   </div>
 </div>
 
+
+<!-- Défi du jour -->
+<div id="dailyScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🗓️ Défi du jour</div>
+    <p class="duel-sub" id="dailySub">Chargement…</p>
+
+    <div id="dailyPlayArea" class="hidden">
+      <div class="duel-searching-count" id="dailyAttemptsLeft"></div>
+      <div class="history" id="dailyHistory"></div>
+      <div class="current-row">
+        <div class="label">Ta proposition</div>
+        <div class="slots" id="dailySlots"></div>
+      </div>
+      <div class="palette" id="dailyPalette"></div>
+      <button class="btn" id="dailySubmitBtn" onclick="submitDailyGuess()" disabled>Valider la proposition</button>
+    </div>
+
+    <div id="dailyDoneArea" class="hidden">
+      <div class="analysis-panel" id="dailyDoneMessage" style="text-align:center;"></div>
+    </div>
+
+    <div class="online-players-title" style="margin-top:16px;">🏆 Classement du jour</div>
+    <div class="online-players-list" id="dailyLeaderboard"></div>
+
+    <button class="btn secondary" onclick="closeDailyChallenge()">Fermer</button>
+  </div>
+</div>
+
 <!-- Invitation à un duel reçue -->
 <div id="inviteScreen" class="hidden duel-overlay">
   <div class="card duel-card">
@@ -1278,7 +1328,7 @@ function undoLastMove(){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  getDatabase, ref, set, push, onValue, runTransaction, remove, off, onDisconnect
+  getDatabase, ref, set, get, push, onValue, runTransaction, remove, off, onDisconnect
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -1458,15 +1508,19 @@ function showPseudoScreen(){
 
   const isDuel = pseudoScreenPurpose === 'duel';
   const isChallenge = pseudoScreenPurpose === 'challenge';
-  document.getElementById('pseudoTitle').textContent = (isDuel || isChallenge) ? '⚔️ Duel en ligne' : '👋 Bienvenue sur BrainMind';
+  const isDaily = pseudoScreenPurpose === 'daily';
+  const needsPseudo = isDuel || isChallenge || isDaily;
+  document.getElementById('pseudoTitle').textContent = isDaily ? '🗓️ Défi du jour' : needsPseudo ? '⚔️ Duel en ligne' : '👋 Bienvenue sur BrainMind';
   document.getElementById('pseudoSub').textContent = isChallenge
     ? "Choisis un pseudo pour pouvoir défier cet adversaire."
+    : isDaily
+    ? "Choisis un pseudo pour apparaître dans le classement du défi du jour."
     : isDuel
     ? "Choisis un pseudo pour affronter un autre joueur (recherche automatique de l'adversaire)."
     : "Choisis un pseudo pour sauvegarder ta progression et pouvoir affronter d'autres joueurs.";
-  document.getElementById('pseudoSubmitBtn').textContent = isChallenge ? 'Défier' : isDuel ? 'Chercher un duel' : 'Continuer';
-  document.getElementById('pseudoCancelBtn').classList.toggle('hidden', !(isDuel || isChallenge));
-  document.getElementById('pseudoSkipLink').classList.toggle('hidden', isDuel || isChallenge);
+  document.getElementById('pseudoSubmitBtn').textContent = isChallenge ? 'Défier' : isDaily ? 'Jouer' : isDuel ? 'Chercher un duel' : 'Continuer';
+  document.getElementById('pseudoCancelBtn').classList.toggle('hidden', !needsPseudo);
+  document.getElementById('pseudoSkipLink').classList.toggle('hidden', needsPseudo);
 }
 
 function openDuelOverlay(){
@@ -1513,6 +1567,11 @@ function submitPseudo(){
     const target = pendingChallengeTarget;
     pendingChallengeTarget = null;
     if(target) challengePlayer(target);
+  } else if(pseudoScreenPurpose === 'daily'){
+    document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
+    openDailyChallenge();
   } else {
     document.getElementById('menu').classList.remove('hidden');
     updatePresenceStatus('online');
@@ -1711,6 +1770,220 @@ function declineInvite(){
   document.getElementById('inviteScreen').classList.add('hidden');
 }
 
+// --- Défi du jour ---
+
+const DAILY_MAX_ATTEMPTS = 12;
+let dailyDateKey = null;
+let dailySecret = null;
+let dailyGuess = [null,null,null,null];
+let dailySelectedSlot = 0;
+let dailyHistory = [];
+let dailyFinished = false;
+let dailyStartedAt = null;
+let dailyLeaderboardRef = null;
+
+function getParisDateKey(){
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+function ensureDailySecret(dateKey){
+  const secretRef = ref(db, `dailyChallenge/${dateKey}/secret`);
+  return runTransaction(secretRef, (current) => {
+    if(current !== null) return; // déjà généré aujourd'hui : on n'y touche pas
+    const secret = [];
+    for(let i=0;i<4;i++) secret.push(Math.floor(Math.random() * DUEL_COLORS));
+    return secret;
+  }).then((result) => result.snapshot.val());
+}
+
+async function openDailyChallenge(){
+  if(!myPseudo){
+    pseudoScreenPurpose = 'daily';
+    showPseudoScreen();
+    return;
+  }
+  dailyDateKey = getParisDateKey();
+  document.getElementById('dailyScreen').classList.remove('hidden');
+  document.getElementById('dailyPlayArea').classList.add('hidden');
+  document.getElementById('dailyDoneArea').classList.add('hidden');
+  document.getElementById('dailySub').textContent = 'Chargement…';
+
+  try {
+    dailySecret = await ensureDailySecret(dailyDateKey);
+    listenDailyLeaderboard();
+    await loadMyDailyProgress();
+  } catch(err){
+    console.error('Erreur défi du jour', err);
+    document.getElementById('dailySub').textContent = "Impossible de charger le défi du jour, réessaie plus tard.";
+  }
+}
+
+async function loadMyDailyProgress(){
+  const snap = await get(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}`));
+  const data = snap.val();
+  document.getElementById('dailySub').textContent = "Même code pour tout le monde aujourd'hui. 12 essais max, un seul passage par jour.";
+
+  if(data && data.finished){
+    dailyFinished = true;
+    showDailyDoneState(data.finished);
+    return;
+  }
+
+  dailyFinished = false;
+  dailyGuess = [null,null,null,null];
+  dailySelectedSlot = 0;
+  dailyHistory = [];
+  if(data && data.moves){
+    dailyHistory = Object.values(data.moves)
+      .sort((a,b) => a.time - b.time)
+      .map(m => ({ guess: m.guess, black: m.black, white: m.white }));
+  }
+  dailyStartedAt = (data && data.startedAt) || Date.now();
+  if(!data || !data.startedAt){
+    set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/startedAt`), dailyStartedAt);
+  }
+
+  document.getElementById('dailyPlayArea').classList.remove('hidden');
+  document.getElementById('dailyDoneArea').classList.add('hidden');
+  renderDailySlots();
+  renderDailyPalette();
+  renderDailyHistory();
+  updateDailyAttemptsLeft();
+}
+
+function renderDailySlots(){
+  const el = document.getElementById('dailySlots');
+  el.innerHTML = dailyGuess.map((ci, idx) => {
+    const sel = idx === dailySelectedSlot ? 'selected' : '';
+    if(ci !== null){
+      if(window.numberModeActive()){
+        return `<div class="slot filled num-peg ${sel}" onclick="selectDailySlot(${idx})">${ci+1}</div>`;
+      }
+      return `<div class="slot filled ${sel}" style="background:${window.COLORS[ci].css}" onclick="selectDailySlot(${idx})"></div>`;
+    }
+    return `<div class="slot ${sel}" style="background:var(--slot-empty)" onclick="selectDailySlot(${idx})"></div>`;
+  }).join('');
+}
+
+function renderDailyPalette(){
+  const el = document.getElementById('dailyPalette');
+  el.innerHTML = window.COLORS.slice(0, DUEL_COLORS).map((c, idx) => {
+    return window.pegHTML(idx, 'swatch').replace('<div', `<div onclick="pickDailyColor(${idx})" title="${c.name}"`);
+  }).join('');
+}
+
+function renderDailyHistory(){
+  const el = document.getElementById('dailyHistory');
+  el.innerHTML = dailyHistory.map((h, idx) => {
+    const pegs = h.guess.map(ci => window.pegHTML(ci, 'peg')).join('');
+    const fpegs = [];
+    for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
+    for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
+    while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
+    return `<div class="row"><span class="num">${idx+1}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function selectDailySlot(idx){
+  dailySelectedSlot = idx;
+  renderDailySlots();
+}
+
+function pickDailyColor(colorIdx){
+  dailyGuess[dailySelectedSlot] = colorIdx;
+  if(dailySelectedSlot < 3) dailySelectedSlot++;
+  renderDailySlots();
+  document.getElementById('dailySubmitBtn').disabled = dailyGuess.some(c => c === null);
+}
+
+function updateDailyAttemptsLeft(){
+  const left = DAILY_MAX_ATTEMPTS - dailyHistory.length;
+  document.getElementById('dailyAttemptsLeft').textContent = `${left} essai${left > 1 ? 's' : ''} restant${left > 1 ? 's' : ''}`;
+}
+
+function submitDailyGuess(){
+  if(dailyGuess.some(c => c === null) || dailyFinished) return;
+  const guessSnapshot = dailyGuess.slice();
+  const fb = window.feedbackFor(guessSnapshot, dailySecret, DUEL_COLORS);
+
+  dailyHistory.push({guess: guessSnapshot, black: fb.black, white: fb.white});
+  renderDailyHistory();
+  updateDailyAttemptsLeft();
+
+  const moveRef = push(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/moves`));
+  set(moveRef, { guess: guessSnapshot, black: fb.black, white: fb.white, time: Date.now() });
+
+  const solved = fb.black === 4;
+  const outOfTries = dailyHistory.length >= DAILY_MAX_ATTEMPTS;
+
+  if(solved || outOfTries){
+    dailyFinished = true;
+    const timeMs = Date.now() - dailyStartedAt;
+    const finishedData = { attempts: dailyHistory.length, timeMs, solved };
+    set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/finished`), finishedData);
+    showDailyDoneState(finishedData);
+    return;
+  }
+
+  dailyGuess = [null,null,null,null];
+  dailySelectedSlot = 0;
+  renderDailySlots();
+  document.getElementById('dailySubmitBtn').disabled = true;
+}
+
+function showDailyDoneState(finishedData){
+  document.getElementById('dailyPlayArea').classList.add('hidden');
+  document.getElementById('dailyDoneArea').classList.remove('hidden');
+  const msg = finishedData.solved
+    ? `🎉 Trouvé en ${finishedData.attempts} coup(s), ${(finishedData.timeMs/1000).toFixed(1)}s ! Reviens demain pour un nouveau défi.`
+    : `😔 Pas trouvé en ${DAILY_MAX_ATTEMPTS} essais. Reviens demain pour un nouveau défi.`;
+  document.getElementById('dailyDoneMessage').textContent = msg;
+}
+
+function listenDailyLeaderboard(){
+  if(dailyLeaderboardRef) off(dailyLeaderboardRef);
+  dailyLeaderboardRef = ref(db, `dailyChallenge/${dailyDateKey}/players`);
+  onValue(dailyLeaderboardRef, (snap) => {
+    renderDailyLeaderboard(snap.val() || {});
+  });
+}
+
+function renderDailyLeaderboard(players){
+  const el = document.getElementById('dailyLeaderboard');
+  const entries = Object.entries(players)
+    .filter(([pseudo, p]) => p && p.finished)
+    .map(([pseudo, p]) => ({ pseudo, ...p.finished }));
+
+  entries.sort((a, b) => {
+    if(a.solved !== b.solved) return a.solved ? -1 : 1;
+    if(a.solved){
+      if(a.attempts !== b.attempts) return a.attempts - b.attempts;
+      return a.timeMs - b.timeMs;
+    }
+    return 0;
+  });
+
+  if(entries.length === 0){
+    el.innerHTML = `<div class="online-players-empty">Personne n'a encore terminé aujourd'hui.</div>`;
+    return;
+  }
+
+  el.innerHTML = entries.map((e, idx) => {
+    const safePseudo = escapeHtml(e.pseudo);
+    const statusText = e.solved ? `${e.attempts} coup(s) · ${(e.timeMs/1000).toFixed(1)}s` : `n'a pas trouvé`;
+    return `<div class="online-player-row">
+      <span class="online-player-name">${idx+1}. ${safePseudo}</span>
+      <span class="online-player-status">${statusText}</span>
+    </div>`;
+  }).join('');
+}
+
+function closeDailyChallenge(){
+  if(dailyLeaderboardRef){ off(dailyLeaderboardRef); dailyLeaderboardRef = null; }
+  document.getElementById('dailyScreen').classList.add('hidden');
+}
+
 function createDuel(opponent){
   const duelId = push(ref(db, 'duels')).key;
   const secret = [];
@@ -1844,7 +2117,7 @@ function renderDuelHistory(){
 function submitDuelGuess(){
   if(duelGuess.some(c => c === null) || duelFinished) return;
   const guessSnapshot = duelGuess.slice();
-  const fb = window.feedback(guessSnapshot, duelSecret);
+  const fb = window.feedbackFor(guessSnapshot, duelSecret, DUEL_COLORS);
 
   duelHistory.push({guess: guessSnapshot, black: fb.black, white: fb.white});
   renderDuelHistory();
@@ -1955,6 +2228,19 @@ function leaveDuel(){
   if(duelListenerRef) off(duelListenerRef);
   if(duelDisconnectRef){ onDisconnect(duelDisconnectRef).cancel(); duelDisconnectRef = null; }
   updatePresenceStatus('online');
+  if(currentDuelId){
+    const duelId = currentDuelId;
+    set(ref(db, `duels/${duelId}/left/${myPseudo}`), true)
+      .then(() => get(ref(db, `duels/${duelId}/left`)))
+      .then((snap) => {
+        const left = snap.val() || {};
+        // Le duel n'a plus d'utilité une fois que les deux joueurs sont partis
+        if(Object.keys(left).length >= 2){
+          remove(ref(db, `duels/${duelId}`));
+        }
+      })
+      .catch((err) => console.error('Erreur nettoyage duel', err));
+  }
   document.getElementById('duelScreen').classList.add('hidden');
   currentDuelId = null;
 }
@@ -1976,6 +2262,11 @@ window.restoreDuelSearch = restoreDuelSearch;
 window.challengePlayer = challengePlayer;
 window.toggleOnlinePlayersPanel = toggleOnlinePlayersPanel;
 window.closeDuelResultAndLeave = closeDuelResultAndLeave;
+window.openDailyChallenge = openDailyChallenge;
+window.selectDailySlot = selectDailySlot;
+window.pickDailyColor = pickDailyColor;
+window.submitDailyGuess = submitDailyGuess;
+window.closeDailyChallenge = closeDailyChallenge;
 window.cancelInvite = cancelInvite;
 window.acceptInvite = acceptInvite;
 window.declineInvite = declineInvite;
