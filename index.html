@@ -492,6 +492,7 @@
     <button class="online-icon-btn" id="onlinePlayersBtn" onclick="toggleOnlinePlayersPanel()" title="Joueurs en ligne">
       👥<span class="online-badge hidden" id="onlinePlayersBadge">0</span>
     </button>
+    <span class="search-badge" id="myLevelBadge" style="cursor:default;" title="">Nv 1</span>
   </div>
 
   <div class="card">
@@ -1017,6 +1018,7 @@ function submitUserGuess(){
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !`, 'win');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
+    if(!trainingMode) window.addXp(window.XP_SOLO);
     launchConfetti();
     return;
   }
@@ -1026,6 +1028,7 @@ function submitUserGuess(){
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.`, '');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
+    if(!trainingMode) window.addXp(window.XP_SOLO);
     return;
   }
 
@@ -1135,6 +1138,7 @@ function submitFeedback(){
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !`, 'win');
     document.getElementById('feedbackInputArea').classList.add('hidden');
     sessionScores.push({mode: 'computerGuesses', numColors: NB_COULEURS, attempts: history.length});
+    window.addXp(window.XP_SOLO);
     launchConfetti();
     return;
   }
@@ -1345,6 +1349,15 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 
 const DUEL_COLORS = 8;
+
+// --- Système de niveau / XP ---
+const XP_SOLO = 5;               // partie solo terminée contre l'ordi (hors entraînement)
+const XP_DUEL_WIN = 20;          // victoire en duel
+const XP_DUEL_LOSS = 8;          // défaite/abandon en duel (participation)
+const XP_DAILY_BASE = 25;        // défi du jour réussi
+const XP_DAILY_BONUS_PER_SAVED = 3; // bonus par essai économisé sur les 12 possibles
+let playerXpCache = {}; // pseudo -> xp total
+let lastPresenceData = {};
 let myPseudo = null;
 let deviceId = null;
 let pseudoScreenPurpose = 'startup'; // 'startup' ou 'duel'
@@ -1431,15 +1444,63 @@ function setupPresence(){
 
   onValue(ref(db, 'presence'), (snap) => {
     const data = snap.val() || {};
+    lastPresenceData = data;
     const count = Object.keys(data).length;
     document.getElementById('onlineCount').textContent = `🟢 ${count} joueur${count>1?'s':''} en ligne`;
     renderOnlinePlayers(data);
   });
+
+  setupPlayersXpListener();
 }
 
 function updatePresenceStatus(status){
   if(!deviceId) return;
   set(ref(db, 'presence/' + deviceId), { pseudo: myPseudo || null, status, at: Date.now() });
+}
+
+// XP nécessaire pour passer du niveau `level` au niveau `level+1`.
+// Courbe modérée : chaque niveau demande un peu plus que le précédent,
+// linéairement (50, 100, 150, 200 XP...).
+function xpForLevel(level){
+  return 50 * level;
+}
+
+function levelFromXp(totalXp){
+  let level = 1;
+  let remaining = totalXp || 0;
+  while(remaining >= xpForLevel(level)){
+    remaining -= xpForLevel(level);
+    level++;
+  }
+  return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
+}
+
+function addXp(amount){
+  if(!myPseudo || !amount) return;
+  const xpRef = ref(db, `players/${myPseudo}/xp`);
+  runTransaction(xpRef, (current) => (current || 0) + amount);
+}
+window.addXp = addXp;
+window.XP_SOLO = XP_SOLO;
+
+function setupPlayersXpListener(){
+  onValue(ref(db, 'players'), (snap) => {
+    const data = snap.val() || {};
+    playerXpCache = {};
+    Object.entries(data).forEach(([pseudo, p]) => {
+      if(p && typeof p.xp === 'number') playerXpCache[pseudo] = p.xp;
+    });
+    renderOnlinePlayers(lastPresenceData);
+    updateMyLevelBadge();
+  });
+}
+
+function updateMyLevelBadge(){
+  const badge = document.getElementById('myLevelBadge');
+  if(!badge || !myPseudo) return;
+  const info = levelFromXp(playerXpCache[myPseudo] || 0);
+  badge.textContent = `Nv ${info.level}`;
+  badge.title = `${info.xpIntoLevel} / ${info.xpForNext} XP vers le niveau ${info.level + 1}`;
 }
 
 function escapeHtml(s){
@@ -1470,8 +1531,9 @@ function renderOnlinePlayers(data){
   el.innerHTML = others.map(p => {
     const statusLabel = p.status === 'in_duel' ? '⚔️ en duel' : p.status === 'searching' ? '🔍 en recherche' : '';
     const safePseudo = escapeHtml(p.pseudo);
+    const lvl = levelFromXp(playerXpCache[p.pseudo] || 0).level;
     return `<div class="online-player-row">
-      <span class="online-player-name">${safePseudo}</span>
+      <span class="online-player-name">${safePseudo} <small style="opacity:0.6;">Nv${lvl}</small></span>
       ${statusLabel ? `<span class="online-player-status">${statusLabel}</span>` : ''}
       <button class="challenge-btn" onclick="challengePlayer('${safePseudo.replace(/'/g, "\\'")}')">⚔️ Défier</button>
     </div>`;
@@ -1922,6 +1984,10 @@ function submitDailyGuess(){
     const timeMs = Date.now() - dailyStartedAt;
     const finishedData = { attempts: dailyHistory.length, timeMs, solved };
     set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/finished`), finishedData);
+    if(solved){
+      const bonus = Math.max(0, DAILY_MAX_ATTEMPTS - finishedData.attempts) * XP_DAILY_BONUS_PER_SAVED;
+      addXp(XP_DAILY_BASE + bonus);
+    }
     showDailyDoneState(finishedData);
     return;
   }
@@ -2173,6 +2239,7 @@ function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
   else winner = myResult.timeMs <= oppResult.timeMs ? myPseudo : opponentPseudo;
 
   const won = winner === myPseudo;
+  addXp(winner === null ? XP_DUEL_LOSS : (won ? XP_DUEL_WIN : XP_DUEL_LOSS));
   const myLine = myForfeit ? 'Toi : abandon' : (myResult ? `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s` : 'Toi : partie arrêtée');
   const oppLine = oppForfeit ? `${opponentPseudo} : abandon` : (oppResult ? `${opponentPseudo} : ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s` : `${opponentPseudo} : partie arrêtée`);
   const title = winner === null ? '🤝 Double abandon' : (won ? '🏆 Victoire !' : '😔 Défaite');
