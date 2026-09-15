@@ -541,7 +541,7 @@
         <span class="small">Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.</span>
       </button>
       <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
-        <span class="xp-plus-badge">XP</span>
+        <span class="xp-plus-badge" id="xpBadgeOrdi">XP</span>
         <span class="big">🔍 L'ordinateur cache un code</span>
         <span class="small">Un code secret est tiré au hasard, à toi de le deviner.</span>
       </button>
@@ -904,6 +904,13 @@ function setColorCount(n){
   generateCodes();
   renderColorCountPicker();
   document.getElementById('subtitle').textContent = `${n} couleurs · 4 trous`;
+  updateXpBadgeOrdi();
+}
+
+function updateXpBadgeOrdi(){
+  const badge = document.getElementById('xpBadgeOrdi');
+  if(!badge) return;
+  badge.classList.toggle('hidden', NB_COULEURS !== 8);
 }
 
 function renderSessionHistory(){
@@ -936,6 +943,7 @@ function launchConfetti(){
 
 renderColorCountPicker();
 renderAttemptsPicker();
+updateXpBadgeOrdi();
 
 function resetToMenu(){
   document.getElementById('menu').classList.remove('hidden');
@@ -1046,7 +1054,7 @@ function submitUserGuess(){
 
   if(fb.black === NB_TROUS){
     solved = true;
-    const wonXp = trainingMode ? 0 : xpForAttempts(history.length);
+    const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length);
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${wonXp ? ` (+${wonXp} XP)` : ''}`, 'win');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
@@ -1060,7 +1068,7 @@ function submitUserGuess(){
 
   if(moveLimit !== null && history.length >= moveLimit){
     const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
-    const lostXp = trainingMode ? 0 : xpForAttempts(history.length);
+    const lostXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length);
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.${lostXp ? ` (+${lostXp} XP)` : ''}`, '');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
@@ -1174,7 +1182,7 @@ function submitFeedback(){
 
   if(black === NB_TROUS){
     solved = true;
-    const wonXp = xpForAttempts(history.length);
+    const wonXp = NB_COULEURS === 8 ? xpForAttempts(history.length) : 0;
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${wonXp ? ` (+${wonXp} XP)` : ''}`, 'win');
     document.getElementById('feedbackInputArea').classList.add('hidden');
     sessionScores.push({mode: 'computerGuesses', numColors: NB_COULEURS, attempts: history.length});
@@ -1360,6 +1368,7 @@ function undoLastMove(){
         <div class="duel-player"><div class="duel-avatar opponent" id="duelOppAvatar"></div><span id="duelOpponentName"></span></div>
       </div>
       <div class="duel-opponent-status" id="duelOpponentStatus"></div>
+      <div class="duel-sub" id="duelAttemptsCounter" style="text-align:center; font-size:12px; color:var(--ink-dim); margin-bottom:6px;"></div>
       <div class="history" id="duelHistory"></div>
       <div class="current-row">
         <div class="label">Ta proposition</div>
@@ -1408,6 +1417,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getDatabase(firebaseApp);
 
 const DUEL_COLORS = 8;
+const DUEL_MAX_ATTEMPTS = 12;
 
 // --- Système de niveau / XP ---
 const XP_SOLO_TIERS = [50, 40, 30, 20, 10]; // XP selon le nombre d'essais utilisés (1er essai, 2e, ...)
@@ -1620,7 +1630,7 @@ function openLeaderboard(){
   if(!el) return;
   document.getElementById('leaderboardScreen').classList.remove('hidden');
   const top = Object.entries(playerXpCache)
-    .map(([pseudo, xp]) => ({pseudo, xp, level: levelFromXp(xp).level}))
+    .map(([pseudo, xp]) => ({pseudo, xp, info: levelFromXp(xp)}))
     .sort((a,b) => b.xp - a.xp)
     .slice(0, 15);
   if(top.length === 0){
@@ -1632,7 +1642,7 @@ function openLeaderboard(){
     return `<div class="online-player-row${isMe ? ' leaderboard-me' : ''}">
       <span class="leaderboard-rank">${i + 1}</span>
       <span class="online-player-name">${escapeHtml(p.pseudo)}</span>
-      <span class="online-player-status">Nv ${p.level}</span>
+      <span class="online-player-status">Nv ${p.info.level} · ${p.info.xpIntoLevel}/${p.info.xpForNext} XP</span>
     </div>`;
   }).join('');
 }
@@ -1659,7 +1669,7 @@ function updateMyLevelBadge(){
   const badge = document.getElementById('myLevelBadge');
   if(!badge || !myPseudo) return;
   const info = levelFromXp(playerXpCache[myPseudo] || 0);
-  badge.textContent = `Nv ${info.level}`;
+  badge.textContent = `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
   badge.title = `${info.xpIntoLevel} / ${info.xpForNext} XP vers le niveau ${info.level + 1}`;
 }
 
@@ -2258,6 +2268,7 @@ function enterDuel(duelId){
   document.getElementById('duelActive').classList.remove('hidden');
   document.getElementById('duelResult').innerHTML = '';
   document.getElementById('duelLeaveBtn').classList.add('hidden');
+  updateDuelAttemptsCounter();
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonRow').classList.remove('hidden');
   document.getElementById('duelAbandonConfirm').classList.add('hidden');
@@ -2363,12 +2374,28 @@ function submitDuelGuess(){
     document.getElementById('duelSubmitBtn').disabled = true;
     document.getElementById('duelAbandonRow').classList.add('hidden');
     document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">🎉 Trouvé en ${duelHistory.length} coup(s), ${(timeMs/1000).toFixed(1)}s ! En attente de l'adversaire…</div>`;
+  } else if(duelHistory.length >= DUEL_MAX_ATTEMPTS){
+    duelFinished = true;
+    const timeMs = Date.now() - duelStartedAt;
+    set(ref(db, `duels/${currentDuelId}/finished/${myPseudo}`), { attempts: duelHistory.length, timeMs, notFound: true });
+    if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
+    document.getElementById('duelSubmitBtn').disabled = true;
+    document.getElementById('duelAbandonRow').classList.add('hidden');
+    document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">😔 ${DUEL_MAX_ATTEMPTS} essais utilisés sans trouver le code. En attente de l'adversaire…</div>`;
   } else {
     duelGuess = [null,null,null,null];
     duelSelectedSlot = 0;
     renderDuelSlots();
     document.getElementById('duelSubmitBtn').disabled = true;
   }
+  updateDuelAttemptsCounter();
+}
+
+function updateDuelAttemptsCounter(){
+  const el = document.getElementById('duelAttemptsCounter');
+  if(!el) return;
+  if(duelFinished){ el.textContent = ''; return; }
+  el.textContent = `Essai ${duelHistory.length + 1} / ${DUEL_MAX_ATTEMPTS}`;
 }
 
 function checkDuelEnd(data){
@@ -2395,21 +2422,28 @@ function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
   duelResultShown = true;
   duelFinished = true;
 
+  const myNotFound = !!(myResult && myResult.notFound);
+  const oppNotFound = !!(oppResult && oppResult.notFound);
+
   let winner;
   if(myForfeit && oppForfeit) winner = null;
   else if(myForfeit) winner = opponentPseudo;
   else if(oppForfeit) winner = myPseudo;
+  else if(myNotFound && oppNotFound) winner = null;
+  else if(myNotFound) winner = opponentPseudo;
+  else if(oppNotFound) winner = myPseudo;
   else if(myResult.attempts !== oppResult.attempts) winner = myResult.attempts < oppResult.attempts ? myPseudo : opponentPseudo;
   else winner = myResult.timeMs <= oppResult.timeMs ? myPseudo : opponentPseudo;
 
   const won = winner === myPseudo;
-  // Pas d'XP si j'ai moi-même abandonné (le double-abandon est donc aussi à 0).
-  const myXp = myForfeit ? 0 : (won ? XP_DUEL_WIN : XP_DUEL_LOSS);
+  // Pas d'XP si j'ai abandonné, ni si j'ai épuisé mes 12 essais sans trouver le code
+  // (même en cas d'égalité entre deux joueurs qui ont tous les deux échoué).
+  const myXp = (myForfeit || myNotFound) ? 0 : (won ? XP_DUEL_WIN : XP_DUEL_LOSS);
   addXp(myXp);
-  recordGameHistory({type: 'duel', result: myForfeit ? 'abandon' : (won ? 'gagné' : 'perdu'), opponent: opponentPseudo, xp: myXp});
-  const myLine = myForfeit ? 'Toi : abandon' : (myResult ? `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s` : 'Toi : partie arrêtée');
-  const oppLine = oppForfeit ? `${opponentPseudo} : abandon` : (oppResult ? `${opponentPseudo} : ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s` : `${opponentPseudo} : partie arrêtée`);
-  const title = winner === null ? '🤝 Double abandon' : (won ? '🏆 Victoire !' : '😔 Défaite');
+  recordGameHistory({type: 'duel', result: myForfeit ? 'abandon' : (myNotFound ? 'perdu' : (won ? 'gagné' : 'perdu')), opponent: opponentPseudo, xp: myXp});
+  const myLine = myForfeit ? 'Toi : abandon' : myNotFound ? `Toi : ${DUEL_MAX_ATTEMPTS} essais, non trouvé` : (myResult ? `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s` : 'Toi : partie arrêtée');
+  const oppLine = oppForfeit ? `${opponentPseudo} : abandon` : oppNotFound ? `${opponentPseudo} : ${DUEL_MAX_ATTEMPTS} essais, non trouvé` : (oppResult ? `${opponentPseudo} : ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s` : `${opponentPseudo} : partie arrêtée`);
+  const title = winner === null ? (myForfeit && oppForfeit ? '🤝 Double abandon' : '🤝 Égalité') : (won ? '🏆 Victoire !' : '😔 Défaite');
   const xpLine = myXp > 0 ? `<div class="duel-result-xp">+${myXp} XP</div>` : '';
 
   document.getElementById('duelSubmitBtn').disabled = true;
