@@ -608,9 +608,9 @@
         <div class="remaining" id="remaining"></div>
         <div class="poss-graph" id="possGraph"></div>
         <button class="btn" id="submitFeedbackBtn" onclick="submitFeedback()">Valider le feedback</button>
-      </div>
+</div>
 
-      <button class="btn secondary" onclick="resetToMenu()">↩ Changer de mode</button>
+<button class="btn secondary" onclick="resetToMenu()">➔ Changer de mode</button>
     </div>
 
     <div class="legend" id="legend"></div>
@@ -790,7 +790,6 @@ function startGame(chosenMode){
   undoStack = [];
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
-  document.getElementById('undoBtn').classList.add('hidden');
   document.getElementById('analysisPanel').innerHTML = '';
   renderLegend();
 
@@ -1036,7 +1035,6 @@ function submitUserGuess(){
     historyLength: history.length,
     analysisCandidates: candidatesBeforeMove
   });
-  document.getElementById('undoBtn').classList.remove('hidden');
 
   const fb = feedback(guessSnapshot, secretCode);
   history.push({guess: guessSnapshot, black: fb.black, white: fb.white});
