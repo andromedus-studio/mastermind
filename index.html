@@ -133,6 +133,51 @@
     border-radius: 10px;
     letter-spacing: 0.3px;
   }
+  .xp-plus-badge.golden {
+    background: linear-gradient(135deg, #ffe08a, #d9a441);
+    box-shadow: 0 0 8px rgba(255,199,79,0.7);
+  }
+  .golden-banner {
+    text-align: center;
+    font-weight: 800;
+    font-size: 13px;
+    color: #1a1a1a;
+    background: linear-gradient(135deg, #ffe08a, #d9a441);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+  .quest-toast {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translate(-50%, -20px);
+    background: var(--panel-bg-light, #222);
+    border: 1px solid var(--gold);
+    color: var(--ink, #fff);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    max-width: 90vw;
+    text-align: center;
+  }
+  .quest-toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .quest-group-title { font-size: 13px; font-weight: 800; color: var(--gold); margin: 12px 0 6px; }
+  .quest-group-title:first-child { margin-top: 0; }
+  .quest-row {
+    background: var(--panel-bg-light); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px;
+  }
+  .quest-row.quest-done { opacity: 0.7; }
+  .quest-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .quest-desc { font-size: 13px; font-weight: 700; }
+  .quest-xp { font-size: 12px; color: var(--gold); font-weight: 800; white-space: nowrap; }
+  .quest-progress-track { background: rgba(255,255,255,0.08); border-radius: 6px; height: 6px; overflow: hidden; }
+  .quest-progress-fill { background: var(--gold); height: 100%; }
+  .quest-progress-label { font-size: 11px; color: var(--ink-dim); margin-top: 4px; text-align: right; }
   .mode-btn:hover { border-color: var(--gold); transform: translateY(-1px); }
   .mode-btn .big { font-size: 17px; font-weight: 700; display:block; margin-bottom:4px; }
   .mode-btn .small { font-size: 13px; color: var(--ink-dim); }
@@ -520,6 +565,7 @@
     </button>
     <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 15 des joueurs">🏆</button>
     <button class="online-icon-btn" onclick="openMyGameHistory()" title="Mes dernières parties">📜</button>
+    <button class="online-icon-btn" onclick="openQuestsPanel()" title="Quêtes du jour et de la semaine">🎯</button>
     <span class="search-badge" id="myLevelBadge" style="cursor:default;" title="">Nv 1</span>
   </div>
 
@@ -536,9 +582,9 @@
       <button class="cc-option toggle-btn" id="numberModeBtn" onclick="toggleNumberMode()" style="width:100%; max-width:none; margin-bottom:20px; padding:12px;">🔢 Chiffres au lieu de couleurs</button>
 
       <button class="mode-btn" onclick="openDailyChallenge()">
-        <span class="xp-plus-badge">XP+</span>
+        <span class="xp-plus-badge" id="dailyTileXpBadge">XP+</span>
         <span class="big">🗓️ Défi du jour</span>
-        <span class="small">Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.</span>
+        <span class="small" id="dailyTileSmall">Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.</span>
       </button>
       <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
         <span class="xp-plus-badge" id="xpBadgeOrdi">XP</span>
@@ -608,9 +654,10 @@
         <div class="remaining" id="remaining"></div>
         <div class="poss-graph" id="possGraph"></div>
         <button class="btn" id="submitFeedbackBtn" onclick="submitFeedback()">Valider le feedback</button>
-</div>
+      </div>
 
-<button class="btn secondary" onclick="resetToMenu()">➔ Changer de mode</button>
+      <button class="btn secondary hidden" id="undoBtn" onclick="undoLastMove()">↺ Annuler le dernier essai</button>
+      <button class="btn secondary" onclick="resetToMenu()">↩ Changer de mode</button>
     </div>
 
     <div class="legend" id="legend"></div>
@@ -790,6 +837,7 @@ function startGame(chosenMode){
   undoStack = [];
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
+  document.getElementById('undoBtn').classList.add('hidden');
   document.getElementById('analysisPanel').innerHTML = '';
   renderLegend();
 
@@ -1030,12 +1078,6 @@ function submitUserGuess(){
   const guessSnapshot = currentGuess.slice();
   const candidatesBeforeMove = analysisCandidates.slice();
 
-  undoStack.push({
-    mode: 'userGuesses',
-    historyLength: history.length,
-    analysisCandidates: candidatesBeforeMove
-  });
-
   const fb = feedback(guessSnapshot, secretCode);
   history.push({guess: guessSnapshot, black: fb.black, white: fb.white});
   renderHistory();
@@ -1219,18 +1261,6 @@ function undoLastMove(){
   history = history.slice(0, snap.historyLength);
   renderHistory();
 
-  if(snap.mode === 'userGuesses'){
-    document.getElementById('userInputArea').classList.remove('hidden');
-    currentGuess = [null,null,null,null];
-    selectedSlot = 0;
-    analysisCandidates = snap.analysisCandidates;
-    document.getElementById('analysisPanel').innerHTML = '';
-    renderSlots();
-    renderAttemptsLeft();
-    document.getElementById('submitGuessBtn').disabled = true;
-    setStatus(`Dernier essai annulé. Essai ${history.length + 1}, à toi de rejouer.`);
-  }
-
   if(snap.mode === 'computerGuesses'){
     candidates = snap.candidates;
     computerCurrentGuess = snap.computerCurrentGuess;
@@ -1288,11 +1318,21 @@ function undoLastMove(){
   </div>
 </div>
 
+<!-- Quêtes journalières et hebdomadaires -->
+<div id="questsScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🎯 Quêtes</div>
+    <div class="online-players-list" id="questsList"></div>
+    <button class="btn secondary" onclick="closeQuestsPanel()">Fermer</button>
+  </div>
+</div>
+
 
 <!-- Défi du jour -->
 <div id="dailyScreen" class="hidden duel-overlay">
   <div class="card duel-card">
     <div class="duel-title">🗓️ Défi du jour</div>
+    <div id="dailyGoldenBanner" class="golden-banner hidden">✨ Défi en or aujourd'hui ! XP x3 ✨</div>
     <p class="duel-sub" id="dailySub">Chargement…</p>
 
     <div id="dailyPlayArea" class="hidden">
@@ -1559,11 +1599,166 @@ function addXp(amount){
 window.addXp = addXp;
 window.xpForAttempts = xpForAttempts;
 
+// --- Utilitaires date/hash (pour le défi en or et le choix des quêtes) ---
+function simpleHash(str){
+  let h = 0;
+  for(let i = 0; i < str.length; i++){
+    h = (h * 31 + str.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
+
+// Lundi de la semaine (au format YYYY-MM-DD) contenant la date `dateKey` (YYYY-MM-DD).
+function getMondayKeyFor(dateKey){
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  const dow = dt.getUTCDay(); // 0=dim..6=sam
+  const diffToMonday = (dow === 0 ? -6 : 1 - dow);
+  dt.setUTCDate(dt.getUTCDate() + diffToMonday);
+  return dt.toISOString().slice(0, 10);
+}
+
+function weekdayIndexMondayFirst(dateKey){
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0=dim..6=sam
+  return dow === 0 ? 6 : dow - 1; // 0=lundi..6=dimanche
+}
+
+// Choisit `n` éléments de `pool` de façon déterministe (même résultat sur
+// tous les clients) à partir d'une graine textuelle (date ou semaine).
+function pickN(pool, seedStr, n){
+  return pool
+    .map(item => ({ item, r: simpleHash(seedStr + '-' + item.id) }))
+    .sort((a, b) => a.r - b.r)
+    .slice(0, n)
+    .map(x => x.item);
+}
+
+// --- Défi en or : un jour tiré au sort chaque semaine où le défi du jour rapporte plus d'XP ---
+const GOLDEN_XP_MULTIPLIER = 3;
+
+function isGoldenChallengeToday(dateKey){
+  const mondayKey = getMondayKeyFor(dateKey);
+  const goldenIndex = simpleHash(mondayKey + '-golden-challenge') % 7;
+  return weekdayIndexMondayFirst(dateKey) === goldenIndex;
+}
+
+// --- Quêtes journalières / hebdomadaires ---
+const DAILY_QUEST_DEFS = [
+  { id: 'win_1_duel', scope: 'daily', desc: 'Gagne 1 duel en ligne', target: 1, xp: 20, matches: e => e.type === 'duel' && e.result === 'gagné' },
+  { id: 'solve_daily', scope: 'daily', desc: 'Réussis le défi du jour', target: 1, xp: 20, matches: e => e.type === 'daily' && e.result === 'gagné' },
+  { id: 'play_3_games', scope: 'daily', desc: 'Termine 3 parties (tous modes, hors abandon)', target: 3, xp: 15, matches: e => e.result !== 'abandon' },
+  { id: 'find_fast', scope: 'daily', desc: 'Trouve un code en 5 essais ou moins (mode ordi)', target: 1, xp: 25, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'play_2_duels', scope: 'daily', desc: 'Va au bout de 2 duels (gagnés ou perdus)', target: 2, xp: 15, matches: e => e.type === 'duel' && e.result !== 'abandon' },
+];
+const WEEKLY_QUEST_DEFS = [
+  { id: 'win_5_duels_week', scope: 'weekly', desc: 'Gagne 5 duels cette semaine', target: 5, xp: 80, matches: e => e.type === 'duel' && e.result === 'gagné' },
+  { id: 'play_15_games_week', scope: 'weekly', desc: 'Termine 15 parties cette semaine', target: 15, xp: 60, matches: e => e.result !== 'abandon' },
+  { id: 'solve_daily_3x_week', scope: 'weekly', desc: 'Réussis le défi du jour 3 fois cette semaine', target: 3, xp: 70, matches: e => e.type === 'daily' && e.result === 'gagné' },
+  { id: 'find_fast_5x_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins, 5 fois cette semaine', target: 5, xp: 50, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+];
+
+function getActiveDailyQuests(dateKey){
+  return pickN(DAILY_QUEST_DEFS, dateKey, 3);
+}
+function getActiveWeeklyQuests(weekKey){
+  return pickN(WEEKLY_QUEST_DEFS, weekKey, 2);
+}
+
+async function bumpOneQuest(scope, periodKey, q){
+  const path = `players/${myPseudo}/quests/${scope}/${periodKey}/${q.id}`;
+  const bumpResult = await runTransaction(ref(db, path), (current) => {
+    const cur = current || { progress: 0, claimed: false };
+    if(cur.claimed) return cur;
+    cur.progress = (cur.progress || 0) + 1;
+    return cur;
+  });
+  const val = bumpResult.snapshot.val();
+  if(val && !val.claimed && val.progress >= q.target){
+    const claimResult = await runTransaction(ref(db, path), (current) => {
+      if(!current || current.claimed) return current;
+      current.claimed = true;
+      return current;
+    });
+    if(claimResult.committed && claimResult.snapshot.val() && claimResult.snapshot.val().claimed){
+      addXp(q.xp);
+      showQuestToast(`🎯 Quête accomplie : ${q.desc} (+${q.xp} XP)`);
+    }
+  }
+}
+
+function bumpQuestsForEvent(entry){
+  if(!myPseudo) return;
+  const dateKey = getParisDateKey();
+  const weekKey = getMondayKeyFor(dateKey);
+  getActiveDailyQuests(dateKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('daily', dateKey, q); });
+  getActiveWeeklyQuests(weekKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('weekly', weekKey, q); });
+}
+
+function showQuestToast(text){
+  const el = document.createElement('div');
+  el.className = 'quest-toast';
+  el.textContent = text;
+  document.body.appendChild(el);
+  setTimeout(() => el.classList.add('show'), 10);
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 3500);
+}
+
+async function openQuestsPanel(){
+  if(!myPseudo){
+    pseudoScreenPurpose = 'quests';
+    showPseudoScreen();
+    return;
+  }
+  const el = document.getElementById('questsList');
+  if(!el) return;
+  document.getElementById('questsScreen').classList.remove('hidden');
+  el.innerHTML = `<div class="online-players-empty">Chargement…</div>`;
+
+  const dateKey = getParisDateKey();
+  const weekKey = getMondayKeyFor(dateKey);
+  const dailyQuests = getActiveDailyQuests(dateKey);
+  const weeklyQuests = getActiveWeeklyQuests(weekKey);
+
+  const [dailySnap, weeklySnap] = await Promise.all([
+    get(ref(db, `players/${myPseudo}/quests/daily/${dateKey}`)),
+    get(ref(db, `players/${myPseudo}/quests/weekly/${weekKey}`))
+  ]);
+  const dailyProgress = dailySnap.val() || {};
+  const weeklyProgress = weeklySnap.val() || {};
+
+  const renderGroup = (title, quests, progress) => `
+    <div class="quest-group-title">${title}</div>
+    ${quests.map(q => {
+      const p = progress[q.id] || { progress: 0, claimed: false };
+      const done = !!p.claimed;
+      const pct = Math.min(100, Math.round((p.progress / q.target) * 100));
+      return `<div class="quest-row${done ? ' quest-done' : ''}">
+        <div class="quest-row-top">
+          <span class="quest-desc">${done ? '✅' : '🎯'} ${escapeHtml(q.desc)}</span>
+          <span class="quest-xp">+${q.xp} XP</span>
+        </div>
+        <div class="quest-progress-track"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
+        <div class="quest-progress-label">${Math.min(p.progress, q.target)} / ${q.target}</div>
+      </div>`;
+    }).join('')}
+  `;
+
+  el.innerHTML = renderGroup('📅 Quêtes du jour', dailyQuests, dailyProgress) + renderGroup('🗓️ Quêtes de la semaine', weeklyQuests, weeklyProgress);
+}
+window.openQuestsPanel = openQuestsPanel;
+
+function closeQuestsPanel(){
+  document.getElementById('questsScreen').classList.add('hidden');
+}
+window.closeQuestsPanel = closeQuestsPanel;
+
 // --- Historique de parties (20 dernières, par compte) ---
 function recordGameHistory(entry){
   if(!myPseudo) return;
   const histRef = ref(db, `players/${myPseudo}/history`);
   push(histRef, {...entry, at: Date.now()}).then(trimGameHistory);
+  bumpQuestsForEvent(entry);
 }
 
 function trimGameHistory(){
@@ -1801,6 +1996,11 @@ function submitPseudo(){
     updatePresenceStatus('online');
     setupInviteListener();
     openDailyChallenge();
+  } else if(pseudoScreenPurpose === 'quests'){
+    document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
+    openQuestsPanel();
   } else {
     document.getElementById('menu').classList.remove('hidden');
     updatePresenceStatus('online');
@@ -2033,6 +2233,7 @@ async function openDailyChallenge(){
   }
   dailyDateKey = getParisDateKey();
   document.getElementById('dailyScreen').classList.remove('hidden');
+  document.getElementById('dailyGoldenBanner').classList.toggle('hidden', !isGoldenChallengeToday(dailyDateKey));
   document.getElementById('dailyPlayArea').classList.add('hidden');
   document.getElementById('dailyDoneArea').classList.add('hidden');
   document.getElementById('dailySub').textContent = 'Chargement…';
@@ -2153,7 +2354,8 @@ function submitDailyGuess(){
     set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/finished`), finishedData);
     if(solved){
       const bonus = Math.max(0, DAILY_MAX_ATTEMPTS - finishedData.attempts) * XP_DAILY_BONUS_PER_SAVED;
-      const dailyXp = XP_DAILY_BASE + bonus;
+      const isGolden = isGoldenChallengeToday(dailyDateKey);
+      const dailyXp = (XP_DAILY_BASE + bonus) * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
       addXp(dailyXp);
       recordGameHistory({type: 'daily', result: 'gagné', attempts: finishedData.attempts, xp: dailyXp});
     } else {
@@ -2536,6 +2738,18 @@ window.closeDailyChallenge = closeDailyChallenge;
 window.cancelInvite = cancelInvite;
 window.acceptInvite = acceptInvite;
 window.declineInvite = declineInvite;
+
+function updateDailyTileGoldenState(){
+  const isGolden = isGoldenChallengeToday(getParisDateKey());
+  const badge = document.getElementById('dailyTileXpBadge');
+  const small = document.getElementById('dailyTileSmall');
+  if(badge) badge.textContent = isGolden ? `✨XP+ x${GOLDEN_XP_MULTIPLIER}` : 'XP+';
+  if(badge) badge.classList.toggle('golden', isGolden);
+  if(small) small.textContent = isGolden
+    ? `✨ Défi en or aujourd'hui : XP x${GOLDEN_XP_MULTIPLIER} ! 12 essais, classement en direct.`
+    : `Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.`;
+}
+updateDailyTileGoldenState();
 </script>
 </body>
 </html>
