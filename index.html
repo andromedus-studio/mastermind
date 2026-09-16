@@ -102,6 +102,13 @@
     text-align: center;
   }
   .cc-option.active { border-color: var(--gold); color: var(--gold); background: rgba(217,164,65,0.1); }
+  .cc-bonus { display: block; font-size: 10px; font-weight: 800; color: var(--gold); margin-top: 2px; }
+  .secret-reveal {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: rgba(217,164,65,0.08); border: 1px solid var(--gold);
+    border-radius: 10px; padding: 8px 10px; margin-bottom: 10px;
+  }
+  .secret-reveal-label { font-size: 12px; font-weight: 700; color: var(--gold); }
 
   .session-history { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); }
   .session-history .sh-title { font-size: 12px; color: var(--ink-dim); margin-bottom: 8px; text-align: center; }
@@ -478,6 +485,14 @@
     border-radius: 10px; padding: 4px 10px; font-size: 15px;
     cursor: pointer; color: inherit;
   }
+  /* Sur mobile, les icônes restent toutes visibles mais se compactent
+     (plus petites, moins d'espacement) pour tenir sur une seule ligne. */
+  .extra-icons { display: inline-flex; gap: 8px; }
+  @media (max-width: 480px) {
+    .online-icon-btn { padding: 3px 7px; font-size: 14px; border-radius: 8px; }
+    .extra-icons { gap: 5px; }
+    #myLevelBadge { font-size: 11px; }
+  }
   .online-badge {
     position: absolute; top: -6px; right: -6px;
     background: var(--gold); color: #1a1420;
@@ -563,9 +578,11 @@
     <button class="online-icon-btn" id="onlinePlayersBtn" onclick="toggleOnlinePlayersPanel()" title="Joueurs en ligne">
       👥<span class="online-badge hidden" id="onlinePlayersBadge">0</span>
     </button>
-    <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 15 des joueurs">🏆</button>
-    <button class="online-icon-btn" onclick="openMyGameHistory()" title="Mes dernières parties">📜</button>
-    <button class="online-icon-btn" onclick="openQuestsPanel()" title="Quêtes du jour et de la semaine">🎯</button>
+    <span class="extra-icons" id="extraIcons">
+      <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 15 des joueurs">🏆</button>
+      <button class="online-icon-btn" onclick="openMyGameHistory()" title="Mes dernières parties">📜</button>
+      <button class="online-icon-btn" onclick="openQuestsPanel()" title="Quêtes du jour et de la semaine">🎯</button>
+    </span>
     <span class="search-badge" id="myLevelBadge" style="cursor:default;" title="">Nv 1</span>
   </div>
 
@@ -585,6 +602,11 @@
         <span class="xp-plus-badge" id="dailyTileXpBadge">XP+</span>
         <span class="big">🗓️ Défi du jour</span>
         <span class="small" id="dailyTileSmall">Le même code pour tout le monde aujourd'hui. 12 essais, classement en direct.</span>
+      </button>
+      <button class="mode-btn" onclick="openPuzzleChallenge()">
+        <span class="xp-plus-badge">XP+</span>
+        <span class="big">🧩 Puzzle du jour</span>
+        <span class="small">Des lignes déjà jouées par l'ordi, à toi de trouver le code en un seul essai. Même puzzle pour tout le monde.</span>
       </button>
       <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
         <span class="xp-plus-badge" id="xpBadgeOrdi">XP</span>
@@ -611,6 +633,7 @@
     <!-- GAME -->
     <div id="game" class="hidden">
       <div class="history" id="history"></div>
+      <div class="secret-reveal hidden" id="secretReveal"></div>
       <div class="status" id="status"></div>
       <div id="analysisPanel"></div>
 
@@ -839,6 +862,7 @@ function startGame(chosenMode){
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('undoBtn').classList.add('hidden');
   document.getElementById('analysisPanel').innerHTML = '';
+  hideSecretReveal();
   renderLegend();
 
   if(mode === 'userGuesses'){
@@ -876,17 +900,26 @@ function startTraining(){
   startGame('userGuesses');
 }
 
+// Bonus XP fixe selon la limite de coups choisie (plus c'est serré, plus ça rapporte).
+const MOVE_LIMIT_BONUS = { 6: 15, 8: 10, 10: 5, 12: 2 };
+function moveLimitBonus(){
+  return moveLimit === null ? 0 : (MOVE_LIMIT_BONUS[moveLimit] || 0);
+}
+
 function renderAttemptsPicker(){
   const el = document.getElementById('attemptsPicker');
   const options = [
     {label: 'Illimité', value: null},
+    {label: '6', value: 6},
     {label: '8', value: 8},
     {label: '10', value: 10},
     {label: '12', value: 12},
   ];
-  el.innerHTML = options.map(o =>
-    `<div class="cc-option ${o.value === moveLimit ? 'active' : ''}" onclick="setAttemptsLimit(${o.value})">${o.label}</div>`
-  ).join('');
+  el.innerHTML = options.map(o => {
+    const bonus = o.value === null ? 0 : (MOVE_LIMIT_BONUS[o.value] || 0);
+    const bonusLabel = bonus ? `<span class="cc-bonus">+${bonus} XP</span>` : '';
+    return `<div class="cc-option ${o.value === moveLimit ? 'active' : ''}" onclick="setAttemptsLimit(${o.value})">${o.label}${bonusLabel}</div>`;
+  }).join('');
 }
 
 function setAttemptsLimit(n){
@@ -1016,6 +1049,18 @@ function renderLegend(){
   }).join('');
 }
 
+function showSecretReveal(code){
+  const el = document.getElementById('secretReveal');
+  if(!el) return;
+  el.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${code.map(ci => pegHTML(ci, 'peg')).join('')}</div>`;
+  el.classList.remove('hidden');
+}
+
+function hideSecretReveal(){
+  const el = document.getElementById('secretReveal');
+  if(el) el.classList.add('hidden');
+}
+
 function renderHistory(){
   const el = document.getElementById('history');
   el.innerHTML = history.map((h, idx) => {
@@ -1093,7 +1138,7 @@ function submitUserGuess(){
 
   if(fb.black === NB_TROUS){
     solved = true;
-    const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length);
+    const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length) + moveLimitBonus();
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${wonXp ? ` (+${wonXp} XP)` : ''}`, 'win');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
@@ -1108,6 +1153,7 @@ function submitUserGuess(){
   if(moveLimit !== null && history.length >= moveLimit){
     const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
     const lostXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length);
+    showSecretReveal(secretCode);
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.${lostXp ? ` (+${lostXp} XP)` : ''}`, '');
     document.getElementById('userInputArea').classList.add('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
@@ -1357,6 +1403,35 @@ function undoLastMove(){
   </div>
 </div>
 
+<!-- Puzzle du jour (déduction pure) -->
+<div id="puzzleScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🧩 Puzzle du jour</div>
+    <p class="duel-sub" id="puzzleSub">Chargement…</p>
+
+    <div id="puzzlePlayArea" class="hidden">
+      <div class="online-players-title" style="margin-top:0;">Lignes déjà jouées</div>
+      <div class="history" id="puzzleGivenLines"></div>
+      <div class="current-row">
+        <div class="label">Ta réponse (un seul essai)</div>
+        <div class="slots" id="puzzleSlots"></div>
+      </div>
+      <div class="palette" id="puzzlePalette"></div>
+      <button class="btn" id="puzzleSubmitBtn" onclick="submitPuzzleGuess()" disabled>Valider ma réponse</button>
+    </div>
+
+    <div id="puzzleDoneArea" class="hidden">
+      <div class="analysis-panel" id="puzzleDoneMessage" style="text-align:center;"></div>
+      <div class="secret-reveal hidden" id="puzzleSecretReveal"></div>
+    </div>
+
+    <div class="online-players-title" style="margin-top:16px;">🏆 Qui a trouvé aujourd'hui</div>
+    <div class="online-players-list" id="puzzleLeaderboard"></div>
+
+    <button class="btn secondary" onclick="closePuzzleChallenge()">Fermer</button>
+  </div>
+</div>
+
 <!-- Invitation à un duel reçue -->
 <div id="inviteScreen" class="hidden duel-overlay">
   <div class="card duel-card">
@@ -1384,6 +1459,7 @@ function undoLastMove(){
     <div class="duel-result-title" id="duelResultTitle">VICTOIRE</div>
     <div class="duel-result-winner" id="duelResultWinner"></div>
     <div class="duel-result-recap" id="duelResultRecap"></div>
+    <button class="btn secondary" onclick="closeDuelResultKeepBoard()">👁️ Voir la réponse</button>
     <button class="btn" onclick="closeDuelResultAndLeave()">Retour au menu</button>
   </div>
 </div>
@@ -1407,6 +1483,7 @@ function undoLastMove(){
       <div class="duel-opponent-status" id="duelOpponentStatus"></div>
       <div class="duel-sub" id="duelAttemptsCounter" style="text-align:center; font-size:12px; color:var(--ink-dim); margin-bottom:6px;"></div>
       <div class="history" id="duelHistory"></div>
+      <div class="secret-reveal hidden" id="duelSecretReveal"></div>
       <div class="current-row">
         <div class="label">Ta proposition</div>
         <div class="slots" id="duelSlots"></div>
@@ -1651,11 +1728,25 @@ const DAILY_QUEST_DEFS = [
   { id: 'find_fast', scope: 'daily', desc: 'Trouve un code en 5 essais ou moins (mode ordi)', target: 1, xp: 25, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
   { id: 'play_2_duels', scope: 'daily', desc: 'Va au bout de 2 duels (gagnés ou perdus)', target: 2, xp: 15, matches: e => e.type === 'duel' && e.result !== 'abandon' },
 ];
+// Quêtes hebdomadaires : volontairement longues, impossibles à boucler en une seule
+// journée (soit par le volume demandé, soit parce qu'elles reposent sur le défi du
+// jour / des jours distincts, limités à une occurrence par jour).
 const WEEKLY_QUEST_DEFS = [
-  { id: 'win_5_duels_week', scope: 'weekly', desc: 'Gagne 5 duels cette semaine', target: 5, xp: 80, matches: e => e.type === 'duel' && e.result === 'gagné' },
-  { id: 'play_15_games_week', scope: 'weekly', desc: 'Termine 15 parties cette semaine', target: 15, xp: 60, matches: e => e.result !== 'abandon' },
-  { id: 'solve_daily_3x_week', scope: 'weekly', desc: 'Réussis le défi du jour 3 fois cette semaine', target: 3, xp: 70, matches: e => e.type === 'daily' && e.result === 'gagné' },
-  { id: 'find_fast_5x_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins, 5 fois cette semaine', target: 5, xp: 50, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'win_15_duels_week', scope: 'weekly', desc: 'Gagne 15 duels cette semaine', target: 15, xp: 150, matches: e => e.type === 'duel' && e.result === 'gagné' },
+  { id: 'play_40_games_week', scope: 'weekly', desc: 'Termine 40 parties cette semaine', target: 40, xp: 120, matches: e => e.result !== 'abandon' },
+  { id: 'solve_daily_5x_week', scope: 'weekly', desc: 'Réussis le défi du jour 5 jours différents', target: 5, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' },
+  { id: 'find_fast_15x_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins, 15 fois', target: 15, xp: 110, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'play_6_days_week', scope: 'weekly', desc: 'Joue au moins une partie sur 6 jours différents', target: 6, xp: 140, distinctDays: true, matches: e => e.result !== 'abandon' },
+  { id: 'win_duels_5_days_week', scope: 'weekly', desc: 'Gagne un duel sur 5 jours différents', target: 5, xp: 150, distinctDays: true, matches: e => e.type === 'duel' && e.result === 'gagné' },
+  { id: 'perfect_daily_3x_week', scope: 'weekly', desc: 'Réussis le défi du jour en 6 essais ou moins, 3 fois', target: 3, xp: 170, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 6 },
+  { id: 'duels_25_week', scope: 'weekly', desc: 'Va au bout de 25 duels (gagnés ou perdus)', target: 25, xp: 130, matches: e => e.type === 'duel' && e.result !== 'abandon' },
+  { id: 'ordi_30_wins_week', scope: 'weekly', desc: 'Gagne 30 parties contre l\'ordinateur', target: 30, xp: 140, matches: e => e.type === 'ordi' && e.result === 'gagné' },
+  { id: 'flawless_3x_week', scope: 'weekly', desc: 'Trouve un code en 3 essais ou moins, 5 fois', target: 5, xp: 180, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 3 },
+  { id: 'xp_500_week', scope: 'weekly', desc: 'Accumule 500 XP de parties cette semaine', target: 500, xp: 200, amountFrom: e => e.xp || 0, matches: e => (e.xp || 0) > 0 },
+  { id: 'xp_1000_week', scope: 'weekly', desc: 'Accumule 1000 XP de parties cette semaine', target: 1000, xp: 300, amountFrom: e => e.xp || 0, matches: e => (e.xp || 0) > 0 },
+  { id: 'daily_all_week', scope: 'weekly', desc: 'Participe au défi du jour les 7 jours de la semaine', target: 7, xp: 250, distinctDays: true, matches: e => e.type === 'daily' },
+  { id: 'daily_fast_10_week', scope: 'weekly', desc: 'Réussis le défi du jour en 10 essais ou moins, 4 fois', target: 4, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 10 },
+  { id: 'ordi_fast_days_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins sur 4 jours différents', target: 4, xp: 150, distinctDays: true, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
 ];
 
 function getActiveDailyQuests(dateKey){
@@ -1665,12 +1756,22 @@ function getActiveWeeklyQuests(weekKey){
   return pickN(WEEKLY_QUEST_DEFS, weekKey, 2);
 }
 
-async function bumpOneQuest(scope, periodKey, q){
+async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
   const path = `players/${myPseudo}/quests/${scope}/${periodKey}/${q.id}`;
+  const amount = q.amountFrom ? q.amountFrom(entry) : 1;
+  if(amount <= 0) return;
   const bumpResult = await runTransaction(ref(db, path), (current) => {
     const cur = current || { progress: 0, claimed: false };
     if(cur.claimed) return cur;
-    cur.progress = (cur.progress || 0) + 1;
+    if(q.distinctDays){
+      // Une seule progression par journée : on mémorise les jours déjà comptés.
+      cur.days = cur.days || {};
+      if(cur.days[dateKey]) return cur;
+      cur.days[dateKey] = true;
+      cur.progress = Object.keys(cur.days).length;
+    } else {
+      cur.progress = (cur.progress || 0) + amount;
+    }
     return cur;
   });
   const val = bumpResult.snapshot.val();
@@ -1691,8 +1792,8 @@ function bumpQuestsForEvent(entry){
   if(!myPseudo) return;
   const dateKey = getParisDateKey();
   const weekKey = getMondayKeyFor(dateKey);
-  getActiveDailyQuests(dateKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('daily', dateKey, q); });
-  getActiveWeeklyQuests(weekKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('weekly', weekKey, q); });
+  getActiveDailyQuests(dateKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('daily', dateKey, q, dateKey, entry); });
+  getActiveWeeklyQuests(weekKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('weekly', weekKey, q, dateKey, entry); });
 }
 
 function showQuestToast(text){
@@ -2001,6 +2102,11 @@ function submitPseudo(){
     updatePresenceStatus('online');
     setupInviteListener();
     openQuestsPanel();
+  } else if(pseudoScreenPurpose === 'puzzle'){
+    document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
+    openPuzzleChallenge();
   } else {
     document.getElementById('menu').classList.remove('hidden');
     updatePresenceStatus('online');
@@ -2213,6 +2319,240 @@ let dailyLeaderboardRef = null;
 
 function getParisDateKey(){
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+
+// --- Puzzle du jour (déduction pure) ---
+// Toutes les codes possibles en 8 couleurs / 4 trous, utilisés pour générer
+// des grilles dont les lignes déjà jouées isolent un unique candidat.
+const ALL_CODES_8 = (() => {
+  const arr = [];
+  const prefix = [];
+  function rec(){
+    if(prefix.length === 4){ arr.push(prefix.slice()); return; }
+    for(let c = 0; c < 8; c++){ prefix.push(c); rec(); prefix.pop(); }
+  }
+  rec();
+  return arr;
+})();
+
+const PUZZLE_MAX_LINES = 5; // nombre max de lignes déjà jouées données au joueur
+const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai unique)
+
+// Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
+// la combinaison réduit les candidats possibles à exactement 1 (le secret).
+// Le nombre de lignes nécessaires varie (souvent 3 à 5) : peu importe tant que
+// le puzzle reste résoluble par pure déduction.
+function generatePuzzleData(){
+  for(let attempt = 0; attempt < 300; attempt++){
+    const secret = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+    let candidates = ALL_CODES_8;
+    const lines = [];
+    for(let i = 0; i < PUZZLE_MAX_LINES; i++){
+      const guess = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+      const fb = feedbackFor(guess, secret, 8);
+      lines.push({ guess, black: fb.black, white: fb.white });
+      candidates = candidates.filter(code => {
+        const f = feedbackFor(guess, code, 8);
+        return f.black === fb.black && f.white === fb.white;
+      });
+      if(candidates.length === 1) break;
+    }
+    if(candidates.length === 1) return { secret, lines };
+  }
+  return null; // ne devrait quasiment jamais arriver
+}
+
+function ensurePuzzle(dateKey){
+  const puzzleRef = ref(db, `puzzleChallenge/${dateKey}`);
+  return runTransaction(puzzleRef, (current) => {
+    if(current !== null) return; // déjà généré aujourd'hui : on n'y touche pas
+    const data = generatePuzzleData();
+    if(!data) return;
+    return { secret: data.secret, lines: data.lines };
+  }).then((result) => result.snapshot.val());
+}
+
+let puzzleDateKey = null;
+let puzzleSecret = null;
+let puzzleLines = [];
+let puzzleGuess = [null,null,null,null];
+let puzzleSelectedSlot = 0;
+let puzzleFinished = false;
+let puzzleStartedAt = null;
+let puzzleLeaderboardRef = null;
+
+async function openPuzzleChallenge(){
+  if(!myPseudo){
+    pseudoScreenPurpose = 'puzzle';
+    showPseudoScreen();
+    return;
+  }
+  puzzleDateKey = getParisDateKey();
+  document.getElementById('puzzleScreen').classList.remove('hidden');
+  document.getElementById('puzzlePlayArea').classList.add('hidden');
+  document.getElementById('puzzleDoneArea').classList.add('hidden');
+  document.getElementById('puzzleSub').textContent = 'Chargement…';
+
+  try {
+    const data = await ensurePuzzle(puzzleDateKey);
+    if(!data){
+      document.getElementById('puzzleSub').textContent = "Impossible de générer le puzzle du jour, réessaie plus tard.";
+      return;
+    }
+    puzzleSecret = data.secret;
+    puzzleLines = data.lines;
+    listenPuzzleLeaderboard();
+    await loadMyPuzzleProgress();
+  } catch(err){
+    console.error('Erreur puzzle du jour', err);
+    document.getElementById('puzzleSub').textContent = "Impossible de charger le puzzle du jour, réessaie plus tard.";
+  }
+}
+
+async function loadMyPuzzleProgress(){
+  const snap = await get(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}`));
+  const data = snap.val();
+  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai.`;
+
+  if(data && data.finished){
+    puzzleFinished = true;
+    showPuzzleDoneState(data.finished);
+    return;
+  }
+
+  puzzleFinished = false;
+  puzzleGuess = [null,null,null,null];
+  puzzleSelectedSlot = 0;
+  puzzleStartedAt = Date.now();
+
+  document.getElementById('puzzlePlayArea').classList.remove('hidden');
+  document.getElementById('puzzleDoneArea').classList.add('hidden');
+  renderPuzzleGivenLines();
+  renderPuzzleSlots();
+  renderPuzzlePalette();
+}
+
+function renderPuzzleGivenLines(){
+  const el = document.getElementById('puzzleGivenLines');
+  el.innerHTML = puzzleLines.map((h, idx) => {
+    const pegs = h.guess.map(ci => window.pegHTML(ci, 'peg')).join('');
+    const fpegs = [];
+    for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
+    for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
+    while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
+    return `<div class="row"><span class="num">${idx+1}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
+  }).join('');
+}
+
+function renderPuzzleSlots(){
+  const el = document.getElementById('puzzleSlots');
+  el.innerHTML = puzzleGuess.map((ci, idx) => {
+    const sel = idx === puzzleSelectedSlot ? 'selected' : '';
+    if(ci !== null){
+      return `<div class="slot filled ${sel}" style="background:${window.COLORS[ci].css}" onclick="selectPuzzleSlot(${idx})"></div>`;
+    }
+    return `<div class="slot ${sel}" style="background:var(--slot-empty)" onclick="selectPuzzleSlot(${idx})"></div>`;
+  }).join('');
+}
+
+function renderPuzzlePalette(){
+  const el = document.getElementById('puzzlePalette');
+  el.innerHTML = window.COLORS.slice(0, 8).map((c, idx) => {
+    return window.pegHTML(idx, 'swatch').replace('<div', `<div onclick="pickPuzzleColor(${idx})" title="${c.name}"`);
+  }).join('');
+}
+
+function selectPuzzleSlot(idx){
+  puzzleSelectedSlot = idx;
+  renderPuzzleSlots();
+}
+
+function pickPuzzleColor(colorIdx){
+  puzzleGuess[puzzleSelectedSlot] = colorIdx;
+  if(puzzleSelectedSlot < 3) puzzleSelectedSlot++;
+  renderPuzzleSlots();
+  document.getElementById('puzzleSubmitBtn').disabled = puzzleGuess.some(c => c === null);
+}
+
+function submitPuzzleGuess(){
+  if(puzzleGuess.some(c => c === null) || puzzleFinished) return;
+  const guessSnapshot = puzzleGuess.slice();
+  const fb = window.feedbackFor(guessSnapshot, puzzleSecret, 8);
+  const solved = fb.black === 4;
+  const timeMs = Date.now() - puzzleStartedAt;
+
+  puzzleFinished = true;
+  const finishedData = { guess: guessSnapshot, solved, timeMs };
+  set(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/finished`), finishedData);
+
+  if(solved){
+    const isGolden = isGoldenChallengeToday(puzzleDateKey);
+    const puzzleXp = PUZZLE_XP_WIN * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
+    addXp(puzzleXp);
+    recordGameHistory({type: 'puzzle', result: 'gagné', attempts: 1, xp: puzzleXp});
+    finishedData.xp = puzzleXp;
+  } else {
+    recordGameHistory({type: 'puzzle', result: 'perdu', attempts: 1, xp: 0});
+  }
+  showPuzzleDoneState(finishedData);
+}
+
+function showPuzzleDoneState(finishedData){
+  document.getElementById('puzzlePlayArea').classList.add('hidden');
+  document.getElementById('puzzleDoneArea').classList.remove('hidden');
+  const msg = finishedData.solved
+    ? `🎉 Bien joué, tu as trouvé le code du premier coup !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens demain pour un nouveau puzzle.`
+    : `😔 Ce n'était pas le bon code. Reviens demain pour un nouveau puzzle.`;
+  document.getElementById('puzzleDoneMessage').textContent = msg;
+  const revealEl = document.getElementById('puzzleSecretReveal');
+  if(!finishedData.solved && puzzleSecret){
+    revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${puzzleSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
+    revealEl.classList.remove('hidden');
+  } else {
+    revealEl.classList.add('hidden');
+  }
+}
+
+function listenPuzzleLeaderboard(){
+  if(puzzleLeaderboardRef) off(puzzleLeaderboardRef);
+  puzzleLeaderboardRef = ref(db, `puzzleChallenge/${puzzleDateKey}/players`);
+  onValue(puzzleLeaderboardRef, (snap) => {
+    renderPuzzleLeaderboard(snap.val() || {});
+  });
+}
+
+function renderPuzzleLeaderboard(players){
+  const el = document.getElementById('puzzleLeaderboard');
+  if(!el) return;
+  const entries = Object.entries(players)
+    .filter(([, p]) => p && p.finished)
+    .map(([pseudo, p]) => ({ pseudo, ...p.finished }));
+
+  entries.sort((a, b) => {
+    if(a.solved !== b.solved) return a.solved ? -1 : 1;
+    if(a.solved) return a.timeMs - b.timeMs;
+    return 0;
+  });
+
+  if(entries.length === 0){
+    el.innerHTML = `<div class="online-players-empty">Personne n'a encore tenté le puzzle aujourd'hui.</div>`;
+    return;
+  }
+
+  el.innerHTML = entries.map((e) => {
+    const safePseudo = escapeHtml(e.pseudo);
+    const statusText = e.solved ? `✅ ${(e.timeMs/1000).toFixed(1)}s` : `❌ raté`;
+    const isMe = e.pseudo === myPseudo;
+    return `<div class="online-player-row${isMe ? ' leaderboard-me' : ''}">
+      <span class="online-player-name">${safePseudo}</span>
+      <span class="online-player-status">${statusText}</span>
+    </div>`;
+  }).join('');
+}
+
+function closePuzzleChallenge(){
+  if(puzzleLeaderboardRef) off(puzzleLeaderboardRef);
+  document.getElementById('puzzleScreen').classList.add('hidden');
 }
 
 function ensureDailySecret(dateKey){
@@ -2467,6 +2807,7 @@ function enterDuel(duelId){
   document.getElementById('duelActive').classList.remove('hidden');
   document.getElementById('duelResult').innerHTML = '';
   document.getElementById('duelLeaveBtn').classList.add('hidden');
+  document.getElementById('duelSecretReveal').classList.add('hidden');
   updateDuelAttemptsCounter();
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonRow').classList.remove('hidden');
@@ -2668,6 +3009,18 @@ function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
   document.getElementById('duelResultScreen').classList.remove('hidden');
 }
 
+function closeDuelResultKeepBoard(){
+  // Ferme la pop-up sans quitter le duel : la grille reste visible et le code
+  // secret est révélé pour pouvoir analyser ses erreurs.
+  document.getElementById('duelResultScreen').classList.add('hidden');
+  const el = document.getElementById('duelSecretReveal');
+  if(el && duelSecret){
+    el.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${duelSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
+    el.classList.remove('hidden');
+  }
+  document.getElementById('duelLeaveBtn').classList.remove('hidden');
+}
+
 function closeDuelResultAndLeave(){
   document.getElementById('duelResultScreen').classList.add('hidden');
   leaveDuel();
@@ -2730,11 +3083,17 @@ window.restoreDuelSearch = restoreDuelSearch;
 window.challengePlayer = challengePlayer;
 window.toggleOnlinePlayersPanel = toggleOnlinePlayersPanel;
 window.closeDuelResultAndLeave = closeDuelResultAndLeave;
+window.closeDuelResultKeepBoard = closeDuelResultKeepBoard;
 window.openDailyChallenge = openDailyChallenge;
 window.selectDailySlot = selectDailySlot;
 window.pickDailyColor = pickDailyColor;
 window.submitDailyGuess = submitDailyGuess;
 window.closeDailyChallenge = closeDailyChallenge;
+window.openPuzzleChallenge = openPuzzleChallenge;
+window.selectPuzzleSlot = selectPuzzleSlot;
+window.pickPuzzleColor = pickPuzzleColor;
+window.submitPuzzleGuess = submitPuzzleGuess;
+window.closePuzzleChallenge = closePuzzleChallenge;
 window.cancelInvite = cancelInvite;
 window.acceptInvite = acceptInvite;
 window.declineInvite = declineInvite;
