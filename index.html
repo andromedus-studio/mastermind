@@ -509,6 +509,13 @@
   .online-player-status { font-size: 11px; color: var(--ink-dim); white-space: nowrap; }
   .leaderboard-rank { font-weight: 800; color: var(--gold); font-size: 13px; width: 18px; text-align: center; }
   .leaderboard-me { border: 1px solid var(--gold); }
+  .pseudo-frame {
+    display: inline-block; padding: 0px 6px; border-radius: 6px;
+    border: 1.5px solid transparent; font-weight: 700;
+  }
+  .pseudo-frame-bronze { border-color: #cd7f32; color: #e3a866; }
+  .pseudo-frame-silver { border-color: #c8ccd4; color: #dfe3e8; }
+  .pseudo-frame-gold { border-color: #ffd700; color: #ffe066; box-shadow: 0 0 6px rgba(255,215,0,0.5); }
   .history-row {
     display: flex; align-items: center; gap: 8px;
     background: var(--panel-bg-light); border-radius: 10px; padding: 6px 10px;
@@ -1152,7 +1159,7 @@ function submitUserGuess(){
 
   if(moveLimit !== null && history.length >= moveLimit){
     const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
-    const lostXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length);
+    const lostXp = 0; // une défaite ne rapporte plus d'XP, quel que soit le nombre d'essais
     showSecretReveal(secretCode);
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.${lostXp ? ` (+${lostXp} XP)` : ''}`, '');
     document.getElementById('userInputArea').classList.add('hidden');
@@ -1668,6 +1675,22 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
+// Cadre autour du pseudo selon le niveau : bronze dès 5, argent dès 10, or dès 15.
+function pseudoTier(level){
+  if(level >= 15) return 'gold';
+  if(level >= 10) return 'silver';
+  if(level >= 5) return 'bronze';
+  return null;
+}
+
+function decoratedPseudoHTML(pseudo){
+  const level = levelFromXp(playerXpCache[pseudo] || 0).level;
+  const safe = escapeHtml(pseudo);
+  const tier = pseudoTier(level);
+  if(!tier) return safe;
+  return `<span class="pseudo-frame pseudo-frame-${tier}" title="Niveau ${level}">${safe}</span>`;
+}
+
 function addXp(amount){
   if(!myPseudo || !amount) return;
   const xpRef = ref(db, `players/${myPseudo}/xp`);
@@ -1882,7 +1905,7 @@ function gameHistoryLabel(entry){
   let typeLabel = entry.type === 'duel' ? '⚔️ Duel' : entry.type === 'daily' ? '🗓️ Défi du jour' : '🧠 Solo';
   let resultLabel = entry.result === 'gagné' ? '✅ Gagné' : entry.result === 'abandon' ? '🚩 Abandon' : '❌ Perdu';
   const detail = entry.type === 'duel'
-    ? (entry.opponent ? `vs ${escapeHtml(entry.opponent)}` : '')
+    ? (entry.opponent ? `vs ${decoratedPseudoHTML(entry.opponent)}` : '')
     : (entry.attempts != null ? `${entry.attempts} essai${entry.attempts>1?'s':''}` : '');
   const xpLabel = entry.xp ? `+${entry.xp} XP` : '';
   return `<div class="history-row">
@@ -1934,7 +1957,7 @@ function openLeaderboard(){
     const isMe = p.pseudo === myPseudo;
     return `<div class="online-player-row${isMe ? ' leaderboard-me' : ''}">
       <span class="leaderboard-rank">${i + 1}</span>
-      <span class="online-player-name">${escapeHtml(p.pseudo)}</span>
+      <span class="online-player-name">${decoratedPseudoHTML(p.pseudo)}</span>
       <span class="online-player-status">Nv ${p.info.level} · ${p.info.xpIntoLevel}/${p.info.xpForNext} XP</span>
     </div>`;
   }).join('');
@@ -1962,7 +1985,10 @@ function updateMyLevelBadge(){
   const badge = document.getElementById('myLevelBadge');
   if(!badge || !myPseudo) return;
   const info = levelFromXp(playerXpCache[myPseudo] || 0);
-  badge.textContent = `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
+  const tier = pseudoTier(info.level);
+  badge.innerHTML = tier
+    ? `<span class="pseudo-frame pseudo-frame-${tier}">Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP</span>`
+    : `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
   badge.title = `${info.xpIntoLevel} / ${info.xpForNext} XP vers le niveau ${info.level + 1}`;
 }
 
@@ -1995,8 +2021,10 @@ function renderOnlinePlayers(data){
     const statusLabel = p.status === 'in_duel' ? '⚔️ en duel' : p.status === 'searching' ? '🔍 en recherche' : '';
     const safePseudo = escapeHtml(p.pseudo);
     const lvl = levelFromXp(playerXpCache[p.pseudo] || 0).level;
+    const tier = pseudoTier(lvl);
+    const nameHTML = tier ? `<span class="pseudo-frame pseudo-frame-${tier}">${safePseudo}</span>` : safePseudo;
     return `<div class="online-player-row">
-      <span class="online-player-name">${safePseudo} <small style="opacity:0.6;">Nv${lvl}</small></span>
+      <span class="online-player-name">${nameHTML} <small style="opacity:0.6;">Nv${lvl}</small></span>
       ${statusLabel ? `<span class="online-player-status">${statusLabel}</span>` : ''}
       <button class="challenge-btn" onclick="challengePlayer('${safePseudo.replace(/'/g, "\\'")}')">⚔️ Défier</button>
     </div>`;
@@ -2540,11 +2568,10 @@ function renderPuzzleLeaderboard(players){
   }
 
   el.innerHTML = entries.map((e) => {
-    const safePseudo = escapeHtml(e.pseudo);
     const statusText = e.solved ? `✅ ${(e.timeMs/1000).toFixed(1)}s` : `❌ raté`;
     const isMe = e.pseudo === myPseudo;
     return `<div class="online-player-row${isMe ? ' leaderboard-me' : ''}">
-      <span class="online-player-name">${safePseudo}</span>
+      <span class="online-player-name">${decoratedPseudoHTML(e.pseudo)}</span>
       <span class="online-player-status">${statusText}</span>
     </div>`;
   }).join('');
@@ -2749,10 +2776,9 @@ function renderDailyLeaderboard(players){
   }
 
   el.innerHTML = entries.map((e, idx) => {
-    const safePseudo = escapeHtml(e.pseudo);
     const statusText = e.solved ? `${e.attempts} coup(s) · ${(e.timeMs/1000).toFixed(1)}s` : `n'a pas trouvé`;
     return `<div class="online-player-row">
-      <span class="online-player-name">${idx+1}. ${safePseudo}</span>
+      <span class="online-player-name">${idx+1}. ${decoratedPseudoHTML(e.pseudo)}</span>
       <span class="online-player-status">${statusText}</span>
     </div>`;
   }).join('');
