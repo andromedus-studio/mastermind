@@ -1274,12 +1274,12 @@ function submitFeedback(){
 
   if(black === NB_TROUS){
     solved = true;
-    const wonXp = NB_COULEURS === 8 ? xpForAttempts(history.length) : 0;
-    setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${wonXp ? ` (+${wonXp} XP)` : ''}`, 'win');
+    // Pas d'XP dans ce mode : le joueur saisit lui-même le feedback (noir/blanc)
+    // donné à l'ordinateur, il pourrait donc mentir pour se faire gagner de l'XP.
+    setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !`, 'win');
     document.getElementById('feedbackInputArea').classList.add('hidden');
     sessionScores.push({mode: 'computerGuesses', numColors: NB_COULEURS, attempts: history.length});
-    window.addXp(wonXp);
-    recordGameHistory({type: 'ordi', result: 'gagné', attempts: history.length, xp: wonXp});
+    recordGameHistory({type: 'ordi', result: 'gagné', attempts: history.length, xp: 0});
     launchConfetti();
     return;
   }
