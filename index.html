@@ -672,7 +672,7 @@
       <button class="mode-btn" onclick="startSerieMind()">
         <span class="xp-plus-badge">XP</span>
         <span class="big">🎰 Série-Mind</span>
-        <span class="small">L'ordinateur cache un code. 9 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : repars avec le gain, ou continue pour le doubler — mais si tu perds une manche, tu repars les mains vides.</span>
+        <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
       </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge">XP</span>
@@ -704,8 +704,8 @@
         <div class="analysis-panel" style="text-align:center;">
           <div id="serieMindChoiceText"></div>
           <div style="display:flex; gap:10px; justify-content:center; margin-top:10px; flex-wrap:wrap;">
-            <button class="btn" onclick="serieMindCashOut()">💰 Repartir avec le gain</button>
-            <button class="btn secondary" id="serieMindContinueBtn" onclick="serieMindContinueRound()">🎲 Continuer (doubler ou tout perdre)</button>
+            <button class="btn" onclick="serieMindCashOut()">💰 Récupérer le pactole</button>
+            <button class="btn secondary" id="serieMindContinueBtn" onclick="serieMindContinueRound()">🎲 Quitte ou double</button>
           </div>
         </div>
       </div>
@@ -850,8 +850,8 @@ window.numberModeActive = () => numberMode;
 // --- Mode Série-Mind (risque le tout pour le tout) ---
 let serieMindActive = false;
 let serieMindRound = 1;      // manche courante (1 à 9)
-let serieMindReserve = 0;    // gain en réserve, pas encore acquis
-const SERIE_MIND_START_ATTEMPTS = 9; // essais de la manche 1, -1 par manche ensuite
+let serieMindReserve = 0;    // banque accumulée, pas encore acquise tant que non récupérée
+const SERIE_MIND_START_ATTEMPTS = 8; // essais de la manche 1, -1 par manche ensuite
 
 // mode computerGuesses
 let candidates = [];
@@ -1003,22 +1003,31 @@ function renderSerieMindBanner(){
   if(!el) return;
   if(!serieMindActive){ el.classList.add('hidden'); el.innerHTML = ''; return; }
   el.classList.remove('hidden');
-  const reserveText = serieMindReserve > 0 ? ` · Réserve en jeu : ${serieMindReserve} XP` : '';
-  el.innerHTML = `🎰 Série-Mind — Manche ${serieMindRound} (${moveLimit} essai${moveLimit>1?'s':''})${reserveText}`;
+  const bankText = serieMindReserve > 0 ? ` · Banque : ${serieMindReserve} XP` : '';
+  el.innerHTML = `🎰 Série-Mind — Manche ${serieMindRound} (${moveLimit} essai${moveLimit>1?'s':''})${bankText}`;
 }
 
-// Fin de manche réussie : affiche le choix repartir / continuer.
+// Barème Série-Mind : même base que xpForAttempts, +10 XP de bonus fixe.
+// 1 essai=60, 2=50, 3=40, 4=30, 5=20, 6+ essais=15.
+function serieMindXpForAttempts(attempts){
+  return xpForAttempts(attempts) + 10;
+}
+
+// Fin de manche réussie : les XP de la manche s'ajoutent à la banque, puis choix repartir / doubler.
 function serieMindShowChoice(attemptsUsed){
-  const gain = xpForAttempts(attemptsUsed);
-  serieMindReserve = serieMindRound === 1 ? gain : serieMindReserve * 2;
-  const canContinue = (moveLimit - 1) >= 1;
+  const gain = serieMindXpForAttempts(attemptsUsed);
+  serieMindReserve += gain;
+  const nextAttempts = moveLimit - 1;
+  const canContinue = nextAttempts >= 1;
   document.getElementById('userInputArea').classList.add('hidden');
   const choiceEl = document.getElementById('serieMindChoice');
   choiceEl.classList.remove('hidden');
   document.getElementById('serieMindChoiceText').innerHTML =
-    `🎉 Manche ${serieMindRound} réussie en ${attemptsUsed} coup${attemptsUsed>1?'s':''} !<br>` +
-    `Réserve actuelle : <strong>${serieMindReserve} XP</strong>` +
-    (canContinue ? `<br><span class="small">Continuer : manche ${serieMindRound+1} avec ${moveLimit-1} essai${moveLimit-1>1?'s':''}. En cas d'échec, la réserve entière est perdue.</span>` : `<br><span class="small">Plus assez d'essais pour continuer — il faut repartir avec le gain.</span>`);
+    `🎉 Manche ${serieMindRound} réussie en ${attemptsUsed} coup${attemptsUsed>1?'s':''} (+${gain} XP) !<br>` +
+    `Banque actuelle : <strong>${serieMindReserve} XP</strong>` +
+    (canContinue
+      ? `<br><span class="small">Quitte ou double : la banque passera à ${serieMindReserve*2} XP, manche ${serieMindRound+1} avec ${nextAttempts} essai${nextAttempts>1?'s':''}. En cas d'échec, tout est perdu.</span>`
+      : `<br><span class="small">Plus assez d'essais pour continuer — il faut récupérer le pactole.</span>`);
   document.getElementById('serieMindContinueBtn').classList.toggle('hidden', !canContinue);
   renderSerieMindBanner();
 }
@@ -1027,7 +1036,7 @@ function serieMindCashOut(){
   const wonXp = serieMindReserve;
   document.getElementById('serieMindChoice').classList.add('hidden');
   window.addXp(wonXp);
-  recordGameHistory({type: 'ordi', result: 'gagné', attempts: history.length, xp: wonXp});
+  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'gagné', attempts: history.length, xp: wonXp});
   setStatus(`💰 Tu repars avec ${wonXp} XP !`, 'win');
   serieMindActive = false;
   serieMindRound = 1;
@@ -1037,6 +1046,7 @@ function serieMindCashOut(){
 
 function serieMindContinueRound(){
   document.getElementById('serieMindChoice').classList.add('hidden');
+  serieMindReserve *= 2; // "quitte ou double" : la banque double dès qu'on choisit de continuer
   serieMindRound++;
   moveLimit = moveLimit - 1;
   history = [];
@@ -1053,17 +1063,17 @@ function serieMindContinueRound(){
   renderAttemptsLeft();
   renderHistory();
   renderSerieMindBanner();
-  setStatus(`Manche ${serieMindRound} : ${moveLimit} essai${moveLimit>1?'s':''} pour doubler la réserve.`);
+  setStatus(`Manche ${serieMindRound} : ${moveLimit} essai${moveLimit>1?'s':''} pour ${serieMindReserve} XP en jeu.`);
 }
 
 function serieMindLose(){
   const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
   showSecretReveal(secretCode);
-  setStatus(`😔 Manche ${serieMindRound} perdue ! Le code secret était : ${secretLisible}. Réserve perdue : ${serieMindReserve} XP (0 XP au total).`, '');
+  setStatus(`😔 Manche ${serieMindRound} perdue ! Le code secret était : ${secretLisible}. Banque perdue : ${serieMindReserve} XP (0 XP au total).`, '');
   document.getElementById('userInputArea').classList.add('hidden');
   sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
   window.addXp(0);
-  recordGameHistory({type: 'ordi', result: 'perdu', attempts: history.length, xp: 0});
+  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'perdu', attempts: history.length, xp: 0});
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
@@ -1325,7 +1335,7 @@ function submitUserGuess(){
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
     if(!trainingMode){
       window.addXp(wonXp);
-      recordGameHistory({type: 'ordi', result: 'gagné', attempts: history.length, xp: wonXp});
+      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'gagné', attempts: history.length, xp: wonXp});
     }
     launchConfetti();
     return;
@@ -1344,7 +1354,7 @@ function submitUserGuess(){
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
     if(!trainingMode){
       window.addXp(lostXp);
-      recordGameHistory({type: 'ordi', result: 'perdu', attempts: history.length, xp: lostXp});
+      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'perdu', attempts: history.length, xp: lostXp});
     }
     return;
   }
@@ -1457,7 +1467,7 @@ function submitFeedback(){
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !`, 'win');
     document.getElementById('feedbackInputArea').classList.add('hidden');
     sessionScores.push({mode: 'computerGuesses', numColors: NB_COULEURS, attempts: history.length});
-    recordGameHistory({type: 'ordi', result: 'gagné', attempts: history.length, xp: 0});
+    recordGameHistory({type: 'ordi', sub: 'cache', result: 'gagné', attempts: history.length, xp: 0});
     launchConfetti();
     return;
   }
@@ -2014,6 +2024,7 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
     if(claimResult.committed && claimResult.snapshot.val() && claimResult.snapshot.val().claimed){
       addXp(q.xp);
       showQuestToast(`🎯 Quête accomplie : ${q.desc} (+${q.xp} XP)`);
+      recordGameHistory({type: 'quest', result: 'gagné', desc: q.desc, xp: q.xp});
     }
   }
 }
@@ -2084,7 +2095,7 @@ function closeQuestsPanel(){
 }
 window.closeQuestsPanel = closeQuestsPanel;
 
-// --- Historique de parties (20 dernières, par compte) ---
+// --- Historique de parties (30 dernières, par compte) ---
 function recordGameHistory(entry){
   if(!myPseudo) return;
   const histRef = ref(db, `players/${myPseudo}/history`);
@@ -2097,9 +2108,9 @@ function trimGameHistory(){
   get(histRef).then(snap => {
     const data = snap.val() || {};
     const keys = Object.keys(data).sort((a,b) => data[a].at - data[b].at);
-    if(keys.length > 20){
+    if(keys.length > 30){
       const updates = {};
-      keys.slice(0, keys.length - 20).forEach(k => updates[k] = null);
+      keys.slice(0, keys.length - 30).forEach(k => updates[k] = null);
       update(histRef, updates);
     }
   });
@@ -2109,17 +2120,26 @@ window.recordGameHistory = recordGameHistory;
 function gameHistoryLabel(entry){
   const dateStr = new Date(entry.at).toLocaleDateString('fr-FR', {day:'2-digit', month:'2-digit'});
   const timeStr = new Date(entry.at).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
-  let typeLabel = entry.type === 'duel' ? '⚔️ Duel' : entry.type === 'daily' ? '🗓️ Défi du jour' : '🧠 Solo';
+  const ORDI_SUB_LABELS = { vsordi: '🔍 Joueur vs Ordi', cache: '🧠 Je cache un code', seriemind: '🎰 Série-Mind' };
+  let typeLabel;
+  if(entry.type === 'duel') typeLabel = '⚔️ Duel';
+  else if(entry.type === 'daily') typeLabel = '🗓️ Défi du jour';
+  else if(entry.type === 'puzzle') typeLabel = '🧩 Puzzle du jour';
+  else if(entry.type === 'quest') typeLabel = '🎯 Quête';
+  else if(entry.type === 'ordi') typeLabel = ORDI_SUB_LABELS[entry.sub] || '🧠 Solo';
+  else typeLabel = '🧠 Solo';
   let resultLabel = entry.result === 'gagné' ? '✅ Gagné' : entry.result === 'abandon' ? '🚩 Abandon' : '❌ Perdu';
   const detail = entry.type === 'duel'
     ? (entry.opponent ? `vs ${decoratedPseudoHTML(entry.opponent)}` : '')
+    : entry.type === 'quest'
+    ? (entry.desc || '')
     : (entry.attempts != null ? `${entry.attempts} essai${entry.attempts>1?'s':''}` : '');
   const xpLabel = entry.xp ? `+${entry.xp} XP` : '';
   return `<div class="history-row">
     <span class="history-date">${dateStr} ${timeStr}</span>
     <span class="history-type">${typeLabel}</span>
     <span class="history-detail">${detail}</span>
-    <span class="history-result">${resultLabel}</span>
+    <span class="history-result">${entry.type === 'quest' ? '' : resultLabel}</span>
     <span class="history-xp">${xpLabel}</span>
   </div>`;
 }
