@@ -851,6 +851,7 @@ window.numberModeActive = () => numberMode;
 let serieMindActive = false;
 let serieMindRound = 1;      // manche courante (1 à 9)
 let serieMindReserve = 0;    // banque accumulée, pas encore acquise tant que non récupérée
+let serieMindSavedMoveLimit = null; // limite d'essais du mode normal, restaurée en quittant Série-Mind
 const SERIE_MIND_START_ATTEMPTS = 8; // essais de la manche 1, -1 par manche ensuite
 
 // mode computerGuesses
@@ -993,6 +994,7 @@ function startSerieMind(){
   serieMindActive = true;
   serieMindRound = 1;
   serieMindReserve = 0;
+  serieMindSavedMoveLimit = moveLimit; // on mémorise la limite choisie en mode normal
   moveLimit = SERIE_MIND_START_ATTEMPTS;
   startGame('userGuesses');
   renderSerieMindBanner();
@@ -1041,6 +1043,7 @@ function serieMindCashOut(){
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
+  moveLimit = serieMindSavedMoveLimit;
   renderSerieMindBanner();
 }
 
@@ -1077,6 +1080,7 @@ function serieMindLose(){
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
+  moveLimit = serieMindSavedMoveLimit;
   renderSerieMindBanner();
 }
 
@@ -1209,12 +1213,16 @@ function resetToMenu(){
   document.getElementById('game').classList.add('hidden');
   trainingMode = false;
   analysisMode = false;
+  if(serieMindActive){
+    // Le joueur quitte en cours de manche : la limite d'essais du mode normal est restaurée.
+    moveLimit = serieMindSavedMoveLimit;
+  }
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
-  moveLimit = null;
   document.getElementById('serieMindChoice').classList.add('hidden');
   renderSerieMindBanner();
+  renderAttemptsPicker();
   renderSessionHistory();
   mode = null;
 }
