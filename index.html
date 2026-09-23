@@ -2045,11 +2045,25 @@ function getParisDateTimeKey(date = new Date()){
 
 function getActiveXpEvent(date = new Date()){
   const nowKey = getParisDateTimeKey(date);
-  return SPECIAL_XP_EVENTS.find(event => nowKey >= event.start && nowKey <= event.end) || null;
+  return SPECIAL_XP_EVENTS.find(event => {
+    // 1. Si l'événement est en cours
+    if(nowKey >= event.start && nowKey <= event.end){
+      return true;
+    }
+    // 2. Si l'événement est à venir dans les 7 prochains jours
+    const [sy, sm, sd, sh, smin, ss] = event.start.split(/[-T:]/).map(Number);
+    const startDate = new Date(Date.UTC(sy, sm - 1, sd, sh, smin, ss));
+    const [ny, nm, nd, nh, nmin, ns] = nowKey.split(/[-T:]/).map(Number);
+    const nowDate = new Date(Date.UTC(ny, nm - 1, nd, nh, nmin, ns));
+    
+    const diffDays = (startDate - nowDate) / (1000 * 60 * 60 * 24);
+    return diffDays > 0 && diffDays <= 7;
+  }) || null;
 }
 
 function getActiveXpMultiplier(){
-  const event = getActiveXpEvent();
+  const nowKey = getParisDateTimeKey();
+  const event = SPECIAL_XP_EVENTS.find(e => nowKey >= e.start && nowKey <= e.end);
   return event ? Math.max(1, Number(event.multiplier) || 1) : 1;
 }
 
@@ -2077,7 +2091,9 @@ function renderSpecialXpEvent(){
     banner.classList.remove('active');
     return;
   }
-  title.textContent = event.title;
+  const nowKey = getParisDateTimeKey();
+  const isUpcoming = nowKey < event.start;
+  title.textContent = isUpcoming ? `📢 À VENIR : ${event.title}` : event.title;
   message.textContent = event.message;
   banner.classList.add('active');
 }
