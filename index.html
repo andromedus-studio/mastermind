@@ -504,6 +504,17 @@
     box-shadow: 0 4px 14px rgba(0,0,0,0.4);
     transition: border-color 0.15s ease;
   }
+  /* Sous le bouton son (à gauche il masquait le B secret du logo sur mobile) */
+  .info-toggle { top: 66px; font-size: 17px; font-weight: 800; }
+  .rank-block { border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--panel-bg-light); text-align: left; }
+  .rank-block.current { border-color: var(--gold); box-shadow: 0 0 10px rgba(255,193,57,0.25); }
+  .rank-block-title { font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .rank-block-title .rank-levels { font-weight: 600; font-size: 11px; color: var(--ink-dim); }
+  .rank-current-tag { font-size: 10px; font-weight: 800; color: #1a1420; background: var(--gold); border-radius: 999px; padding: 1px 8px; }
+  .rank-block-lines { font-size: 12px; color: var(--ink-dim); margin-top: 4px; line-height: 1.55; }
+  .rank-secret { margin-top: 4px; font-size: 12px; font-style: italic; color: var(--gold); }
+  .rank-info-scroll { max-height: 62vh; overflow-y: auto; margin-bottom: 12px; }
+  .rank-info-intro { text-align: center; font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
   .sound-toggle:hover { border-color: var(--gold); }
   .sound-toggle.playing { color: var(--gold); border-color: var(--gold); }
 
@@ -621,6 +632,7 @@
   .pseudo-frame-bronze { border-color: #cd7f32; color: #e3a866; }
   .pseudo-frame-silver { border-color: #c8ccd4; color: #dfe3e8; }
   .pseudo-frame-gold { border-color: #ffd700; color: #ffe066; box-shadow: 0 0 6px rgba(255,215,0,0.5); }
+  .pseudo-frame-emerald { border-color: #2ecc71; color: #86ffb8; box-shadow: 0 0 7px rgba(46,204,113,0.6); }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
@@ -694,6 +706,13 @@
   }
   .duel-avatar.opponent { border-color: var(--c0); color: var(--c0); }
   .duel-vs .vs { color: var(--ink-dim); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  /* Bannières de rang réduites dans l'écran de duel (texte proportionnel à la largeur de la bannière) */
+  .duel-vs { gap: 8px; }
+  .duel-banner-slot { flex: 1 1 0; min-width: 0; max-width: 170px; display: flex; justify-content: center; }
+  .duel-banner-slot .player-banner-card { max-width: 100%; }
+  .duel-banner-slot .player-banner-frame { container-type: inline-size; }
+  .duel-banner-slot .player-banner-name { font-size: 11px; font-size: 7.5cqw; }
+  .duel-banner-slot .player-banner-sub { font-size: 9px; font-size: 6cqw; margin-top: 1px; }
   .duel-opponent-status { text-align: center; font-size: 12px; color: var(--ink-dim); margin-bottom: 14px; }
 
   .btn-text-danger {
@@ -714,6 +733,7 @@
 <div class="bg-photo"></div>
 <div class="bg-overlay"></div>
 <button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Musique">🔇</button>
+<button class="sound-toggle info-toggle" id="ranksInfoBtn" onclick="openRanksInfo()" title="Rangs et avantages" aria-label="Rangs et avantages">ℹ️</button>
 <audio id="bgMusic" loop preload="auto"><source src="audio/music-main.mp3" type="audio/mpeg"></audio>
 <div class="app">
   <div class="logo-secret-hit"><img class="logo" src="images/logo.png" alt="BrainMind"><button class="logo-b-secret" id="logoBSecret" type="button" aria-label="BrainMind"></button></div>
@@ -1107,10 +1127,10 @@ function renderSerieMindBanner(){
   el.innerHTML = `🎰 Série-Mind — Manche ${serieMindRound} (${moveLimit} essai${moveLimit>1?'s':''})${bankText}`;
 }
 
-// Barème Série-Mind : même base que xpForAttempts, +10 XP de bonus fixe.
+// Barème Série-Mind : même base que xpForAttempts, +10 XP de bonus fixe, + bonus de victoire du rang.
 // 1 essai=60, 2=50, 3=40, 4=30, 5=20, 6+ essais=15.
 function serieMindXpForAttempts(attempts){
-  return xpForAttempts(attempts) + 10;
+  return xpForAttempts(attempts) + 10 + rankWinBonus();
 }
 
 // Fin de manche réussie : les XP de la manche s'ajoutent à la banque, puis choix repartir / doubler.
@@ -1184,8 +1204,96 @@ function serieMindLose(){
 
 // Bonus XP fixe selon la limite de coups choisie (plus c'est serré, plus ça rapporte).
 const MOVE_LIMIT_BONUS = { 6: 15, 8: 10, 10: 5, 12: 2 };
+
+// Équilibrage par rang (à modifier ici) :
+//  - limitBonus12    : XP en plus quand la limite d'essais choisie est 12
+//  - limitBonusOther : XP en plus pour les limites 6 / 8 / 10 (Illimité : aucun bonus)
+//  - questMult       : multiplicateur des récompenses de quêtes
+//  - winBonus        : XP de base en plus à chaque victoire (duel, contre l'ordi, manche Série-Mind)
+const RANK_BALANCE = {
+  debutant: { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 0 },
+  bronze:   { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 5 },
+  silver:   { limitBonus12: 2, limitBonusOther: 5, questMult: 2, winBonus: 10 },
+  gold:     { limitBonus12: 4, limitBonusOther: 10, questMult: 3, winBonus: 15 },
+  emerald:  { limitBonus12: 6, limitBonusOther: 15, questMult: 4, winBonus: 20 },
+};
+function myRankBalance(){
+  // Le rang est calculé dans le script module (window.getMyTier) ; avant son init : Débutant.
+  const tier = (typeof window.getMyTier === 'function') ? window.getMyTier() : 'debutant';
+  return RANK_BALANCE[tier] || RANK_BALANCE.debutant;
+}
+function rankLimitBonus(limit){
+  if(limit === null || limit === undefined) return 0;
+  const r = myRankBalance();
+  return limit === 12 ? r.limitBonus12 : r.limitBonusOther;
+}
+// Paliers de niveau des rangs (source unique, utilisée par pseudoTier et le panneau d'info).
+const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20 };
+const RANK_INFO = [
+  { key: 'debutant', icon: '🌱', name: 'Débutant', from: 1 },
+  { key: 'bronze',   icon: '🥉', name: 'Bronze',   from: RANK_LEVELS.bronze },
+  { key: 'silver',   icon: '🥈', name: 'Argent',   from: RANK_LEVELS.silver },
+  { key: 'gold',     icon: '🥇', name: 'Or',       from: RANK_LEVELS.gold,
+    secret: {
+      locked:   '🔒 Un secret est réservé aux joueurs Or…',
+      unlocked: '🤫 Secret débloqué : la première lettre du logo cache quelque chose… touche-la plusieurs fois.'
+    } },
+  { key: 'emerald',  icon: '💚', name: 'Émeraude', from: RANK_LEVELS.emerald,
+    secret: {
+      locked:   '🔒 Un second secret est réservé aux joueurs Émeraude…',
+      unlocked: '🤫 Un secret t\'attend… il se prépare, reste attentif.'
+    } },
+];
+// Position d'un rang dans l'échelle (débutant = 0). Sert à comparer "au moins tel rang".
+function rankIndex(key){ return RANK_INFO.findIndex(r => r.key === key); }
+function rankAdvantageLines(key){
+  const r = RANK_BALANCE[key];
+  const lines = [];
+  if(r.winBonus) lines.push(`⚔️ +${r.winBonus} XP à chaque victoire (duel, ordi, Série-Mind)`);
+  if(r.limitBonusOther || r.limitBonus12) lines.push(`🎯 Bonus d'essais : +${r.limitBonusOther} XP (6 / 8 / 10 essais), +${r.limitBonus12} XP (12 essais)`);
+  if(r.questMult > 1) lines.push(`📜 Récompenses de quêtes ×${r.questMult}`);
+  if(!lines.length) lines.push('Aucun bonus pour l\'instant : monte de niveau pour en débloquer !');
+  return lines;
+}
+function openRanksInfo(){
+  const myTier = (typeof window.getMyTier === 'function') ? window.getMyTier() : 'debutant';
+  const myLevel = (typeof window.getMyLevel === 'function') ? window.getMyLevel() : 1;
+  const idx = RANK_INFO.findIndex(r => r.key === myTier);
+  const next = RANK_INFO[idx + 1];
+  const intro = next
+    ? `Tu es niveau ${myLevel}. Prochain rang : ${next.icon} ${next.name} au niveau ${next.from}.`
+    : `Tu es niveau ${myLevel} : rang maximum atteint 🎉`;
+  const blocks = RANK_INFO.map((r, i) => {
+    const to = RANK_INFO[i + 1] ? `Niv ${r.from} à ${RANK_INFO[i + 1].from - 1}` : `Niv ${r.from}+`;
+    let extra = '';
+    if(r.secret){
+      const unlocked = rankIndex(myTier) >= rankIndex(r.key);
+      extra = `<div class="rank-secret">${unlocked ? r.secret.unlocked : r.secret.locked}</div>`;
+    }
+    return `<div class="rank-block${r.key === myTier ? ' current' : ''}">
+      <div class="rank-block-title">${r.icon} ${r.name} <span class="rank-levels">${to}</span>${r.key === myTier ? '<span class="rank-current-tag">Toi</span>' : ''}</div>
+      <div class="rank-block-lines">${rankAdvantageLines(r.key).join('<br>')}</div>
+      ${extra}
+    </div>`;
+  }).join('');
+  document.getElementById('ranksInfoList').innerHTML = `<div class="rank-info-intro">${intro}</div>${blocks}`;
+  document.getElementById('ranksInfoScreen').classList.remove('hidden');
+  // La liste défile : on amène le rang du joueur à l'écran
+  const cur = document.querySelector('#ranksInfoList .rank-block.current');
+  if(cur) cur.scrollIntoView({ block: 'center' });
+}
+function closeRanksInfo(){
+  document.getElementById('ranksInfoScreen').classList.add('hidden');
+}
+
+function rankWinBonus(){
+  return myRankBalance().winBonus || 0;
+}
+function questRewardXp(q){
+  return Math.round(q.xp * myRankBalance().questMult);
+}
 function moveLimitBonus(){
-  return moveLimit === null ? 0 : (MOVE_LIMIT_BONUS[moveLimit] || 0);
+  return moveLimit === null ? 0 : (MOVE_LIMIT_BONUS[moveLimit] || 0) + rankLimitBonus(moveLimit);
 }
 
 function renderAttemptsPicker(){
@@ -1198,7 +1306,7 @@ function renderAttemptsPicker(){
     {label: '12', value: 12},
   ];
   el.innerHTML = options.map(o => {
-    const bonus = o.value === null ? 0 : (MOVE_LIMIT_BONUS[o.value] || 0);
+    const bonus = o.value === null ? 0 : (MOVE_LIMIT_BONUS[o.value] || 0) + rankLimitBonus(o.value);
     const bonusLabel = bonus ? `<span class="cc-bonus">+${bonus} XP</span>` : '';
     return `<div class="cc-option ${o.value === moveLimit ? 'active' : ''}" onclick="setAttemptsLimit(${o.value})">${o.label}${bonusLabel}</div>`;
   }).join('');
@@ -1435,7 +1543,7 @@ function submitUserGuess(){
       serieMindShowChoice(history.length);
       return;
     }
-    const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length) + moveLimitBonus();
+    const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length) + moveLimitBonus() + rankWinBonus();
     const awardedWonXp = (!trainingMode && wonXp) ? window.addXp(wonXp) : 0;
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${awardedWonXp ? ` (+${awardedWonXp} XP)` : ''}`, 'win');
     document.getElementById('userInputArea').classList.add('hidden');
@@ -1665,6 +1773,15 @@ function undoLastMove(){
   </div>
 </div>
 
+<!-- Info : rangs et avantages -->
+<div id="ranksInfoScreen" class="hidden duel-overlay" onclick="if(event.target === this) closeRanksInfo()">
+  <div class="card duel-card">
+    <div class="duel-title">ℹ️ Rangs &amp; avantages</div>
+    <div class="rank-info-scroll" id="ranksInfoList"></div>
+    <button class="btn secondary" onclick="closeRanksInfo()">Fermer</button>
+  </div>
+</div>
+
 <!-- Quêtes journalières et hebdomadaires -->
 <div id="questsScreen" class="hidden duel-overlay">
   <div class="card duel-card">
@@ -1778,9 +1895,9 @@ function undoLastMove(){
     </div>
     <div id="duelActive" class="hidden">
       <div class="duel-vs">
-        <div class="duel-player"><div class="duel-avatar" id="duelMyAvatar"></div><span id="duelMyName"></span></div>
+        <div class="duel-banner-slot" id="duelMyBanner"></div>
         <span class="vs">VS</span>
-        <div class="duel-player"><div class="duel-avatar opponent" id="duelOppAvatar"></div><span id="duelOpponentName"></span></div>
+        <div class="duel-banner-slot" id="duelOppBanner"></div>
       </div>
       <div class="duel-opponent-status" id="duelOpponentStatus"></div>
       <div class="duel-sub" id="duelAttemptsCounter" style="text-align:center; font-size:12px; color:var(--ink-dim); margin-bottom:6px;"></div>
@@ -1972,18 +2089,21 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
-// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15+).
+// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20+).
+// Tant que images/banner-emerald.webp n'existe pas, la bannière Or est affichée à la place (onerror).
 const TIER_BANNERS = {
   debutant: 'images/banner-debutant.webp',
   bronze: 'images/banner-bronze.webp',
   silver: 'images/banner-silver.webp',
-  gold: 'images/banner-gold.webp'
+  gold: 'images/banner-gold.webp',
+  emerald: 'images/banner-emerald.webp'
 };
 
 function pseudoTier(level){
-  if(level >= 15) return 'gold';
-  if(level >= 10) return 'silver';
-  if(level >= 5) return 'bronze';
+  if(level >= RANK_LEVELS.emerald) return 'emerald';
+  if(level >= RANK_LEVELS.gold) return 'gold';
+  if(level >= RANK_LEVELS.silver) return 'silver';
+  if(level >= RANK_LEVELS.bronze) return 'bronze';
   return 'debutant';
 }
 
@@ -1997,7 +2117,7 @@ function playerBannerCardHTML(pseudo, level, extra){
   const safe = escapeHtml(pseudo);
   return `<div class="player-banner-card${extra.isMe ? ' player-banner-me' : ''}">
     <div class="player-banner-frame">
-      <img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}">
+      <img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="this.onerror=null;this.src='${TIER_BANNERS.gold}'">
       ${extra.rank ? `<span class="player-banner-rank">${extra.rank}</span>` : ''}
       <div class="player-banner-overlay">
         <div class="player-banner-name">${safe}</div>
@@ -2008,8 +2128,25 @@ function playerBannerCardHTML(pseudo, level, extra){
   </div>`;
 }
 
-// Vrai si le joueur connecté a atteint le palier Or (utilisé par l'easter egg).
-window.isGoldPlayer = () => !!myPseudo && pseudoTier(levelFromXp(playerXpCache[myPseudo] || 0).level) === 'gold';
+window.getMyLevel = () => myPseudo ? levelFromXp(playerXpCache[myPseudo] || 0).level : 1;
+window.getMyTier = () => myPseudo ? pseudoTier(levelFromXp(playerXpCache[myPseudo] || 0).level) : 'debutant';
+// Vrai pour Or ET au-dessus (Émeraude garde l'accès à l'easter egg Or).
+window.isGoldPlayer = () => !!myPseudo && rankIndex(window.getMyTier()) >= rankIndex('gold');
+
+// Bannières (réduites) des deux joueurs dans l'écran de duel.
+let duelBannerKey = '';
+function renderDuelBanners(){
+  const myEl = document.getElementById('duelMyBanner');
+  const oppEl = document.getElementById('duelOppBanner');
+  if(!myEl || !oppEl || !myPseudo) return;
+  const myLevel = levelFromXp(playerXpCache[myPseudo] || 0).level;
+  const oppLevel = opponentPseudo ? levelFromXp(playerXpCache[opponentPseudo] || 0).level : 1;
+  const key = `${myPseudo}|${myLevel}|${opponentPseudo}|${oppLevel}`;
+  if(key === duelBannerKey) return; // évite de recharger les images à chaque coup joué
+  duelBannerKey = key;
+  myEl.innerHTML = playerBannerCardHTML(myPseudo, myLevel, { isMe: true, subHTML: `Nv ${myLevel}` });
+  oppEl.innerHTML = opponentPseudo ? playerBannerCardHTML(opponentPseudo, oppLevel, { subHTML: `Nv ${oppLevel}` }) : '';
+}
 
 function decoratedPseudoHTML(pseudo){
   const level = levelFromXp(playerXpCache[pseudo] || 0).level;
@@ -2219,7 +2356,7 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
       return current;
     });
     if(claimResult.committed && claimResult.snapshot.val() && claimResult.snapshot.val().claimed){
-      const awardedQuestXp = addXp(q.xp, { ignoreEvent: true });
+      const awardedQuestXp = addXp(questRewardXp(q), { ignoreEvent: true });
       showQuestToast(`🎯 Quête accomplie : ${q.desc} (+${awardedQuestXp} XP)`);
       recordGameHistory({type: 'quest', result: 'gagné', desc: q.desc, xp: awardedQuestXp});
     }
@@ -2276,7 +2413,7 @@ async function openQuestsPanel(){
       return `<div class="quest-row${done ? ' quest-done' : ''}">
         <div class="quest-row-top">
           <span class="quest-desc">${done ? '✅' : '🎯'} ${escapeHtml(q.desc)}</span>
-          <span class="quest-xp">+${q.xp} XP</span>
+          <span class="quest-xp">+${questRewardXp(q)} XP</span>
         </div>
         <div class="quest-progress-track"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
         <div class="quest-progress-label">${Math.min(p.progress, q.target)} / ${q.target}</div>
@@ -2408,6 +2545,8 @@ function setupPlayersXpListener(){
     });
     renderOnlinePlayers(lastPresenceData);
     updateMyLevelBadge();
+    renderAttemptsPicker(); // les bonus d'essais dépendent du rang
+    if(currentDuelId) renderDuelBanners(); // niveau/rang à jour pendant un duel
   });
 }
 
@@ -3302,7 +3441,9 @@ function enterDuel(duelId){
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonRow').classList.remove('hidden');
   document.getElementById('duelAbandonConfirm').classList.add('hidden');
-  document.getElementById('duelMyAvatar').textContent = myPseudo.charAt(0).toUpperCase();
+  duelBannerKey = '';
+  document.getElementById('duelMyBanner').innerHTML = '';
+  document.getElementById('duelOppBanner').innerHTML = '';
 
   const duelRef = ref(db, 'duels/' + duelId);
   duelListenerRef = duelRef;
@@ -3315,9 +3456,7 @@ function enterDuel(duelId){
 
     const players = Object.keys(data.players || {});
     opponentPseudo = players.find(p => p !== myPseudo) || '…';
-    document.getElementById('duelMyName').textContent = myPseudo;
-    document.getElementById('duelOpponentName').textContent = opponentPseudo;
-    document.getElementById('duelOppAvatar').textContent = opponentPseudo.charAt(0).toUpperCase();
+    renderDuelBanners();
 
     const oppMovesObj = (data.moves && data.moves[opponentPseudo]) ? data.moves[opponentPseudo] : {};
     const oppMovesCount = Object.keys(oppMovesObj).length;
@@ -3468,7 +3607,7 @@ function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
   const won = winner === myPseudo;
   // Pas d'XP si j'ai abandonné, ni si j'ai épuisé mes 12 essais sans trouver le code
   // (même en cas d'égalité entre deux joueurs qui ont tous les deux échoué).
-  const myBaseXp = (myForfeit || myNotFound) ? 0 : (won ? XP_DUEL_WIN : XP_DUEL_LOSS);
+  const myBaseXp = (myForfeit || myNotFound) ? 0 : (won ? XP_DUEL_WIN + rankWinBonus() : XP_DUEL_LOSS);
   const myXp = addXp(myBaseXp);
   recordGameHistory({type: 'duel', result: myForfeit ? 'abandon' : (myNotFound ? 'perdu' : (won ? 'gagné' : 'perdu')), opponent: opponentPseudo, xp: myXp});
   const myLine = myForfeit ? 'Toi : abandon' : myNotFound ? `Toi : ${DUEL_MAX_ATTEMPTS} essais, non trouvé` : (myResult ? `Toi : ${myResult.attempts} coup(s), ${(myResult.timeMs/1000).toFixed(1)}s` : 'Toi : partie arrêtée');
