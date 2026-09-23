@@ -105,11 +105,14 @@
   body.easter-egg .bg-overlay {
     background: radial-gradient(circle at 50% 35%, rgba(255,193,57,0.12) 0%, rgba(36,26,48,0.45) 55%, rgba(12,8,18,0.76) 100%);
   }
+  /* Contour néon or autour de chaque fenêtre (menu + toutes les pop-ups utilisent .card) */
   body.easter-egg .card {
+    border: 1.5px solid #ffd766;
     box-shadow:
-      0 0 0 1px rgba(255,205,88,0.18),
-      0 0 24px rgba(255,193,57,0.20),
-      0 0 55px rgba(255,184,45,0.10),
+      0 0 0 1px rgba(255,190,50,0.30),
+      0 0 8px rgba(255,214,102,0.85),
+      0 0 22px rgba(255,184,45,0.45),
+      inset 0 0 10px rgba(255,205,88,0.22),
       0 10px 30px rgba(0,0,0,0.38);
     animation: brainmindGoldAura 3.2s ease-in-out infinite;
   }
@@ -117,8 +120,8 @@
     filter: drop-shadow(0 0 10px rgba(255,205,88,0.32)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
   }
   @keyframes brainmindGoldAura {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(255,205,88,0.16), 0 0 22px rgba(255,193,57,0.17), 0 0 48px rgba(255,184,45,0.08), 0 10px 30px rgba(0,0,0,0.38); }
-    50% { box-shadow: 0 0 0 1px rgba(255,218,110,0.30), 0 0 34px rgba(255,193,57,0.28), 0 0 70px rgba(255,184,45,0.14), 0 10px 30px rgba(0,0,0,0.38); }
+    0%, 100% { border-color: #f2c84f; box-shadow: 0 0 0 1px rgba(255,190,50,0.25), 0 0 6px rgba(255,214,102,0.65), 0 0 16px rgba(255,184,45,0.32), inset 0 0 8px rgba(255,205,88,0.16), 0 10px 30px rgba(0,0,0,0.38); }
+    50% { border-color: #ffe08a; box-shadow: 0 0 0 1px rgba(255,210,90,0.40), 0 0 12px rgba(255,224,138,0.95), 0 0 30px rgba(255,184,45,0.55), inset 0 0 14px rgba(255,205,88,0.28), 0 10px 30px rgba(0,0,0,0.38); }
   }
   body.easter-egg::after {
     content: '';
@@ -765,12 +768,12 @@
         <span class="small">Un code secret est tiré au hasard, à toi de le deviner.</span>
       </button>
       <button class="mode-btn" onclick="startSerieMind()">
-        <span class="xp-plus-badge">XP</span>
+        <span class="xp-plus-badge" id="xpBadgeSerie">XP</span>
         <span class="big">🎰 Série-Mind</span>
         <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
       </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
-        <span class="xp-plus-badge">XP</span>
+        <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
         <span class="big">⚔️ Duel en ligne (bêta)</span>
         <span class="small">Affronte un autre joueur en temps réel : même code à deviner, le plus efficace (et le plus rapide en cas d'égalité) gagne.</span>
       </button>
@@ -2005,6 +2008,9 @@ function playerBannerCardHTML(pseudo, level, extra){
   </div>`;
 }
 
+// Vrai si le joueur connecté a atteint le palier Or (utilisé par l'easter egg).
+window.isGoldPlayer = () => !!myPseudo && pseudoTier(levelFromXp(playerXpCache[myPseudo] || 0).level) === 'gold';
+
 function decoratedPseudoHTML(pseudo){
   const level = levelFromXp(playerXpCache[pseudo] || 0).level;
   const safe = escapeHtml(pseudo);
@@ -2021,6 +2027,14 @@ function decoratedPseudoHTML(pseudo){
 // multiplier = 2 signifie XP x2, multiplier = 3 signifie XP x3, etc.
 // Pour afficher seulement un message sans bonus XP, mets multiplier: 1.
 // ============================================================
+// Heure serveur Firebase (évite qu'une horloge d'appareil décalée fausse les événements).
+let serverTimeOffset = 0;
+function serverNow(){ return new Date(Date.now() + serverTimeOffset); }
+onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
+  serverTimeOffset = Number(snap.val()) || 0;
+  renderSpecialXpEvent();
+});
+
 const SPECIAL_XP_EVENTS = [
   {
     id: 'weekend-x2-2026-09-26',
@@ -2037,40 +2051,41 @@ function getParisDateTimeKey(date = new Date()){
     timeZone: 'Europe/Paris',
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', second: '2-digit',
-    hour12: false
+    hourCycle: 'h23'
   }).formatToParts(date);
   const get = type => parts.find(p => p.type === type)?.value || '00';
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
 }
 
-function getActiveXpEvent(date = new Date()){
+function getActiveXpEvent(date = serverNow()){
   const nowKey = getParisDateTimeKey(date);
-  return SPECIAL_XP_EVENTS.find(event => {
-    // 1. Si l'événement est en cours
-    if(nowKey >= event.start && nowKey <= event.end){
-      return true;
-    }
-    // 2. Si l'événement est à venir dans les 7 prochains jours
-    const [sy, sm, sd, sh, smin, ss] = event.start.split(/[-T:]/).map(Number);
-    const startDate = new Date(Date.UTC(sy, sm - 1, sd, sh, smin, ss));
-    const [ny, nm, nd, nh, nmin, ns] = nowKey.split(/[-T:]/).map(Number);
-    const nowDate = new Date(Date.UTC(ny, nm - 1, nd, nh, nmin, ns));
-    
-    const diffDays = (startDate - nowDate) / (1000 * 60 * 60 * 24);
-    return diffDays > 0 && diffDays <= 7;
-  }) || null;
+  // 1. Un événement en cours passe toujours avant un événement à venir
+  const running = SPECIAL_XP_EVENTS.find(e => nowKey >= e.start && nowKey <= e.end);
+  if(running) return running;
+  // 2. Sinon, le prochain événement à venir dans les 7 prochains jours
+  const [ny, nm, nd, nh, nmin, ns] = nowKey.split(/[-T:]/).map(Number);
+  const nowDate = new Date(Date.UTC(ny, nm - 1, nd, nh, nmin, ns));
+  const upcoming = SPECIAL_XP_EVENTS
+    .filter(e => {
+      const [sy, sm, sd, sh, smin, ss] = e.start.split(/[-T:]/).map(Number);
+      const diffDays = (Date.UTC(sy, sm - 1, sd, sh, smin, ss) - nowDate) / 86400000;
+      return diffDays > 0 && diffDays <= 7;
+    })
+    .sort((a, b) => a.start.localeCompare(b.start));
+  return upcoming[0] || null;
 }
 
 function getActiveXpMultiplier(){
-  const nowKey = getParisDateTimeKey();
+  const nowKey = getParisDateTimeKey(serverNow());
   const event = SPECIAL_XP_EVENTS.find(e => nowKey >= e.start && nowKey <= e.end);
   return event ? Math.max(1, Number(event.multiplier) || 1) : 1;
 }
 
-function addXp(amount){
+// opts.ignoreEvent = true : le multiplicateur d'événement ne s'applique pas (ex. quêtes).
+function addXp(amount, opts = {}){
   if(!myPseudo || !amount) return 0;
   const baseAmount = Number(amount) || 0;
-  const multiplier = getActiveXpMultiplier();
+  const multiplier = opts.ignoreEvent ? 1 : getActiveXpMultiplier();
   const awardedAmount = Math.round(baseAmount * multiplier);
   const xpRef = ref(db, `players/${myPseudo}/xp`);
   runTransaction(xpRef, (current) => (current || 0) + awardedAmount);
@@ -2091,7 +2106,7 @@ function renderSpecialXpEvent(){
     banner.classList.remove('active');
     return;
   }
-  const nowKey = getParisDateTimeKey();
+  const nowKey = getParisDateTimeKey(serverNow());
   const isUpcoming = nowKey < event.start;
   title.textContent = isUpcoming ? `📢 À VENIR : ${event.title}` : event.title;
   message.textContent = event.message;
@@ -2164,8 +2179,8 @@ const WEEKLY_QUEST_DEFS = [
   { id: 'duels_25_week', scope: 'weekly', desc: 'Va au bout de 25 duels (gagnés ou perdus)', target: 25, xp: 130, matches: e => e.type === 'duel' && e.result !== 'abandon' },
   { id: 'ordi_30_wins_week', scope: 'weekly', desc: 'Gagne 30 parties contre l\'ordinateur', target: 30, xp: 140, matches: e => e.type === 'ordi' && e.result === 'gagné' },
   { id: 'flawless_3x_week', scope: 'weekly', desc: 'Trouve un code en 3 essais ou moins, 5 fois', target: 5, xp: 180, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 3 },
-  { id: 'xp_500_week', scope: 'weekly', desc: 'Accumule 500 XP de parties cette semaine', target: 500, xp: 200, amountFrom: e => e.xp || 0, matches: e => (e.xp || 0) > 0 },
-  { id: 'xp_1000_week', scope: 'weekly', desc: 'Accumule 1000 XP de parties cette semaine', target: 1000, xp: 300, amountFrom: e => e.xp || 0, matches: e => (e.xp || 0) > 0 },
+  { id: 'xp_500_week', scope: 'weekly', desc: 'Accumule 500 XP de parties cette semaine', target: 500, xp: 200, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
+  { id: 'xp_1000_week', scope: 'weekly', desc: 'Accumule 1000 XP de parties cette semaine', target: 1000, xp: 300, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
   { id: 'daily_all_week', scope: 'weekly', desc: 'Participe au défi du jour les 7 jours de la semaine', target: 7, xp: 250, distinctDays: true, matches: e => e.type === 'daily' },
   { id: 'daily_fast_10_week', scope: 'weekly', desc: 'Réussis le défi du jour en 10 essais ou moins, 4 fois', target: 4, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 10 },
   { id: 'ordi_fast_days_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins sur 4 jours différents', target: 4, xp: 150, distinctDays: true, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
@@ -2204,7 +2219,7 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
       return current;
     });
     if(claimResult.committed && claimResult.snapshot.val() && claimResult.snapshot.val().claimed){
-      const awardedQuestXp = addXp(q.xp);
+      const awardedQuestXp = addXp(q.xp, { ignoreEvent: true });
       showQuestToast(`🎯 Quête accomplie : ${q.desc} (+${awardedQuestXp} XP)`);
       recordGameHistory({type: 'quest', result: 'gagné', desc: q.desc, xp: awardedQuestXp});
     }
@@ -2213,6 +2228,7 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
 
 function bumpQuestsForEvent(entry){
   if(!myPseudo) return;
+  if(entry.type === 'quest') return; // une quête accomplie n'est ni une partie ni de l'XP de partie
   const dateKey = getParisDateKey();
   const weekKey = getMondayKeyFor(dateKey);
   getActiveDailyQuests(dateKey).forEach(q => { if(q.matches(entry)) bumpOneQuest('daily', dateKey, q, dateKey, entry); });
@@ -2280,6 +2296,11 @@ window.closeQuestsPanel = closeQuestsPanel;
 // --- Historique de parties (30 dernières, par compte) ---
 function recordGameHistory(entry){
   if(!myPseudo) return;
+  // Mémorise le multiplicateur d'événement appliqué (pour que les quêtes d'XP comptent l'XP de base).
+  if(entry.type !== 'quest' && entry.xp > 0){
+    const evMult = getActiveXpMultiplier();
+    if(evMult > 1) entry = {...entry, xpMult: evMult};
+  }
   const histRef = ref(db, `players/${myPseudo}/history`);
   push(histRef, {...entry, at: Date.now()}).then(trimGameHistory);
   bumpQuestsForEvent(entry);
@@ -3581,6 +3602,15 @@ function updateDailyTileGoldenState(){
   const dailyMultiplier = goldenMultiplier * eventMultiplier;
   const label = dailyMultiplier > 1 ? `✨ XP x${dailyMultiplier}` : 'XP+';
 
+  // Badges des autres modes : suivent l'événement en cours (XP / XP x2)
+  const eventLabel = eventMultiplier > 1 ? `✨ XP x${eventMultiplier}` : 'XP';
+  ['xpBadgeOrdi', 'xpBadgeSerie', 'xpBadgeDuel'].forEach(id => {
+    const b = document.getElementById(id);
+    if(!b) return;
+    b.textContent = eventLabel;
+    b.classList.toggle('golden', eventMultiplier > 1);
+  });
+
   if(dailyBadge) dailyBadge.textContent = label;
   if(puzzleBadge) puzzleBadge.textContent = label;
   if(dailyBadge) dailyBadge.classList.toggle('golden', dailyMultiplier > 1);
@@ -3602,7 +3632,7 @@ setInterval(updateDailyTileGoldenState, 30000);
 </script>
 <script>
 // ============================================================
-// EASTER EGG — 5 clics sur le B de BrainMind
+// EASTER EGG — 5 clics sur le B de BrainMind (réservé aux joueurs de grade Or)
 // Fond : images/easter-egg-city.png
 // Musique : audio/brainmind-secret.mp3
 // ============================================================
@@ -3653,7 +3683,11 @@ setInterval(updateDailyTileGoldenState, 30000);
     clearTimeout(clickTimer);
 
     if(clickCount >= REQUIRED_CLICKS){
-      activateEasterEgg();
+      clickCount = 0;
+      // Réservé au grade Or : pour les autres, rien ne se passe (le secret reste secret).
+      if(typeof window.isGoldPlayer === 'function' && window.isGoldPlayer()){
+        activateEasterEgg();
+      }
       return;
     }
 
