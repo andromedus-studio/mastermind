@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>BrainMind · Admin</title>
+<style>
+  :root {
+    --bg: #171220; --panel: #241a30; --panel2: #2f2340; --ink: #f2ece2; --dim: #b9aec6;
+    --gold: #ffc139; --ok: #58d68d; --bad: #ff8a80; --line: rgba(255,255,255,0.10);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 14px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 16px; margin: 0; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .hidden { display: none !important; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .center { text-align: center; max-width: 460px; margin: 40px auto; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); padding: 8px 14px; }
+  button:hover { border-color: var(--gold); }
+  button.primary { background: var(--gold); color: #1a1420; font-weight: 700; border-color: var(--gold); }
+  button.danger { color: var(--bad); }
+  input[type=text], input[type=search] { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 0; }
+  code { background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+  .muted { color: var(--dim); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .stat b { display: block; font-size: 22px; color: var(--gold); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+  .toolbar input { flex: 1 1 200px; }
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { position: sticky; top: 0; background: var(--panel2); cursor: pointer; user-select: none; font-size: 12px; color: var(--dim); }
+  tr.row { cursor: pointer; }
+  tr.row:hover td { background: rgba(255,193,57,0.06); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); }
+  .pill.ok { color: var(--ok); } .pill.warn { color: var(--gold); } .pill.bad { color: var(--bad); }
+  .overlay { position: fixed; inset: 0; background: rgba(8,6,12,0.82); z-index: 20; display: flex; align-items: flex-start; justify-content: center; padding: 20px 12px; overflow-y: auto; }
+  .modal { width: 100%; max-width: 560px; }
+  .kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 10px; margin: 10px 0; }
+  .kv div:nth-child(odd) { color: var(--dim); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+  h3 { margin: 14px 0 6px; font-size: 14px; }
+  .mini { width: 100%; min-width: 0; border-collapse: collapse; }
+  .mini th, .mini td { padding: 5px 6px; font-size: 12px; position: static; cursor: default; }
+  #toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--gold); border-radius: 12px; padding: 10px 16px; z-index: 40; max-width: 92vw; }
+  #toast.err { border-color: var(--bad); color: var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🛠️ BrainMind · Admin</h1>
+  <div id="who" class="muted"></div>
+</header>
+
+<main>
+  <!-- Connexion -->
+  <section id="loginView" class="card center hidden">
+    <h2>Connexion administrateur</h2>
+    <p class="muted">Connecte-toi avec le même compte Google que celui que tu as lié dans le jeu.</p>
+    <button class="primary" id="loginBtn">Se connecter avec Google</button>
+    <p id="loginErr" class="muted"></p>
+  </section>
+
+  <!-- Connecté mais pas admin -->
+  <section id="denyView" class="card center hidden">
+    <h2>Accès non autorisé</h2>
+    <p class="muted">Ce compte n'est pas administrateur. Pour t'autoriser : dans la console Firebase → Realtime Database, crée le nœud <code id="denyPath"></code> avec la valeur <code>true</code>, puis recharge cette page.</p>
+    <p>Ton identifiant : <code id="denyUid"></code></p>
+    <button id="denyLogout">Se déconnecter</button>
+  </section>
+
+  <!-- Administration -->
+  <section id="adminView" class="hidden">
+    <div class="cards" id="summary"></div>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Rechercher un pseudo…">
+      <button id="refreshBtn">↻ Actualiser</button>
+      <button id="reserveBtn">🛡️ Réserver un pseudo</button>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th data-k="pseudo">Pseudo</th>
+            <th data-k="level" class="num">Niv</th>
+            <th data-k="xp" class="num">XP</th>
+            <th data-k="games" class="num">Parties</th>
+            <th data-k="wins" class="num">V</th>
+            <th data-k="losses" class="num">D</th>
+            <th data-k="rate" class="num">% V</th>
+            <th data-k="status">Statut</th>
+            <th data-k="seen">Dernière activité</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="muted" id="footnote"></p>
+  </section>
+</main>
+
+<div id="modalWrap" class="overlay hidden"><div class="card modal" id="modal"></div></div>
+<div id="toast" class="hidden"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCEbzwWaOrhEb5pE-UPrdUy1g2KF4YWL0Y",
+  authDomain: "brainmind-96ed3.firebaseapp.com",
+  databaseURL: "https://brainmind-96ed3-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "brainmind-96ed3",
+  storageBucket: "brainmind-96ed3.firebasestorage.app",
+  messagingSenderId: "284482234772",
+  appId: "1:284482234772:web:dae16e24a607e3d0300781"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// --- Mêmes règles que le jeu (à garder synchronisées avec index.html) ---
+const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20 };
+const TIER_ICONS = { debutant: '🌱', bronze: '🥉', silver: '🥈', gold: '🥇', emerald: '💚' };
+function levelFromXp(totalXp){
+  let level = 1, remaining = totalXp || 0;
+  while(remaining >= 50 * level){ remaining -= 50 * level; level++; }
+  return level;
+}
+function tierOf(level){
+  if(level >= RANK_LEVELS.emerald) return 'emerald';
+  if(level >= RANK_LEVELS.gold) return 'gold';
+  if(level >= RANK_LEVELS.silver) return 'silver';
+  if(level >= RANK_LEVELS.bronze) return 'bronze';
+  return 'debutant';
+}
+const pseudoKey = (p) => String(p).normalize('NFC').trim().toLowerCase();
+function validatePseudo(v){
+  if(v.length < 2 || v.length > 16) return 'Le pseudo doit faire entre 2 et 16 caractères.';
+  if(/[.#$\[\]\/\u0000-\u001f\u007f]/.test(v)) return 'Caractères interdits : . # $ [ ] /';
+  return '';
+}
+const MODE_LABELS = { vsordi: 'Joueur vs Ordi', cache: 'Je cache un code', seriemind: 'Série-Mind', duel: 'Duel', daily: 'Défi du jour', puzzle: 'Puzzle du jour', ordi: 'Ordi', quest: 'Quête' };
+
+let DATA = { players: {}, owners: {}, accounts: {} };
+let sortKey = 'xp', sortDir = -1, currentUser = null;
+
+function toast(msg, isErr){
+  const t = $('toast'); t.textContent = msg; t.classList.toggle('err', !!isErr); t.classList.remove('hidden');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3500);
+}
+function fmtDate(ts){
+  if(!ts) return '—';
+  return new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function showView(name){
+  ['loginView', 'denyView', 'adminView'].forEach(v => $(v).classList.toggle('hidden', v !== name));
+}
+
+// ---------------- Authentification ----------------
+$('loginBtn').onclick = async () => {
+  $('loginErr').textContent = '';
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch(e){ $('loginErr').textContent = 'Connexion impossible : ' + (e.code || e.message); }
+};
+$('denyLogout').onclick = () => signOut(auth);
+function whoHTML(){
+  return currentUser && !currentUser.isAnonymous ? `<button id="logoutBtn">Déconnexion</button>` : '';
+}
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
+  $('who').innerHTML = whoHTML();
+  const lb = $('logoutBtn'); if(lb) lb.onclick = () => signOut(auth);
+  if(!user || user.isAnonymous){ showView('loginView'); return; }
+  let isAdmin = false;
+  try { isAdmin = (await get(ref(db, 'admins/' + user.uid))).val() === true; } catch(e){}
+  if(!isAdmin){
+    $('denyUid').textContent = user.uid;
+    $('denyPath').textContent = 'admins/' + user.uid;
+    showView('denyView');
+    return;
+  }
+  showView('adminView');
+  await loadAll();
+});
+
+// ---------------- Données ----------------
+async function loadAll(){
+  try {
+    const [p, o, a] = await Promise.all([get(ref(db, 'players')), get(ref(db, 'pseudoOwners')), get(ref(db, 'accounts'))]);
+    DATA.players = p.val() || {};
+    DATA.owners = o.val() || {};
+    DATA.accounts = a.val() || {};
+    render();
+  } catch(e){
+    toast('Lecture impossible : ' + (e.code || e.message), true);
+  }
+}
+function buildRows(){
+  const names = new Map();
+  Object.keys(DATA.players).forEach(p => names.set(pseudoKey(p) + '|' + p, p));
+  Object.values(DATA.owners).forEach(o => { if(o && o.pseudo && !DATA.players[o.pseudo]) names.set(pseudoKey(o.pseudo) + '|' + o.pseudo, o.pseudo); });
+  return [...names.values()].map(p => {
+    const pl = DATA.players[p] || {};
+    const owner = DATA.owners[pseudoKey(p)] || null;
+    const acc = owner && owner.uid && owner.uid !== 'reserved' ? DATA.accounts[owner.uid] : null;
+    const st = pl.stats || {};
+    const xp = typeof pl.xp === 'number' ? pl.xp : 0;
+    const level = levelFromXp(xp);
+    const games = st.games || 0, wins = st.wins || 0, losses = st.losses || 0;
+    let status = 'none';
+    if(owner && owner.reserved) status = 'reserved';
+    else if(owner) status = (acc && acc.google) ? 'google' : 'guest';
+    return {
+      pseudo: p, xp, level, tier: tierOf(level), games, wins, losses,
+      rate: (wins + losses) ? Math.round(100 * wins / (wins + losses)) : -1,
+      status, owner, acc, stats: st, hasPlayer: !!DATA.players[p],
+      seen: (acc && acc.seen) || st.lastPlayed || 0
+    };
+  });
+}
+const STATUS_LABEL = {
+  google: ['🟢 Google', 'ok'], guest: ['🟡 Protégé (invité)', 'warn'],
+  reserved: ['🛡️ Réservé', 'warn'], none: ['⚪ Non protégé', 'bad']
+};
+function render(){
+  const rows = buildRows();
+  const q = $('search').value.trim().toLowerCase();
+  const shown = rows.filter(r => !q || r.pseudo.toLowerCase().includes(q));
+  const dir = sortDir;
+  shown.sort((a, b) => {
+    const va = a[sortKey], vb = b[sortKey];
+    if(typeof va === 'string') return dir * va.localeCompare(vb);
+    return dir * ((va || 0) - (vb || 0));
+  });
+  const real = rows.filter(r => r.status !== 'reserved');
+  const totalGames = real.reduce((s, r) => s + r.games, 0);
+  $('summary').innerHTML = [
+    ['Joueurs', real.length], ['Comptes protégés', real.filter(r => r.owner).length],
+    ['Liés à Google', real.filter(r => r.status === 'google').length], ['Non protégés', real.filter(r => r.status === 'none').length],
+    ['Parties comptées', totalGames]
+  ].map(([l, v]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
+  $('rows').innerHTML = shown.map(r => {
+    const [lab, cls] = STATUS_LABEL[r.status];
+    return `<tr class="row" data-p="${esc(r.pseudo)}">
+      <td>${TIER_ICONS[r.tier]} <b>${esc(r.pseudo)}</b></td>
+      <td class="num">${r.level}</td><td class="num">${r.xp}</td>
+      <td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td>
+      <td class="num">${r.rate < 0 ? '—' : r.rate + ' %'}</td>
+      <td><span class="pill ${cls}">${lab}</span></td>
+      <td class="muted">${fmtDate(r.seen)}</td></tr>`;
+  }).join('') || `<tr><td colspan="9" class="muted">Aucun joueur.</td></tr>`;
+  $('footnote').textContent = 'Les compteurs de parties démarrent à la date « depuis » de chaque joueur (mise à jour du jeu) ; l\'historique détaillé est limité à 30 parties.';
+  document.querySelectorAll('#rows tr.row').forEach(tr => tr.onclick = () => openDetail(tr.dataset.p));
+}
+$('search').oninput = render;
+$('refreshBtn').onclick = async () => { await loadAll(); toast('Données actualisées.'); };
+document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
+  const k = th.dataset.k;
+  if(sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = (k === 'pseudo' || k === 'status') ? 1 : -1; }
+  render();
+});
+
+// ---------------- Détail d'un joueur ----------------
+function closeModal(){ $('modalWrap').classList.add('hidden'); }
+$('modalWrap').onclick = (e) => { if(e.target === $('modalWrap')) closeModal(); };
+function openDetail(pseudo){
+  const r = buildRows().find(x => x.pseudo === pseudo);
+  if(!r) return;
+  const st = r.stats || {};
+  const byMode = st.byMode || {};
+  const modeRows = Object.keys(byMode).map(m => {
+    const x = byMode[m]; return `<tr><td>${esc(MODE_LABELS[m] || m)}</td><td class="num">${x.games || 0}</td><td class="num">${x.wins || 0}</td><td class="num">${x.losses || 0}</td><td class="num">${x.abandons || 0}</td></tr>`;
+  }).join('') || `<tr><td colspan="5" class="muted">Pas encore de stats.</td></tr>`;
+  const hist = Object.values((DATA.players[pseudo] || {}).history || {}).sort((a, b) => b.at - a.at).slice(0, 8);
+  const histRows = hist.map(h => `<tr><td>${fmtDate(h.at)}</td><td>${esc(MODE_LABELS[h.sub] || MODE_LABELS[h.type] || h.type)}${h.opponent ? ' vs ' + esc(h.opponent) : ''}</td><td>${esc(h.result || '')}</td><td class="num">${h.xp || 0}</td></tr>`).join('')
+    || `<tr><td colspan="4" class="muted">Aucune partie.</td></tr>`;
+  const [lab] = STATUS_LABEL[r.status];
+  const canRelease = !!r.owner;
+  const canReserve = !r.owner;
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0">${TIER_ICONS[r.tier]} ${esc(pseudo)}</h2>
+      <button id="mClose">✕</button>
+    </div>
+    <div class="kv">
+      <div>Niveau / XP</div><div>Niv ${r.level} · ${r.xp} XP</div>
+      <div>Statut</div><div>${lab}</div>
+      <div>Compte créé</div><div>${fmtDate(r.owner && r.owner.at)}</div>
+      <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
+      <div>Code de secours</div><div>${r.owner && r.owner.recoveryHash ? '✅ généré' : '—'}</div>
+      <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
+      <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
+    </div>
+    <div class="actions">
+      <button id="aRename">✏️ Renommer</button>
+      <button id="aXp">🎚️ Modifier l'XP</button>
+      ${canReserve ? '<button id="aReserve">🛡️ Réserver le pseudo</button>' : ''}
+      ${canRelease ? '<button id="aRelease">🔓 Libérer le pseudo</button>' : ''}
+      <button id="aDelete" class="danger">🗑️ Supprimer</button>
+    </div>
+    <h3>Par mode</h3>
+    <table class="mini"><thead><tr><th>Mode</th><th class="num">Parties</th><th class="num">V</th><th class="num">D</th><th class="num">Abandons</th></tr></thead><tbody>${modeRows}</tbody></table>
+    <h3>Dernières parties</h3>
+    <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>Résultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  $('aRename').onclick = () => renamePlayer(pseudo);
+  $('aXp').onclick = () => setXp(pseudo);
+  if($('aReserve')) $('aReserve').onclick = () => reservePseudo(pseudo);
+  if($('aRelease')) $('aRelease').onclick = () => releasePseudo(pseudo);
+  $('aDelete').onclick = () => deletePlayer(pseudo);
+}
+
+// ---------------- Actions ----------------
+async function renamePlayer(oldP){
+  const input = prompt(`Nouveau pseudo pour « ${oldP} » :`, oldP);
+  if(input === null) return;
+  const newP = input.trim().normalize('NFC');
+  if(newP === oldP) return;
+  const err = validatePseudo(newP);
+  if(err){ toast(err, true); return; }
+  const oldKey = pseudoKey(oldP), newKey = pseudoKey(newP);
+  try {
+    // Données fraîches
+    const [ownerOldS, ownerNewS, playerNewS, playerOldS, matchS] = await Promise.all([
+      get(ref(db, 'pseudoOwners/' + oldKey)), get(ref(db, 'pseudoOwners/' + newKey)),
+      get(ref(db, 'players/' + newP)), get(ref(db, 'players/' + oldP)), get(ref(db, 'matchResults/' + oldP))
+    ]);
+    const ownerOld = ownerOldS.val();
+    if(newKey !== oldKey && ownerNewS.exists()){ toast('Ce pseudo est déjà pris ou réservé.', true); return; }
+    if(playerNewS.exists()){ toast('Un joueur porte déjà ce pseudo.', true); return; }
+    if(!ownerOld && !confirm(`« ${oldP} » n'a pas de compte protégé : le renommage sera appliqué sur son téléphone à sa prochaine ouverture du jeu (mise à jour requise). Continuer ?`)) return;
+    if(!confirm(`Renommer « ${oldP} » en « ${newP} » ? Toute sa progression sera déplacée.`)) return;
+
+    const u = {};
+    if(playerOldS.exists()){ u['players/' + newP] = playerOldS.val(); u['players/' + oldP] = null; }
+    if(matchS.exists()){ u['matchResults/' + newP] = matchS.val(); u['matchResults/' + oldP] = null; }
+    if(ownerOld){
+      if(newKey !== oldKey) u['pseudoOwners/' + oldKey] = null;
+      u['pseudoOwners/' + newKey] = { ...ownerOld, pseudo: newP };
+      if(ownerOld.uid && ownerOld.uid !== 'reserved') u['accounts/' + ownerOld.uid + '/pseudo'] = newP;
+      if(ownerOld.recoveryHash) u['recovery/' + ownerOld.recoveryHash + '/pseudo'] = newP;
+    }
+    u['renames/' + oldKey] = { to: newP, at: Date.now() };
+    await update(ref(db), u);   // une seule écriture atomique
+    toast(`« ${oldP} » est devenu « ${newP} ».`);
+    closeModal();
+    await loadAll();
+  } catch(e){
+    toast('Renommage impossible : ' + (e.code || e.message), true);
+  }
+}
+async function setXp(pseudo){
+  const cur = (DATA.players[pseudo] || {}).xp || 0;
+  const input = prompt(`Nouvelle XP totale pour « ${pseudo} » (actuelle : ${cur}) :`, String(cur));
+  if(input === null) return;
+  const n = Math.round(Number(input));
+  if(!Number.isFinite(n) || n < 0 || n > 10000000){ toast('Valeur invalide.', true); return; }
+  try { await set(ref(db, 'players/' + pseudo + '/xp'), n); toast('XP mise à jour.'); closeModal(); await loadAll(); }
+  catch(e){ toast('Modification impossible : ' + (e.code || e.message), true); }
+}
+async function reservePseudo(pseudo){
+  if(!confirm(`Réserver « ${pseudo} » ? Personne ne pourra le réclamer tant que tu ne l'auras pas libéré.`)) return;
+  try {
+    await set(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: 'reserved', pseudo, at: Date.now(), reserved: true });
+    toast('Pseudo réservé.'); closeModal(); await loadAll();
+  } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+}
+async function releasePseudo(pseudo){
+  const owner = DATA.owners[pseudoKey(pseudo)];
+  if(!confirm(`Libérer « ${pseudo} » ? Le prochain appareil qui ouvre le jeu avec ce pseudo pourra le réclamer.`)) return;
+  try {
+    const u = { ['pseudoOwners/' + pseudoKey(pseudo)]: null };
+    if(owner && owner.recoveryHash) u['recovery/' + owner.recoveryHash] = null;
+    await update(ref(db), u);
+    toast('Pseudo libéré.'); closeModal(); await loadAll();
+  } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+}
+async function deletePlayer(pseudo){
+  const typed = prompt(`Supprime définitivement « ${pseudo} » et toute sa progression.\nTape SUPPRIMER pour confirmer.`);
+  if(typed !== 'SUPPRIMER') return;
+  const owner = DATA.owners[pseudoKey(pseudo)];
+  try {
+    const u = { ['players/' + pseudo]: null, ['matchResults/' + pseudo]: null, ['pseudoOwners/' + pseudoKey(pseudo)]: null };
+    if(owner && owner.recoveryHash) u['recovery/' + owner.recoveryHash] = null;
+    if(owner && owner.uid && owner.uid !== 'reserved') u['accounts/' + owner.uid] = null;
+    await update(ref(db), u);
+    toast('Joueur supprimé.'); closeModal(); await loadAll();
+  } catch(e){ toast('Suppression impossible : ' + (e.code || e.message), true); }
+}
+$('reserveBtn').onclick = async () => {
+  const input = prompt('Pseudo à réserver (par ex. un nom officiel) :');
+  if(input === null) return;
+  const p = input.trim().normalize('NFC');
+  const err = validatePseudo(p);
+  if(err){ toast(err, true); return; }
+  try {
+    const existing = await get(ref(db, 'pseudoOwners/' + pseudoKey(p)));
+    if(existing.exists()){ toast('Ce pseudo est déjà pris ou réservé.', true); return; }
+    await set(ref(db, 'pseudoOwners/' + pseudoKey(p)), { uid: 'reserved', pseudo: p, at: Date.now(), reserved: true });
+    toast('Pseudo réservé.'); await loadAll();
+  } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+};
+</script>
+</body>
+</html>

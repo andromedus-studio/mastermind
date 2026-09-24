@@ -2154,7 +2154,7 @@ async function claimPseudo(pseudo){
     }), 8000);
     if(!res) return { ok: true, offline: true };
     if(!res.committed) return { ok: false, reason: 'taken' };
-    set(ref(db, 'accounts/' + authUid), { pseudo, at: Date.now() }).catch(() => {});
+    update(ref(db, 'accounts/' + authUid), { pseudo, seen: Date.now(), google: isGoogleLinked() }).catch(() => {});
     return { ok: true };
   } catch(e){
     console.warn('claimPseudo', e);
@@ -2165,6 +2165,29 @@ async function claimPseudo(pseudo){
 // Au démarrage : les joueurs existants réclament automatiquement leur pseudo.
 async function verifyOwnershipAtStartup(){
   if(!myPseudo || !authUid) return;
+  // 1. Renommage fait côté serveur (page admin) : le compte pointe vers un autre pseudo
+  try {
+    const acc = (await get(ref(db, 'accounts/' + authUid))).val();
+    if(acc && acc.pseudo && acc.pseudo !== myPseudo){
+      const owner = await getOwnerInfo(acc.pseudo);
+      if(owner && owner.uid === authUid){
+        try { localStorage.setItem('brainmind_pseudo', acc.pseudo); } catch(e){}
+        location.reload();
+        return;
+      }
+    }
+    // 2. Pseudo non protégé renommé par l'admin : redirection vers le nouveau pseudo
+    const ownerNow = await getOwnerInfo(myPseudo);
+    if(!ownerNow){
+      const redirect = (await get(ref(db, 'renames/' + pseudoKey(myPseudo)))).val();
+      if(redirect && redirect.to){
+        try { localStorage.setItem('brainmind_pseudo', redirect.to); } catch(e){}
+        location.reload();
+        return;
+      }
+    }
+  } catch(e){ console.warn('verifyOwnership', e); }
+  // 3. Réclamation normale
   const res = await claimPseudo(myPseudo);
   if(res.ok) return;
   try { sessionStorage.setItem('brainmind_conflict', myPseudo); } catch(e){}
@@ -2207,7 +2230,7 @@ async function recoverWithCode(input){
   const pseudo = snap.val().pseudo;
   await update(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: authUid, pseudo, at: Date.now(), recoveryHash: null });
   await remove(ref(db, 'recovery/' + hash));
-  await set(ref(db, 'accounts/' + authUid), { pseudo, at: Date.now() });
+  await update(ref(db, 'accounts/' + authUid), { pseudo, seen: Date.now(), google: isGoogleLinked() });
   return { ok: true, pseudo };
 }
 
@@ -2307,6 +2330,7 @@ async function settingsLinkGoogle(){
   settingsMsg('Ouverture de Google…');
   try {
     await authMod.linkWithPopup(auth.currentUser, new authMod.GoogleAuthProvider());
+    update(ref(db, 'accounts/' + authUid), { google: true }).catch(() => {});
     settingsMsg('✅ Compte sauvegardé avec Google.');
     await renderSettings();
     refreshSaveReminder();
@@ -2873,7 +2897,32 @@ function recordGameHistory(entry){
   }
   const histRef = ref(db, `players/${myPseudo}/history`);
   push(histRef, {...entry, at: Date.now()}).then(trimGameHistory);
+  bumpPlayerStats(entry);
   bumpQuestsForEvent(entry);
+}
+
+// Compteurs cumulés (l'historique détaillé est limité à 30 parties) : players/<pseudo>/stats
+function bumpPlayerStats(entry){
+  if(!myPseudo || entry.type === 'quest') return;
+  const mode = entry.type === 'ordi' ? (entry.sub || 'ordi') : entry.type;
+  const won = entry.result === 'gagné';
+  const abandoned = entry.result === 'abandon';
+  runTransaction(ref(db, `players/${myPseudo}/stats`), (cur) => {
+    const st = cur || { since: Date.now(), games: 0, wins: 0, losses: 0, abandons: 0, xpGained: 0, byMode: {} };
+    const bump = (o) => {
+      o.games = (o.games || 0) + 1;
+      if(won) o.wins = (o.wins || 0) + 1;
+      else if(abandoned) o.abandons = (o.abandons || 0) + 1;
+      else o.losses = (o.losses || 0) + 1;
+    };
+    bump(st);
+    st.xpGained = (st.xpGained || 0) + (entry.xp || 0);
+    st.lastPlayed = Date.now();
+    st.byMode = st.byMode || {};
+    st.byMode[mode] = st.byMode[mode] || { games: 0, wins: 0, losses: 0, abandons: 0 };
+    bump(st.byMode[mode]);
+    return st;
+  }).catch(() => {});
 }
 
 function trimGameHistory(){
