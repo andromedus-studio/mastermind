@@ -515,6 +515,21 @@
   .rank-secret { margin-top: 4px; font-size: 12px; font-style: italic; color: var(--gold); }
   .rank-info-scroll { max-height: 62vh; overflow-y: auto; margin-bottom: 12px; }
   .rank-info-intro { text-align: center; font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
+  .code-box {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 18px; letter-spacing: 1px;
+    text-align: center; padding: 12px 8px; margin: 8px 0; border: 1px dashed var(--gold);
+    border-radius: 10px; background: rgba(0,0,0,0.25); user-select: all; word-break: break-all;
+  }
+  .settings-note { font-size: 12px; color: var(--ink-dim); line-height: 1.5; margin: 4px 0 8px; }
+  .settings-msg { font-size: 12px; margin: 6px 0; min-height: 16px; text-align: center; color: var(--ink-dim); }
+  .settings-msg.error { color: #ff8a80; }
+  .settings-status { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 999px; background: rgba(255,255,255,0.08); }
+  .settings-block .btn { margin-top: 6px; }
+  .save-reminder {
+    margin: 0 0 14px; padding: 8px 12px; text-align: center; font-size: 12px; font-weight: 700;
+    color: var(--gold); border: 1px dashed rgba(255,193,57,0.55); border-radius: 12px; cursor: pointer;
+    background: rgba(255,193,57,0.06);
+  }
   .sound-toggle:hover { border-color: var(--gold); }
   .sound-toggle.playing { color: var(--gold); border-color: var(--gold); }
 
@@ -765,7 +780,10 @@
         <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 15 des joueurs">🏆</button>
         <button class="online-icon-btn" onclick="openMyGameHistory()" title="Mes dernières parties">📜</button>
         <button class="online-icon-btn" onclick="openQuestsPanel()" title="Quêtes du jour et de la semaine">🎯</button>
+        <button class="online-icon-btn" onclick="openSettings()" title="Paramètres">⚙️</button>
       </div>
+
+      <div id="saveReminder" class="save-reminder hidden" onclick="openSettings()">🛡️ Ta progression n'est pas sauvegardée · Paramètres ›</div>
 
       <div id="specialXpEventBanner" class="special-xp-banner" aria-live="polite">
         <div class="event-title" id="specialXpEventTitle"></div>
@@ -1742,7 +1760,40 @@ function undoLastMove(){
     <button class="btn" id="pseudoSubmitBtn" onclick="submitPseudo()">Continuer</button>
     <button class="btn secondary hidden" id="pseudoCancelBtn" onclick="closeDuelOverlay()">Annuler</button>
     <button class="btn-text-danger" id="pseudoSkipLink" onclick="skipPseudo()" style="color:var(--ink-dim);">Continuer sans pseudo (parties solo uniquement)</button>
+    <button class="btn-text-danger" onclick="openRecover()" style="color:var(--gold);">🔑 J'ai déjà un compte (Google ou code de secours)</button>
     <div class="duel-error" id="pseudoError"></div>
+  </div>
+</div>
+
+<!-- Paramètres du compte -->
+<div id="settingsScreen" class="hidden duel-overlay" onclick="if(event.target === this) closeSettings()">
+  <div class="card duel-card">
+    <div class="duel-title">⚙️ Paramètres</div>
+    <div class="rank-info-scroll" id="settingsBody"></div>
+    <div class="settings-msg" id="settingsMsg"></div>
+    <button class="btn secondary" onclick="closeSettings()">Fermer</button>
+  </div>
+</div>
+
+<!-- Récupérer un compte (Google ou code de secours) -->
+<div id="recoverScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🔑 Récupérer mon compte</div>
+    <div id="recoverChoices">
+      <p class="duel-sub">Retrouve ton pseudo et ta progression sur cet appareil.</p>
+      <button class="btn" onclick="recoverWithGoogleClick()">Se connecter avec Google</button>
+      <p class="settings-note" style="text-align:center;">ou avec ton code de secours</p>
+      <input type="text" id="recoverCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <button class="btn secondary" onclick="recoverWithCodeClick()">Récupérer avec le code</button>
+    </div>
+    <div id="recoverSuccess" class="hidden">
+      <p class="duel-sub" id="recoverSuccessText"></p>
+      <div class="code-box" id="recoverNewCode"></div>
+      <p class="settings-note">Note ce nouveau code : l'ancien ne fonctionne plus. Il ne sera plus affiché.</p>
+      <button class="btn" onclick="recoverContinue()">Continuer</button>
+    </div>
+    <div class="duel-error" id="recoverError"></div>
+    <button class="btn secondary" id="recoverBackBtn" onclick="closeRecover()">Retour</button>
   </div>
 </div>
 
@@ -2031,7 +2082,388 @@ function loadSavedSession(){
   }
 }
 
+
+// ============================================================
+// COMPTE : compte invité (auth anonyme) + Google facultatif + code de secours
+// Tout est facultatif : si Firebase Auth est indisponible, le jeu fonctionne comme avant.
+// Données : pseudoOwners/<pseudo en minuscules> = { uid, pseudo, at, recoveryHash? }
+//           accounts/<uid> = { pseudo, at }      recovery/<sha256(code)> = { pseudo, at }
+// ============================================================
+const AUTH_URL = 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
+let authMod = null;
+let auth = null;
+let authUid = null;
+let authAvailable = false;
+
+function withTimeout(promise, ms){
+  return Promise.race([promise, new Promise(res => setTimeout(() => res(undefined), ms))]);
+}
+
+async function initAuth(){
+  try {
+    authMod = await import(AUTH_URL);   // import dynamique : si ça échoue, le jeu continue sans compte en ligne
+    auth = authMod.getAuth(firebaseApp);
+    await new Promise(res => {
+      let unsub = null;
+      unsub = authMod.onAuthStateChanged(auth, () => { if(unsub) unsub(); res(); });
+    });
+    if(!auth.currentUser) await authMod.signInAnonymously(auth);
+    authUid = auth.currentUser ? auth.currentUser.uid : null;
+    authAvailable = !!authUid;
+    authMod.onAuthStateChanged(auth, (u) => { authUid = u ? u.uid : null; });
+  } catch(e){
+    console.warn('Compte en ligne indisponible : mode invité local.', e);
+    authAvailable = false;
+    authUid = null;
+  }
+  return authAvailable;
+}
+const authReady = withTimeout(initAuth(), 8000).then(ok => !!ok);
+
+function isGoogleLinked(){
+  return !!(auth && auth.currentUser && auth.currentUser.providerData.some(p => p.providerId === 'google.com'));
+}
+function isInAppBrowser(){
+  return /FBAN|FBAV|Instagram|Line\/|Messenger|Snapchat|Twitter|; wv\)/i.test(navigator.userAgent);
+}
+
+// --- Pseudo : clé de comparaison et validation ---
+function pseudoKey(p){ return String(p).normalize('NFC').trim().toLowerCase(); }
+function validatePseudo(v){
+  if(v.length < 2 || v.length > 16) return 'Le pseudo doit faire entre 2 et 16 caractères.';
+  if(/[.#$\[\]\/\u0000-\u001f\u007f]/.test(v)) return 'Caractères interdits : . # $ [ ] /';
+  return '';
+}
+
+async function getOwnerInfo(pseudo){
+  const snap = await get(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)));
+  return snap.val();
+}
+
+// Réclame un pseudo pour ce compte. { ok:true } si libre ou déjà à moi, { ok:false } si pris.
+// En cas de souci technique (hors ligne, auth absente) : { ok:true } pour ne rien bloquer.
+async function claimPseudo(pseudo){
+  try {
+    const ready = await authReady;
+    if(!ready || !authUid) return { ok: true, legacy: true };
+    const ownerRef = ref(db, 'pseudoOwners/' + pseudoKey(pseudo));
+    const res = await withTimeout(runTransaction(ownerRef, (cur) => {
+      if(cur === null || cur === undefined) return { uid: authUid, pseudo, at: Date.now() };
+      if(cur.uid === authUid) return cur;
+      return; // pris par un autre compte : on abandonne
+    }), 8000);
+    if(!res) return { ok: true, offline: true };
+    if(!res.committed) return { ok: false, reason: 'taken' };
+    set(ref(db, 'accounts/' + authUid), { pseudo, at: Date.now() }).catch(() => {});
+    return { ok: true };
+  } catch(e){
+    console.warn('claimPseudo', e);
+    return { ok: true, legacy: true };
+  }
+}
+
+// Au démarrage : les joueurs existants réclament automatiquement leur pseudo.
+async function verifyOwnershipAtStartup(){
+  if(!myPseudo || !authUid) return;
+  const res = await claimPseudo(myPseudo);
+  if(res.ok) return;
+  try { sessionStorage.setItem('brainmind_conflict', myPseudo); } catch(e){}
+  try { localStorage.removeItem('brainmind_pseudo'); } catch(e){}
+  location.reload();
+}
+
+// --- Code de secours ---
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // sans I, L, O, 0, 1
+function generateRecoveryCode(){
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let raw = '';
+  bytes.forEach(b => { raw += CODE_ALPHABET[b % CODE_ALPHABET.length]; });
+  return raw.match(/.{4}/g).join('-');
+}
+async function hashCode(code){
+  const norm = String(code).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if(norm.length !== 16) return null;
+  if(!(window.crypto && crypto.subtle)) throw new Error('crypto-unavailable');
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(norm));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+async function createRecoveryCode(){
+  const owner = await getOwnerInfo(myPseudo);
+  if(!owner || owner.uid !== authUid) throw new Error('not-owner');
+  const code = generateRecoveryCode();
+  const hash = await hashCode(code);
+  if(owner.recoveryHash) await remove(ref(db, 'recovery/' + owner.recoveryHash));
+  await set(ref(db, 'recovery/' + hash), { pseudo: myPseudo, at: Date.now() });
+  await update(ref(db, 'pseudoOwners/' + pseudoKey(myPseudo)), { recoveryHash: hash });
+  return code;
+}
+// Retrouve le pseudo grâce au code, transfère la propriété à cet appareil, invalide le code.
+async function recoverWithCode(input){
+  const hash = await hashCode(input);
+  if(!hash) return { ok: false, reason: 'format' };
+  const snap = await get(ref(db, 'recovery/' + hash));
+  if(!snap.exists()) return { ok: false, reason: 'invalid' };
+  const pseudo = snap.val().pseudo;
+  await update(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: authUid, pseudo, at: Date.now(), recoveryHash: null });
+  await remove(ref(db, 'recovery/' + hash));
+  await set(ref(db, 'accounts/' + authUid), { pseudo, at: Date.now() });
+  return { ok: true, pseudo };
+}
+
+// --- Google ---
+function googleErrorMessage(e){
+  const c = (e && e.code) || '';
+  if(c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return 'Connexion annulée.';
+  if(c === 'auth/credential-already-in-use') return "Ce compte Google est déjà lié à une autre progression. Pour la récupérer ici : Paramètres → Changer de compte, puis « J'ai déjà un compte ».";
+  if(c === 'auth/popup-blocked') return 'La fenêtre Google a été bloquée : autorise les pop-ups pour ce site puis réessaie.';
+  if(c === 'auth/unauthorized-domain') return "Ce site n'est pas encore autorisé pour la connexion Google (à activer dans Firebase).";
+  if(c === 'auth/operation-not-allowed') return "La connexion Google n'est pas encore activée pour ce jeu (à activer dans Firebase).";
+  if(isInAppBrowser()) return 'Google refuse la connexion dans ce navigateur intégré : ouvre le jeu dans Chrome ou Safari.';
+  return 'Connexion Google impossible pour le moment.';
+}
+
+// --- Rappel « progression non sauvegardée » ---
+async function refreshSaveReminder(){
+  const el = document.getElementById('saveReminder');
+  if(!el) return;
+  let show = false;
+  if(authAvailable && myPseudo && !isGoogleLinked()){
+    try {
+      const o = await getOwnerInfo(myPseudo);
+      show = !!(o && o.uid === authUid && !o.recoveryHash);
+    } catch(e){}
+  }
+  el.classList.toggle('hidden', !show);
+}
+
+// --- Écran Paramètres ---
+function settingsMsg(text, isError){
+  const el = document.getElementById('settingsMsg');
+  if(!el) return;
+  el.textContent = text || '';
+  el.classList.toggle('error', !!isError);
+}
+async function openSettings(){
+  settingsMsg('');
+  document.getElementById('settingsScreen').classList.remove('hidden');
+  await renderSettings();
+}
+function closeSettings(){
+  document.getElementById('settingsScreen').classList.add('hidden');
+}
+async function renderSettings(){
+  const body = document.getElementById('settingsBody');
+  if(!body) return;
+  await withTimeout(authReady, 3000);
+  if(!myPseudo){
+    body.innerHTML = `<div class="rank-block settings-block">
+      <div class="rank-block-title">👤 Compte</div>
+      <p class="settings-note">Choisis d'abord un pseudo pour pouvoir sauvegarder ta progression.</p>
+      <button class="btn" onclick="closeSettings(); pseudoScreenPurpose='startup'; showPseudoScreen();">Choisir un pseudo</button>
+    </div>
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">🔑 J'ai déjà un compte</div>
+      <button class="btn secondary" onclick="closeSettings(); openRecover();">Récupérer mon compte</button>
+    </div>`;
+    return;
+  }
+  if(!authAvailable){
+    body.innerHTML = `<div class="rank-block settings-block">
+      <div class="rank-block-title">👤 ${escapeHtml(myPseudo)}</div>
+      <p class="settings-note">⚠️ La sauvegarde en ligne est indisponible pour le moment. Ta progression reste liée à cet appareil.</p>
+    </div>`;
+    return;
+  }
+  let owner = null;
+  try { owner = await getOwnerInfo(myPseudo); } catch(e){}
+  const linked = isGoogleLinked();
+  const hasCode = !!(owner && owner.recoveryHash);
+  const status = linked ? '🟢 Sauvegardé avec Google' : '🟡 Invité : progression liée à cet appareil';
+  body.innerHTML = `
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">👤 ${escapeHtml(myPseudo)}</div>
+      <div><span class="settings-status">${status}</span></div>
+      ${linked ? '' : `<p class="settings-note">Relie ton compte à Google pour retrouver ta progression si tu changes de téléphone.</p>
+      <button class="btn" onclick="settingsLinkGoogle()">Sauvegarder avec Google</button>`}
+    </div>
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">🔑 Code de secours</div>
+      <p class="settings-note">Un code à noter pour récupérer ton compte sans Google. ${hasCode ? "✅ Tu as déjà un code : en générer un nouveau invalide l'ancien." : "Tu n'en as pas encore."} Ne le partage à personne : il donne accès à ton compte.</p>
+      <div id="settingsCodeBox"></div>
+      <button class="btn secondary" onclick="settingsGenerateCode()">${hasCode ? 'Générer un nouveau code' : 'Générer mon code de secours'}</button>
+    </div>
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">📱 Nouveau téléphone ?</div>
+      <p class="settings-note">Sur l'autre appareil, choisis « J'ai déjà un compte » et entre ton code ou connecte-toi avec Google.</p>
+    </div>
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">🧹 Zone sensible</div>
+      <button class="btn secondary" onclick="settingsLogout()">Changer de compte / me déconnecter</button>
+      <button class="btn-text-danger" onclick="settingsDeleteData()">Supprimer mon pseudo et mes données</button>
+    </div>`;
+}
+async function settingsLinkGoogle(){
+  settingsMsg('Ouverture de Google…');
+  try {
+    await authMod.linkWithPopup(auth.currentUser, new authMod.GoogleAuthProvider());
+    settingsMsg('✅ Compte sauvegardé avec Google.');
+    await renderSettings();
+    refreshSaveReminder();
+  } catch(e){
+    settingsMsg(googleErrorMessage(e), true);
+  }
+}
+async function settingsGenerateCode(){
+  try {
+    const code = await createRecoveryCode();
+    document.getElementById('settingsCodeBox').innerHTML = `<div class="code-box">${code}</div>
+      <button class="btn secondary" onclick="copyText('${code}')">Copier le code</button>
+      <p class="settings-note">⚠️ Note-le maintenant : il ne sera plus affiché. L'ancien code (s'il existait) ne fonctionne plus.</p>`;
+    settingsMsg('');
+    refreshSaveReminder();
+  } catch(e){
+    const unsupported = e && e.message === 'crypto-unavailable';
+    settingsMsg(unsupported ? "Le code de secours nécessite une connexion sécurisée (https)." : 'Impossible de générer le code pour le moment.', true);
+  }
+}
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); settingsMsg('Code copié.'); }
+  catch(e){ settingsMsg('Copie impossible : note le code à la main.', true); }
+}
+async function settingsLogout(){
+  let safe = isGoogleLinked();
+  if(!safe && myPseudo){
+    try { const o = await getOwnerInfo(myPseudo); safe = !!(o && o.recoveryHash); } catch(e){}
+  }
+  const msg = safe
+    ? 'Te déconnecter de ce compte sur cet appareil ?'
+    : "Tu n'as ni compte Google ni code de secours : tu perdras l'accès à ton pseudo et à ta progression. Continuer quand même ?";
+  if(!confirm(msg)) return;
+  try { if(auth) await authMod.signOut(auth); } catch(e){}
+  try { localStorage.removeItem('brainmind_pseudo'); } catch(e){}
+  location.reload();
+}
+async function settingsDeleteData(){
+  if(!myPseudo) return;
+  const typed = prompt(`Cette action efface définitivement le pseudo « ${myPseudo} » et toute sa progression.\nTape SUPPRIMER pour confirmer.`);
+  if(typed !== 'SUPPRIMER') return;
+  try {
+    const owner = await getOwnerInfo(myPseudo);
+    if(owner && owner.uid !== authUid){ settingsMsg("Ce pseudo appartient à un autre compte.", true); return; }
+    const paths = [
+      'players/' + myPseudo, 'matchResults/' + myPseudo, 'invites/' + myPseudo, 'inviteDeclined/' + myPseudo,
+      'pseudoOwners/' + pseudoKey(myPseudo)
+    ];
+    if(owner && owner.recoveryHash) paths.push('recovery/' + owner.recoveryHash);
+    if(authUid) paths.push('accounts/' + authUid);
+    for(const pth of paths){ try { await remove(ref(db, pth)); } catch(e){} }
+    try { if(auth && auth.currentUser) await authMod.deleteUser(auth.currentUser); } catch(e){}
+  } catch(e){
+    settingsMsg('Suppression impossible pour le moment.', true);
+    return;
+  }
+  try { localStorage.removeItem('brainmind_pseudo'); } catch(e){}
+  location.reload();
+}
+
+// --- Écran « Récupérer mon compte » ---
+function openRecover(){
+  document.getElementById('pseudoScreen').classList.add('hidden');
+  document.getElementById('recoverChoices').classList.remove('hidden');
+  document.getElementById('recoverSuccess').classList.add('hidden');
+  document.getElementById('recoverBackBtn').classList.remove('hidden');
+  document.getElementById('recoverError').textContent = '';
+  document.getElementById('recoverCodeInput').value = '';
+  document.getElementById('recoverScreen').classList.remove('hidden');
+}
+function closeRecover(){
+  document.getElementById('recoverScreen').classList.add('hidden');
+  if(!myPseudo){ pseudoScreenPurpose = 'startup'; showPseudoScreen(); }
+}
+function recoverError(text){ document.getElementById('recoverError').textContent = text || ''; }
+let recoveredPseudo = null;
+function finishRecoveredLogin(pseudo){
+  myPseudo = pseudo;
+  savePseudoLocally();
+  document.getElementById('recoverScreen').classList.add('hidden');
+  document.getElementById('pseudoScreen').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  renderMyBanner();
+  updatePresenceStatus('online');
+  setupInviteListener();
+  refreshSaveReminder();
+}
+async function showRecoveredSuccess(pseudo, withNewCode){
+  recoveredPseudo = pseudo;
+  if(!withNewCode){ finishRecoveredLogin(pseudo); return; }
+  // La propriété vient d'être transférée : on génère un nouveau code (l'ancien est consommé)
+  myPseudo = pseudo;
+  let newCode = '';
+  try { newCode = await createRecoveryCode(); } catch(e){}
+  document.getElementById('recoverChoices').classList.add('hidden');
+  document.getElementById('recoverBackBtn').classList.add('hidden');
+  document.getElementById('recoverSuccessText').textContent = `✅ Bienvenue « ${pseudo} » ! Ton compte est récupéré. Voici ton nouveau code de secours :`;
+  document.getElementById('recoverNewCode').textContent = newCode || '—';
+  document.getElementById('recoverSuccess').classList.remove('hidden');
+}
+function recoverContinue(){ finishRecoveredLogin(recoveredPseudo); }
+async function recoverWithGoogleClick(){
+  recoverError('');
+  const ready = await withTimeout(authReady, 4000);
+  if(!ready){ recoverError('Compte en ligne indisponible pour le moment.'); return; }
+  try {
+    const cred = await authMod.signInWithPopup(auth, new authMod.GoogleAuthProvider());
+    authUid = cred.user.uid;
+    const acc = (await get(ref(db, 'accounts/' + authUid))).val();
+    if(!acc || !acc.pseudo){
+      recoverError("Aucune progression n'est liée à ce compte Google. Reviens en arrière pour choisir un pseudo.");
+      return;
+    }
+    const key = pseudoKey(acc.pseudo);
+    const cur = (await get(ref(db, 'pseudoOwners/' + key))).val();
+    await update(ref(db, 'pseudoOwners/' + key), { uid: authUid, pseudo: acc.pseudo, at: (cur && cur.at) || Date.now() });
+    await showRecoveredSuccess(acc.pseudo, false);
+  } catch(e){
+    recoverError(googleErrorMessage(e));
+  }
+}
+async function recoverWithCodeClick(){
+  recoverError('');
+  const ready = await withTimeout(authReady, 4000);
+  if(!ready){ recoverError('Compte en ligne indisponible pour le moment.'); return; }
+  try {
+    const res = await recoverWithCode(document.getElementById('recoverCodeInput').value);
+    if(!res.ok){
+      recoverError(res.reason === 'format' ? 'Le code doit contenir 16 caractères (XXXX-XXXX-XXXX-XXXX).' : 'Code inconnu ou déjà utilisé.');
+      return;
+    }
+    await showRecoveredSuccess(res.pseudo, true);
+  } catch(e){
+    recoverError(e && e.message === 'crypto-unavailable' ? 'Le code de secours nécessite une connexion sécurisée (https).' : 'Récupération impossible pour le moment.');
+  }
+}
+
+window.openSettings = openSettings;
+window.closeSettings = closeSettings;
+window.settingsLinkGoogle = settingsLinkGoogle;
+window.settingsGenerateCode = settingsGenerateCode;
+window.settingsLogout = settingsLogout;
+window.settingsDeleteData = settingsDeleteData;
+window.copyText = copyText;
+window.openRecover = openRecover;
+window.closeRecover = closeRecover;
+window.recoverWithGoogleClick = recoverWithGoogleClick;
+window.recoverWithCodeClick = recoverWithCodeClick;
+window.recoverContinue = recoverContinue;
+window.showPseudoScreen = showPseudoScreen;
+
 window.addEventListener('load', () => {
+  // Heure serveur (enregistrée ici : tout le module est initialisé avant le premier appel du callback)
+  onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
+    serverTimeOffset = Number(snap.val()) || 0;
+    renderSpecialXpEvent();
+  });
   loadSavedSession();
   setupPresence();
   setupQueueWatch();
@@ -2044,6 +2476,11 @@ window.addEventListener('load', () => {
     pseudoScreenPurpose = 'startup';
     showPseudoScreen();
   }
+  // Compte en ligne : réclamation automatique du pseudo des joueurs existants, rappel de sauvegarde
+  authReady.then(ok => {
+    if(ok) verifyOwnershipAtStartup();
+    refreshSaveReminder();
+  });
 });
 
 function setupPresence(){
@@ -2167,10 +2604,6 @@ function decoratedPseudoHTML(pseudo){
 // Heure serveur Firebase (évite qu'une horloge d'appareil décalée fausse les événements).
 let serverTimeOffset = 0;
 function serverNow(){ return new Date(Date.now() + serverTimeOffset); }
-onValue(ref(db, '.info/serverTimeOffset'), (snap) => {
-  serverTimeOffset = Number(snap.val()) || 0;
-  renderSpecialXpEvent();
-});
 
 const SPECIAL_XP_EVENTS = [
   {
@@ -2640,6 +3073,14 @@ function showPseudoScreen(){
   document.getElementById('pseudoScreen').classList.remove('hidden');
   document.getElementById('pseudoInput').value = myPseudo || '';
   document.getElementById('pseudoError').textContent = '';
+  try {
+    const lost = sessionStorage.getItem('brainmind_conflict');
+    if(lost){
+      document.getElementById('pseudoError').textContent = `Le pseudo « ${lost} » est protégé par un autre compte. Si c'est le tien, utilise « J'ai déjà un compte » ci-dessous.`;
+      document.getElementById('pseudoInput').value = '';
+      sessionStorage.removeItem('brainmind_conflict');
+    }
+  } catch(e){}
 
   const isDuel = pseudoScreenPurpose === 'duel';
   const isChallenge = pseudoScreenPurpose === 'challenge';
@@ -2680,14 +3121,24 @@ function skipPseudo(){
   document.getElementById('menu').classList.remove('hidden');
 }
 
-function submitPseudo(){
-  const val = document.getElementById('pseudoInput').value.trim();
-  if(val.length < 2 || val.length > 16){
-    document.getElementById('pseudoError').textContent = 'Le pseudo doit faire entre 2 et 16 caractères.';
+async function submitPseudo(){
+  const val = document.getElementById('pseudoInput').value.trim().normalize('NFC');
+  const invalid = validatePseudo(val);
+  if(invalid){
+    document.getElementById('pseudoError').textContent = invalid;
+    return;
+  }
+  const submitBtn = document.getElementById('pseudoSubmitBtn');
+  submitBtn.disabled = true;
+  let claim = { ok: true };
+  try { claim = await claimPseudo(val); } finally { submitBtn.disabled = false; }
+  if(!claim.ok){
+    document.getElementById('pseudoError').textContent = "Ce pseudo est déjà pris. C'est le tien ? Utilise « J'ai déjà un compte » ci-dessous.";
     return;
   }
   myPseudo = val;
   savePseudoLocally();
+  refreshSaveReminder();
   renderMyBanner();
   document.getElementById('pseudoScreen').classList.add('hidden');
 
