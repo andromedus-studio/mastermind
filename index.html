@@ -2089,6 +2089,11 @@ function loadSavedSession(){
 // Données : pseudoOwners/<pseudo en minuscules> = { uid, pseudo, at, recoveryHash? }
 //           accounts/<uid> = { pseudo, at }      recovery/<sha256(code)> = { pseudo, at }
 // ============================================================
+// Sans compte en ligne, les règles de sécurité refusent les écritures : on évite le bruit dans la console.
+window.addEventListener('unhandledrejection', (ev) => {
+  const r = ev.reason;
+  if(r && (r.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(r.message || r)))) ev.preventDefault();
+});
 const AUTH_URL = 'https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js';
 let authMod = null;
 let auth = null;
@@ -2157,6 +2162,8 @@ async function claimPseudo(pseudo){
     update(ref(db, 'accounts/' + authUid), { pseudo, seen: Date.now(), google: isGoogleLinked() }).catch(() => {});
     return { ok: true };
   } catch(e){
+    // Règles de sécurité : « permission refusée » = le pseudo appartient à un autre compte
+    if(e && (e.code === 'PERMISSION_DENIED' || /permission_denied/i.test(String(e.message || e)))) return { ok: false, reason: 'taken' };
     console.warn('claimPseudo', e);
     return { ok: true, legacy: true };
   }
@@ -2164,7 +2171,7 @@ async function claimPseudo(pseudo){
 
 // Au démarrage : les joueurs existants réclament automatiquement leur pseudo.
 async function verifyOwnershipAtStartup(){
-  if(!myPseudo || !authUid) return;
+  if(!myPseudo || !authUid) return true;
   // 1. Renommage fait côté serveur (page admin) : le compte pointe vers un autre pseudo
   try {
     const acc = (await get(ref(db, 'accounts/' + authUid))).val();
@@ -2173,7 +2180,7 @@ async function verifyOwnershipAtStartup(){
       if(owner && owner.uid === authUid){
         try { localStorage.setItem('brainmind_pseudo', acc.pseudo); } catch(e){}
         location.reload();
-        return;
+        return false;
       }
     }
     // 2. Pseudo non protégé renommé par l'admin : redirection vers le nouveau pseudo
@@ -2183,16 +2190,32 @@ async function verifyOwnershipAtStartup(){
       if(redirect && redirect.to){
         try { localStorage.setItem('brainmind_pseudo', redirect.to); } catch(e){}
         location.reload();
-        return;
+        return false;
       }
     }
   } catch(e){ console.warn('verifyOwnership', e); }
   // 3. Réclamation normale
   const res = await claimPseudo(myPseudo);
-  if(res.ok) return;
+  if(res.ok){
+    migrateLegacyRecoveryHash();
+    return true;
+  }
   try { sessionStorage.setItem('brainmind_conflict', myPseudo); } catch(e){}
   try { localStorage.removeItem('brainmind_pseudo'); } catch(e){}
   location.reload();
+  return false;
+}
+
+// Anciennes fiches : le hash du code de secours était dans pseudoOwners (lisible par tous).
+// On le range dans accountsPrivate/<uid> (lisible uniquement par son propriétaire).
+async function migrateLegacyRecoveryHash(){
+  try {
+    const owner = await getOwnerInfo(myPseudo);
+    if(owner && owner.uid === authUid && owner.recoveryHash){
+      await set(ref(db, 'accountsPrivate/' + authUid + '/recoveryHash'), owner.recoveryHash);
+      await update(ref(db, 'pseudoOwners/' + pseudoKey(myPseudo)), { hasRecovery: true, recoveryHash: null });
+    }
+  } catch(e){}
 }
 
 // --- Code de secours ---
@@ -2211,14 +2234,21 @@ async function hashCode(code){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(norm));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+function ownerHasRecovery(o){ return !!(o && (o.hasRecovery || o.recoveryHash)); }
+async function getMyRecoveryHash(){
+  const priv = (await get(ref(db, 'accountsPrivate/' + authUid + '/recoveryHash'))).val();
+  return priv || null;
+}
 async function createRecoveryCode(){
   const owner = await getOwnerInfo(myPseudo);
   if(!owner || owner.uid !== authUid) throw new Error('not-owner');
   const code = generateRecoveryCode();
   const hash = await hashCode(code);
-  if(owner.recoveryHash) await remove(ref(db, 'recovery/' + owner.recoveryHash));
+  const oldHash = (await getMyRecoveryHash()) || owner.recoveryHash || null;
+  if(oldHash) { try { await remove(ref(db, 'recovery/' + oldHash)); } catch(e){} }
   await set(ref(db, 'recovery/' + hash), { pseudo: myPseudo, at: Date.now() });
-  await update(ref(db, 'pseudoOwners/' + pseudoKey(myPseudo)), { recoveryHash: hash });
+  await set(ref(db, 'accountsPrivate/' + authUid + '/recoveryHash'), hash);
+  await update(ref(db, 'pseudoOwners/' + pseudoKey(myPseudo)), { hasRecovery: true, recoveryHash: null });
   return code;
 }
 // Retrouve le pseudo grâce au code, transfère la propriété à cet appareil, invalide le code.
@@ -2228,7 +2258,8 @@ async function recoverWithCode(input){
   const snap = await get(ref(db, 'recovery/' + hash));
   if(!snap.exists()) return { ok: false, reason: 'invalid' };
   const pseudo = snap.val().pseudo;
-  await update(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: authUid, pseudo, at: Date.now(), recoveryHash: null });
+  // « via » prouve à la base (règles de sécurité) que le code est connu
+  await set(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: authUid, pseudo, at: Date.now(), via: hash });
   await remove(ref(db, 'recovery/' + hash));
   await update(ref(db, 'accounts/' + authUid), { pseudo, seen: Date.now(), google: isGoogleLinked() });
   return { ok: true, pseudo };
@@ -2254,7 +2285,7 @@ async function refreshSaveReminder(){
   if(authAvailable && myPseudo && !isGoogleLinked()){
     try {
       const o = await getOwnerInfo(myPseudo);
-      show = !!(o && o.uid === authUid && !o.recoveryHash);
+      show = !!(o && o.uid === authUid && !ownerHasRecovery(o));
     } catch(e){}
   }
   el.classList.toggle('hidden', !show);
@@ -2301,7 +2332,7 @@ async function renderSettings(){
   let owner = null;
   try { owner = await getOwnerInfo(myPseudo); } catch(e){}
   const linked = isGoogleLinked();
-  const hasCode = !!(owner && owner.recoveryHash);
+  const hasCode = ownerHasRecovery(owner);
   const status = linked ? '🟢 Sauvegardé avec Google' : '🟡 Invité : progression liée à cet appareil';
   body.innerHTML = `
     <div class="rank-block settings-block">
@@ -2358,7 +2389,7 @@ async function copyText(text){
 async function settingsLogout(){
   let safe = isGoogleLinked();
   if(!safe && myPseudo){
-    try { const o = await getOwnerInfo(myPseudo); safe = !!(o && o.recoveryHash); } catch(e){}
+    try { const o = await getOwnerInfo(myPseudo); safe = ownerHasRecovery(o); } catch(e){}
   }
   const msg = safe
     ? 'Te déconnecter de ce compte sur cet appareil ?'
@@ -2375,12 +2406,14 @@ async function settingsDeleteData(){
   try {
     const owner = await getOwnerInfo(myPseudo);
     if(owner && owner.uid !== authUid){ settingsMsg("Ce pseudo appartient à un autre compte.", true); return; }
-    const paths = [
-      'players/' + myPseudo, 'matchResults/' + myPseudo, 'invites/' + myPseudo, 'inviteDeclined/' + myPseudo,
-      'pseudoOwners/' + pseudoKey(myPseudo)
-    ];
-    if(owner && owner.recoveryHash) paths.push('recovery/' + owner.recoveryHash);
-    if(authUid) paths.push('accounts/' + authUid);
+    // Ordre important : le code de secours d'abord (il faut encore être propriétaire pour le supprimer),
+    // la fiche de propriété du pseudo en dernier.
+    const paths = [];
+    const myHash = (await getMyRecoveryHash()) || (owner && owner.recoveryHash) || null;
+    if(myHash) paths.push('recovery/' + myHash);
+    paths.push('players/' + myPseudo, 'matchResults/' + myPseudo, 'invites/' + myPseudo, 'inviteDeclined/' + myPseudo);
+    if(authUid){ paths.push('accountsPrivate/' + authUid); paths.push('accounts/' + authUid); }
+    paths.push('pseudoOwners/' + pseudoKey(myPseudo));
     for(const pth of paths){ try { await remove(ref(db, pth)); } catch(e){} }
     try { if(auth && auth.currentUser) await authMod.deleteUser(auth.currentUser); } catch(e){}
   } catch(e){
@@ -2444,9 +2477,12 @@ async function recoverWithGoogleClick(){
       recoverError("Aucune progression n'est liée à ce compte Google. Reviens en arrière pour choisir un pseudo.");
       return;
     }
-    const key = pseudoKey(acc.pseudo);
-    const cur = (await get(ref(db, 'pseudoOwners/' + key))).val();
-    await update(ref(db, 'pseudoOwners/' + key), { uid: authUid, pseudo: acc.pseudo, at: (cur && cur.at) || Date.now() });
+    const cur = await getOwnerInfo(acc.pseudo);
+    if(cur && cur.uid !== authUid){
+      recoverError("Ce pseudo a été transféré vers un autre appareil (code de secours). Utilise ce code, ou contacte l'administrateur.");
+      return;
+    }
+    if(!cur) await claimPseudo(acc.pseudo);
     await showRecoveredSuccess(acc.pseudo, false);
   } catch(e){
     recoverError(googleErrorMessage(e));
@@ -2489,20 +2525,23 @@ window.addEventListener('load', () => {
     renderSpecialXpEvent();
   });
   loadSavedSession();
-  setupPresence();
-  setupQueueWatch();
   if(myPseudo){
     document.getElementById('menu').classList.remove('hidden');
-    setupInviteListener();
     renderMyBanner();
     renderSpecialXpEvent();
   } else {
     pseudoScreenPurpose = 'startup';
     showPseudoScreen();
   }
-  // Compte en ligne : réclamation automatique du pseudo des joueurs existants, rappel de sauvegarde
-  authReady.then(ok => {
-    if(ok) verifyOwnershipAtStartup();
+  // Tout ce qui touche la base attend la connexion au compte (les règles de sécurité exigent d'être connecté :
+  // un écouteur refusé au démarrage serait annulé définitivement). Sans compte en ligne, on continue comme avant.
+  authReady.then(async (ok) => {
+    let proceed = true;
+    if(ok) proceed = await verifyOwnershipAtStartup();   // réclame le pseudo AVANT d'écouter ses invitations
+    if(proceed === false) return;                        // rechargement en cours (renommage / conflit)
+    setupPresence();
+    setupQueueWatch();
+    if(myPseudo) setupInviteListener();
     refreshSaveReminder();
   });
 });

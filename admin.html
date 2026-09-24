@@ -151,7 +151,10 @@ function validatePseudo(v){
 }
 const MODE_LABELS = { vsordi: 'Joueur vs Ordi', cache: 'Je cache un code', seriemind: 'Série-Mind', duel: 'Duel', daily: 'Défi du jour', puzzle: 'Puzzle du jour', ordi: 'Ordi', quest: 'Quête' };
 
-let DATA = { players: {}, owners: {}, accounts: {} };
+let DATA = { players: {}, owners: {}, accounts: {}, priv: {} };
+// Le hash du code de secours est dans accountsPrivate/<uid> (anciennes fiches : dans pseudoOwners)
+const recoveryHashOf = (owner) => owner ? (((DATA.priv[owner.uid] || {}).recoveryHash) || owner.recoveryHash || null) : null;
+const hasRecoveryCode = (owner) => !!(owner && (owner.hasRecovery || owner.recoveryHash));
 let sortKey = 'xp', sortDir = -1, currentUser = null;
 
 function toast(msg, isErr){
@@ -196,10 +199,11 @@ onAuthStateChanged(auth, async (user) => {
 // ---------------- Données ----------------
 async function loadAll(){
   try {
-    const [p, o, a] = await Promise.all([get(ref(db, 'players')), get(ref(db, 'pseudoOwners')), get(ref(db, 'accounts'))]);
+    const [p, o, a, pv] = await Promise.all([get(ref(db, 'players')), get(ref(db, 'pseudoOwners')), get(ref(db, 'accounts')), get(ref(db, 'accountsPrivate'))]);
     DATA.players = p.val() || {};
     DATA.owners = o.val() || {};
     DATA.accounts = a.val() || {};
+    DATA.priv = pv.val() || {};
     render();
   } catch(e){
     toast('Lecture impossible : ' + (e.code || e.message), true);
@@ -297,7 +301,7 @@ function openDetail(pseudo){
       <div>Statut</div><div>${lab}</div>
       <div>Compte créé</div><div>${fmtDate(r.owner && r.owner.at)}</div>
       <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
-      <div>Code de secours</div><div>${r.owner && r.owner.recoveryHash ? '✅ généré' : '—'}</div>
+      <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '✅ généré' : '—'}</div>
       <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
       <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
     </div>
@@ -349,7 +353,8 @@ async function renamePlayer(oldP){
       if(newKey !== oldKey) u['pseudoOwners/' + oldKey] = null;
       u['pseudoOwners/' + newKey] = { ...ownerOld, pseudo: newP };
       if(ownerOld.uid && ownerOld.uid !== 'reserved') u['accounts/' + ownerOld.uid + '/pseudo'] = newP;
-      if(ownerOld.recoveryHash) u['recovery/' + ownerOld.recoveryHash + '/pseudo'] = newP;
+      const h = recoveryHashOf(ownerOld);
+      if(h) u['recovery/' + h + '/pseudo'] = newP;
     }
     u['renames/' + oldKey] = { to: newP, at: Date.now() };
     await update(ref(db), u);   // une seule écriture atomique
@@ -381,7 +386,9 @@ async function releasePseudo(pseudo){
   if(!confirm(`Libérer « ${pseudo} » ? Le prochain appareil qui ouvre le jeu avec ce pseudo pourra le réclamer.`)) return;
   try {
     const u = { ['pseudoOwners/' + pseudoKey(pseudo)]: null };
-    if(owner && owner.recoveryHash) u['recovery/' + owner.recoveryHash] = null;
+    const h = recoveryHashOf(owner);
+    if(h) u['recovery/' + h] = null;
+    if(owner && owner.uid && owner.uid !== 'reserved') u['accountsPrivate/' + owner.uid + '/recoveryHash'] = null;
     await update(ref(db), u);
     toast('Pseudo libéré.'); closeModal(); await loadAll();
   } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
@@ -392,8 +399,9 @@ async function deletePlayer(pseudo){
   const owner = DATA.owners[pseudoKey(pseudo)];
   try {
     const u = { ['players/' + pseudo]: null, ['matchResults/' + pseudo]: null, ['pseudoOwners/' + pseudoKey(pseudo)]: null };
-    if(owner && owner.recoveryHash) u['recovery/' + owner.recoveryHash] = null;
-    if(owner && owner.uid && owner.uid !== 'reserved') u['accounts/' + owner.uid] = null;
+    const h = recoveryHashOf(owner);
+    if(h) u['recovery/' + h] = null;
+    if(owner && owner.uid && owner.uid !== 'reserved'){ u['accounts/' + owner.uid] = null; u['accountsPrivate/' + owner.uid] = null; }
     await update(ref(db), u);
     toast('Joueur supprimé.'); closeModal(); await loadAll();
   } catch(e){ toast('Suppression impossible : ' + (e.code || e.message), true); }
