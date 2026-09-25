@@ -49,6 +49,7 @@
     justify-content: center;
     padding: 28px 14px 60px;
     position: relative;
+    overscroll-behavior-y: none;
   }
 
   .bg-photo {
@@ -57,7 +58,7 @@
     background-image: var(--bg-landscape);
     background-size: cover;
     background-position: center;
-    filter: blur(4px) brightness(0.75);
+    filter: blur(2px) brightness(0.75);
     transform: scale(1.05);
     z-index: -2;
   }
@@ -81,67 +82,22 @@
     margin: 0 auto 4px;
     filter: drop-shadow(0 6px 16px rgba(0,0,0,0.5));
   }
-  .logo-secret-hit {
-    position: relative;
-    width: 100%;
-    max-width: 340px;
-    margin: 0 auto 4px;
-  }
-  .logo-secret-hit .logo { margin: 0; }
-  .logo-b-secret {
-    position: absolute;
-    left: 0;
-    top: 37%;
-    width: 15%;
-    height: 44%;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    z-index: 5;
-  }
-  .logo-b-secret:focus { outline: none; }
-  /* "BrainMind" = 9 lettres, M = 6e lettre → environ 55-67% de large. Si le clic ne tombe pas
-     pile sur le M une fois l'image en place, ajuste juste "left" et "width" ci-dessous. */
-  .logo-m-secret {
-    position: absolute;
-    left: 55%;
-    top: 37%;
-    width: 13%;
-    height: 44%;
-    padding: 0;
-    margin: 0;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    z-index: 5;
-  }
-  .logo-m-secret:focus { outline: none; }
-
-  /* --- Easter Egg BrainMind / Neo-Gold --- */
+  /* --- Thèmes graphiques de rang (Neo-Gold / Neo-Emerald) --- */
+  /* Appliqués automatiquement dès que le joueur atteint le rang requis (voir updateMyLevelBadge). */
   /* Rang Émeraude : accent vert dans toute l'interface (au-delà du thème Or). */
   body[data-tier="emerald"] {
     --accent: #21c481;
     --accent-soft: rgba(33,196,129,0.30);
   }
 
-  body.easter-egg {
-    --bg-landscape: url('images/easter-egg-city.png');
-    --bg-portrait: url('images/easter-egg-city.png');
+  body.theme-gold .bg-photo {
+    filter: blur(1.5px) brightness(0.72) saturate(1.12);
   }
-  body.easter-egg-emerald {
-    --bg-landscape: url('images/easter-egg-emerald.png');
-    --bg-portrait: url('images/easter-egg-emerald.png');
-  }
-  body.easter-egg .bg-photo {
-    filter: blur(3px) brightness(0.72) saturate(1.12);
-  }
-  body.easter-egg .bg-overlay {
+  body.theme-gold .bg-overlay {
     background: radial-gradient(circle at 50% 35%, rgba(255,193,57,0.12) 0%, rgba(36,26,48,0.45) 55%, rgba(12,8,18,0.76) 100%);
   }
   /* Contour néon or autour de chaque fenêtre (menu + toutes les pop-ups utilisent .card) */
-  body.easter-egg .card {
+  body.theme-gold .card {
     border: 1.5px solid #ffd766;
     box-shadow:
       0 0 0 1px rgba(255,190,50,0.30),
@@ -151,15 +107,15 @@
       0 10px 30px rgba(0,0,0,0.38);
     animation: brainmindGoldAura 3.2s ease-in-out infinite;
   }
-  body.easter-egg .logo {
+  body.theme-gold .logo {
     filter: drop-shadow(0 0 10px rgba(255,205,88,0.32)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
   }
   /* Rang Émeraude — Neo-Emerald : lueur verte qui tourne autour des fenêtres (menu + pop-ups) */
-  body.easter-egg-emerald .card {
+  body.theme-emerald .card {
     position: relative;
     border-color: rgba(33,196,129,0.35);
   }
-  body.easter-egg-emerald .card::before {
+  body.theme-emerald .card::before {
     content: '';
     position: absolute;
     inset: -3px;
@@ -180,17 +136,17 @@
   }
   @supports not (background: conic-gradient(from 0deg, red, blue)) {
     /* Repli pour les très vieux navigateurs : un halo statique plutôt que rien */
-    body.easter-egg-emerald .card::before { background: none; box-shadow: 0 0 14px rgba(33,196,129,0.5); }
+    body.theme-emerald .card::before { background: none; box-shadow: 0 0 14px rgba(33,196,129,0.5); }
   }
   @media (prefers-reduced-motion: reduce) {
-    body.easter-egg-emerald .card::before { animation: none; }
+    body.theme-emerald .card::before { animation: none; }
   }
 
   @keyframes brainmindGoldAura {
     0%, 100% { border-color: #f2c84f; box-shadow: 0 0 0 1px rgba(255,190,50,0.25), 0 0 6px rgba(255,214,102,0.65), 0 0 16px rgba(255,184,45,0.32), inset 0 0 8px rgba(255,205,88,0.16), 0 10px 30px rgba(0,0,0,0.38); }
     50% { border-color: #ffe08a; box-shadow: 0 0 0 1px rgba(255,210,90,0.40), 0 0 12px rgba(255,224,138,0.95), 0 0 30px rgba(255,184,45,0.55), inset 0 0 14px rgba(255,205,88,0.28), 0 10px 30px rgba(0,0,0,0.38); }
   }
-  body.easter-egg::after {
+  body.theme-gold::after {
     content: '';
     position: fixed;
     inset: 0;
@@ -779,7 +735,7 @@
     .player-banner-tier-emerald .player-banner-frame::after { animation: none; }
   }
   .player-banner-img, .player-banner-video { display: block; width: 100%; height: auto; }
-  .player-banner-video { background: transparent; }
+  .player-banner-video { background: var(--panel-bg-light); }
   .player-banner-rank {
     position: absolute; top: -8px; right: -8px;
     background: var(--gold); color: #1a1420; font-weight: 800; font-size: 12px; line-height: 1;
@@ -878,8 +834,6 @@
 <audio id="bgMusic" loop preload="auto"><source src="audio/music-main.mp3" type="audio/mpeg"></audio>
 <div class="app">
   <div class="logo-secret-hit"><img class="logo" src="images/logo.png" alt="BrainMind">
-    <button class="logo-b-secret" id="logoBSecret" type="button" aria-label="BrainMind"></button>
-    <button class="logo-m-secret" id="logoMSecret" type="button" aria-label="BrainMind"></button>
   </div>
   <p class="subtitle" id="subtitle">8 couleurs · 4 trous</p>
   <div class="my-banner-wrap" id="myBannerWrap"></div>
@@ -1382,13 +1336,13 @@ const RANK_INFO = [
   { key: 'silver',   icon: '🥈', name: 'Argent',   from: RANK_LEVELS.silver },
   { key: 'gold',     icon: '🥇', name: 'Or',       from: RANK_LEVELS.gold,
     secret: {
-      locked:   '🔒 Un secret est réservé aux joueurs Or…',
-      unlocked: '🤫 Secret débloqué : la première lettre du logo cache quelque chose… touche-la plusieurs fois.'
+      locked:   '🎨 Thème "Neo-Gold" débloqué au rang Or.',
+      unlocked: '🎨 Thème "Neo-Gold" activé : décor et contours dorés.'
     } },
   { key: 'emerald',  icon: '💚', name: 'Émeraude', from: RANK_LEVELS.emerald,
     secret: {
-      locked:   '🔒 Un second secret est réservé aux joueurs Émeraude…',
-      unlocked: '🤫 Un secret t\'attend… il se prépare, reste attentif.'
+      locked:   '🎨 Thème "Neo-Emerald" débloqué au rang Émeraude.',
+      unlocked: '🎨 Thème "Neo-Emerald" activé : décor et contours émeraude.'
     } },
 ];
 // Position d'un rang dans l'échelle (débutant = 0). Sert à comparer "au moins tel rang".
@@ -2751,7 +2705,7 @@ function playerBannerCardHTML(pseudo, level, extra){
   const tier = pseudoTier(level);
   const safe = escapeHtml(pseudo);
   const bannerMedia = TIER_BANNER_VIDEOS[tier]
-    ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm"></video>`
+    ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" poster="${TIER_BANNERS.gold}" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm"></video>`
     : `<img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="this.onerror=null;this.src='${TIER_BANNERS.gold}'">`;
   return `<div class="player-banner-card player-banner-tier-${tier}${extra.isMe ? ' player-banner-me' : ''}">
     <div class="player-banner-frame">
@@ -2768,9 +2722,6 @@ function playerBannerCardHTML(pseudo, level, extra){
 
 window.getMyLevel = () => myPseudo ? levelFromXp(playerXpCache[myPseudo] || 0).level : 1;
 window.getMyTier = () => myPseudo ? pseudoTier(levelFromXp(playerXpCache[myPseudo] || 0).level) : 'debutant';
-// Vrai pour Or ET au-dessus (Émeraude garde l'accès à l'easter egg Or).
-window.isGoldPlayer = () => !!myPseudo && rankIndex(window.getMyTier()) >= rankIndex('gold');
-window.isEmeraldPlayer = () => !!myPseudo && rankIndex(window.getMyTier()) >= rankIndex('emerald');
 
 // Bannières (réduites) des deux joueurs dans l'écran de duel.
 let duelBannerKey = '';
@@ -3210,12 +3161,78 @@ function setupPlayersXpListener(){
   });
 }
 
+// Thème graphique de rang : donné directement dès que le niveau requis est atteint
+// (plus besoin de trouver un easter egg). Émeraude prime sur Or si les deux sont atteints.
+// Le thème Or a sa propre musique dédiée ; l'Émeraude garde la musique principale pour l'instant.
+const MAIN_MUSIC_SRC = 'audio/music-main.mp3';
+const GOLD_THEME_MUSIC_SRC = 'audio/brainmind-secret.mp3';
+let currentRankTheme = null;
+// Images de décor dédiées par thème : appliquées seulement si elles existent vraiment
+// sur le serveur, pour ne jamais casser le fond normal si le fichier n'a pas encore été
+// mis en ligne.
+const THEME_BG_IMAGES = {
+  'theme-gold': 'images/easter-egg-city.png',
+  'theme-emerald': 'images/easter-egg-emerald.png'
+};
+function applyThemeBackground(wanted){
+  document.body.style.removeProperty('--bg-landscape');
+  document.body.style.removeProperty('--bg-portrait');
+  const src = THEME_BG_IMAGES[wanted];
+  if(!src) return;
+  const test = new Image();
+  test.onload = () => {
+    // Le thème n'a peut-être plus cours si le rang a changé entre-temps.
+    if(currentRankTheme !== wanted) return;
+    document.body.style.setProperty('--bg-landscape', `url('${src}')`);
+    document.body.style.setProperty('--bg-portrait', `url('${src}')`);
+  };
+  test.src = src;
+}
+
+function applyRankTheme(tier){
+  const wanted = rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
+    : rankIndex(tier) >= rankIndex('gold') ? 'theme-gold'
+    : null;
+  if(wanted === currentRankTheme) return;
+  document.body.classList.remove('theme-gold', 'theme-emerald');
+  if(wanted) document.body.classList.add(wanted);
+  currentRankTheme = wanted;
+  applyThemeBackground(wanted);
+  document.title = wanted === 'theme-gold' ? 'BrainMind — Neo-Gold'
+    : wanted === 'theme-emerald' ? 'BrainMind — Neo-Emerald'
+    : 'BrainMind — 8 couleurs';
+
+  const mainMusic = document.getElementById('bgMusic');
+  if(!mainMusic) return;
+  const wantedSrc = wanted === 'theme-gold' ? GOLD_THEME_MUSIC_SRC : MAIN_MUSIC_SRC;
+  if(mainMusic.dataset.currentSrc === wantedSrc) return;
+  const wasPlaying = !mainMusic.paused && !mainMusic.ended;
+  const volume = mainMusic.volume || 0.35;
+  mainMusic.pause();
+  mainMusic.src = wantedSrc;
+  mainMusic.dataset.currentSrc = wantedSrc;
+  mainMusic.volume = volume;
+  mainMusic.load();
+  if(wasPlaying && soundOn) mainMusic.play().catch(() => {});
+  // Si la musique du thème Or n'existe pas encore sur GitHub, on revient proprement
+  // à la musique principale au lieu de laisser le lecteur dans un état d'erreur.
+  mainMusic.addEventListener('error', function onErr(){
+    if(mainMusic.dataset.currentSrc !== GOLD_THEME_MUSIC_SRC) return;
+    mainMusic.removeEventListener('error', onErr);
+    mainMusic.src = MAIN_MUSIC_SRC;
+    mainMusic.dataset.currentSrc = MAIN_MUSIC_SRC;
+    mainMusic.load();
+    if(soundOn) mainMusic.play().catch(() => {});
+  });
+}
+
 function updateMyLevelBadge(){
   const badge = document.getElementById('myLevelBadge');
   if(!badge || !myPseudo) return;
   const info = levelFromXp(playerXpCache[myPseudo] || 0);
   const tier = pseudoTier(info.level);
   document.body.dataset.tier = tier; // accent de rang (--accent) dans toute l'interface
+  applyRankTheme(tier); // thème graphique (Neo-Gold / Neo-Emerald) donné directement au rang requis
   badge.innerHTML = tier
     ? `<span class="pseudo-frame pseudo-frame-${tier}">Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP</span>`
     : `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
@@ -4447,95 +4464,6 @@ function updateDailyTileGoldenState(){
 }
 updateDailyTileGoldenState();
 setInterval(updateDailyTileGoldenState, 30000);
-</script>
-<script>
-// ============================================================
-// EASTER EGG — 5 clics sur le B de BrainMind (réservé aux joueurs de grade Or)
-// Fond : images/easter-egg-city.png
-// Musique : audio/brainmind-secret.mp3
-// ============================================================
-(function setupBrainMindEasterEggs(){
-  const mainMusic = document.getElementById('bgMusic');
-  if(!mainMusic) return;
-
-  const MAIN_MUSIC_SRC = 'audio/music-main.mp3';
-  const REQUIRED_CLICKS = 5;
-  const CLICK_WINDOW_MS = 1800;
-  let anyActivated = false; // un seul thème secret actif à la fois
-
-  // secrets[i] = { button, bodyClass, title, checkAccess, musicSrc? }
-  const secrets = [
-    {
-      button: document.getElementById('logoBSecret'),
-      bodyClass: 'easter-egg',
-      title: 'BrainMind — Neo-Gold',
-      checkAccess: () => typeof window.isGoldPlayer === 'function' && window.isGoldPlayer(),
-      musicSrc: 'audio/brainmind-secret.mp3'
-    },
-    {
-      button: document.getElementById('logoMSecret'),
-      bodyClass: 'easter-egg-emerald',
-      title: 'BrainMind — Neo-Emerald',
-      checkAccess: () => typeof window.isEmeraldPlayer === 'function' && window.isEmeraldPlayer(),
-      musicSrc: null // pas de musique dédiée pour l'instant : la musique principale continue
-    }
-  ];
-
-  secrets.forEach((secret) => {
-    if(!secret.button) return;
-    let clickCount = 0;
-    let clickTimer = null;
-    let activated = false;
-    let secretMusicLoaded = false;
-
-    function activate(){
-      if(activated || anyActivated) return;
-      activated = true;
-      anyActivated = true;
-
-      document.body.classList.add(secret.bodyClass);
-      document.title = secret.title;
-      secret.button.setAttribute('aria-label', 'Easter Egg activé');
-      secrets.forEach(s => { if(s.button) s.button.disabled = true; }); // un seul secret par session
-
-      if(secret.musicSrc){
-        // On garde le même élément <audio> que le jeu utilise déjà, pour que le
-        // bouton 🔊/🔇 et les contrôles de visibilité continuent de fonctionner.
-        const wasPlaying = !mainMusic.paused && !mainMusic.ended;
-        const volume = mainMusic.volume || 0.35;
-        mainMusic.pause();
-        mainMusic.src = secret.musicSrc;
-        mainMusic.volume = volume;
-        mainMusic.load();
-        secretMusicLoaded = true;
-        if(wasPlaying) mainMusic.play().catch(() => {});
-      }
-    }
-
-    secret.button.addEventListener('click', () => {
-      if(activated || anyActivated) return;
-      clickCount++;
-      clearTimeout(clickTimer);
-      if(clickCount >= REQUIRED_CLICKS){
-        clickCount = 0;
-        // Réservé au rang requis : pour les autres, rien ne se passe (le secret reste secret).
-        if(secret.checkAccess()) activate();
-        return;
-      }
-      clickTimer = setTimeout(() => { clickCount = 0; }, CLICK_WINDOW_MS);
-    });
-
-    // Si la musique secrète n'existe pas encore sur GitHub, on revient proprement
-    // à la musique principale au lieu de laisser le lecteur dans un état d'erreur.
-    mainMusic.addEventListener('error', () => {
-      if(!secretMusicLoaded || !activated) return;
-      secretMusicLoaded = false;
-      mainMusic.src = MAIN_MUSIC_SRC;
-      mainMusic.load();
-      if(typeof soundOn !== 'undefined' && soundOn) mainMusic.play().catch(() => {});
-    });
-  });
-})();
 </script>
 </body>
 </html>
