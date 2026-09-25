@@ -720,21 +720,52 @@
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
   .player-banner-card { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 320px; }
   .player-banner-frame { position: relative; width: 100%; overflow: hidden; border-radius: 14px; }
-  /* Rang Émeraude : halo qui respire, calé sur le contour réel du ruban (pas un rectangle) */
+  /* Émeraude : petite aura circulaire derrière le logo, sans halo carré autour de la bannière */
+  .player-banner-tier-emerald .player-banner-frame::before {
+    content: '';
+    position: absolute;
+    left: 8%;
+    top: 50%;
+    width: 31%;
+    aspect-ratio: 1;
+    transform: translateY(-50%) scale(0.86);
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(62, 255, 151, 0.48) 0%,
+      rgba(33, 196, 129, 0.30) 34%,
+      rgba(33, 196, 129, 0.12) 55%,
+      transparent 73%);
+    filter: blur(8px);
+    opacity: 0.72;
+    pointer-events: none;
+    z-index: 0;
+    animation: emeraldLogoAura 2.8s ease-in-out infinite;
+  }
+  @keyframes emeraldLogoAura {
+    0%, 100% {
+      opacity: 0.58;
+      transform: translateY(-50%) scale(0.82);
+      filter: blur(9px);
+    }
+    50% {
+      opacity: 0.92;
+      transform: translateY(-50%) scale(1.04);
+      filter: blur(7px);
+    }
+  }
+  .player-banner-tier-emerald .player-banner-video,
   .player-banner-tier-emerald .player-banner-img {
-    animation: emeraldBannerGlow 2.6s ease-in-out infinite;
+    position: relative;
+    z-index: 1;
   }
-  @keyframes emeraldBannerGlow {
-    0%, 100% { filter: drop-shadow(0 0 5px var(--accent)) drop-shadow(0 0 10px var(--accent-soft)); }
-    50% { filter: drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 20px rgba(33,196,129,0.6)); }
-  }
-  /* + un reflet qui balaie l'image de temps en temps, comme un éclat d'émeraude */
+  /* Reflet qui balaie l'image de temps en temps, comme un éclat d'émeraude */
   .player-banner-tier-emerald .player-banner-frame::after {
     content: ''; position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
     background-size: 250% 100%; background-position: 150% 0;
     mix-blend-mode: soft-light;
     animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
   }
   @keyframes emeraldBannerSweep {
     0%, 55% { background-position: 150% 0; }
@@ -742,17 +773,20 @@
     100% { background-position: -50% 0; }
   }
   @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-emerald .player-banner-frame::before,
     .player-banner-tier-emerald .player-banner-img,
+    .player-banner-tier-emerald .player-banner-video,
     .player-banner-tier-emerald .player-banner-frame::after { animation: none; }
   }
-  .player-banner-img { display: block; width: 100%; height: auto; }
+  .player-banner-img, .player-banner-video { display: block; width: 100%; height: auto; }
+  .player-banner-video { background: transparent; }
   .player-banner-rank {
     position: absolute; top: -8px; right: -8px;
     background: var(--gold); color: #1a1420; font-weight: 800; font-size: 12px; line-height: 1;
     border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
     border: 2px solid var(--panel-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
-  .player-banner-me:not(.player-banner-tier-emerald) .player-banner-img { filter: drop-shadow(0 0 6px var(--accent)); }
+  .player-banner-me:not(.player-banner-tier-emerald) .player-banner-frame { box-shadow: 0 0 10px 1px var(--accent-soft); border-radius: 14px; }
   /* Bannière perso affichée sous le titre du jeu, sur l'écran principal */
   .my-banner-wrap { display: flex; justify-content: center; margin: 4px 0 2px; }
   .my-banner-wrap:empty { display: none; margin: 0; }
@@ -760,7 +794,7 @@
   /* Texte (pseudo + niveau/XP) superposé directement sur la bannière, sous le titre du palier */
   .player-banner-overlay {
     position: absolute; top: 54%; left: 50%; transform: translate(-50%, -50%);
-    width: 64%; text-align: center; pointer-events: none;
+    width: 64%; text-align: center; pointer-events: none; z-index: 4;
   }
   .player-banner-overlay .player-banner-name {
     font-weight: 800; font-size: 15px; color: #fff;
@@ -2694,6 +2728,12 @@ const TIER_BANNERS = {
   emerald: 'images/banner-emerald.webp'
 };
 
+// Bannière Émeraude animée : WebM transparent généré à partir de la vidéo Dreamina.
+// Le fichier doit être placé dans le dossier images/ du jeu.
+const TIER_BANNER_VIDEOS = {
+  emerald: 'images/emeraude_banniere_transparente.webm'
+};
+
 function pseudoTier(level){
   if(level >= RANK_LEVELS.emerald) return 'emerald';
   if(level >= RANK_LEVELS.gold) return 'gold';
@@ -2710,9 +2750,12 @@ function playerBannerCardHTML(pseudo, level, extra){
   extra = extra || {};
   const tier = pseudoTier(level);
   const safe = escapeHtml(pseudo);
+  const bannerMedia = TIER_BANNER_VIDEOS[tier]
+    ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm"></video>`
+    : `<img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="this.onerror=null;this.src='${TIER_BANNERS.gold}'">`;
   return `<div class="player-banner-card player-banner-tier-${tier}${extra.isMe ? ' player-banner-me' : ''}">
     <div class="player-banner-frame">
-      <img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="this.onerror=null;this.src='${TIER_BANNERS.gold}'">
+      ${bannerMedia}
       ${extra.rank ? `<span class="player-banner-rank">${extra.rank}</span>` : ''}
       <div class="player-banner-overlay">
         <div class="player-banner-name">${safe}</div>
