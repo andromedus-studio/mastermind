@@ -542,6 +542,11 @@
   .rank-block.current { border-color: var(--accent); box-shadow: 0 0 10px var(--accent-soft); }
   .rank-block-title { font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .rank-block-title .rank-levels { font-weight: 600; font-size: 11px; color: var(--ink-dim); }
+  .rank-ball {
+    display: inline-block; width: 15px; height: 15px; border-radius: 50%; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: inset 0 2px 3px rgba(255,255,255,0.25), inset 0 -2px 3px rgba(0,0,0,0.25);
+  }
   .rank-current-tag { font-size: 10px; font-weight: 800; color: #1a1420; background: var(--accent); border-radius: 999px; padding: 1px 8px; }
   .rank-block-lines { font-size: 12px; color: var(--ink-dim); margin-top: 4px; line-height: 1.55; }
   .rank-secret { margin-top: 4px; font-size: 12px; font-style: italic; color: var(--gold); }
@@ -786,6 +791,7 @@
     background: var(--gold); color: #1a1420; font-weight: 800; font-size: 12px; line-height: 1;
     border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
     border: 2px solid var(--panel-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    z-index: 5; /* toujours au-dessus des effets de bannière (reflets Émeraude/Saphir, etc.) */
   }
   .player-banner-me:not(.player-banner-tier-emerald):not(.player-banner-tier-saphir) .player-banner-frame { box-shadow: 0 0 10px 1px var(--accent-soft); border-radius: 14px; }
   /* Désactive le cadre rectangle vert autour des cartes de bannière Émeraude */
@@ -993,6 +999,7 @@
         <button class="btn" id="submitGuessBtn" onclick="submitUserGuess()" disabled>Valider la proposition</button>
       </div>
 
+      <button class="btn secondary hidden" id="replayBtn" onclick="replayVsOrdi()">🔁 Rejouer contre l'ordi</button>
       <button class="btn secondary" onclick="resetToMenu()">↩ Changer de mode</button>
     </div>
 
@@ -1173,6 +1180,7 @@ function startGame(chosenMode){
   document.getElementById('game').classList.remove('hidden');
   document.getElementById('analysisPanel').innerHTML = '';
   document.getElementById('serieMindChoice').classList.add('hidden');
+  document.getElementById('replayBtn').classList.add('hidden');
   hideSecretReveal();
   renderLegend();
   renderSerieMindBanner();
@@ -1309,12 +1317,15 @@ const MOVE_LIMIT_BONUS = { 6: 15, 8: 10, 10: 5, 12: 2 };
 //  - questMult       : multiplicateur des récompenses de quêtes
 //  - winBonus        : XP de base en plus à chaque victoire (duel, contre l'ordi, manche Série-Mind, défi du jour, puzzle du jour)
 const RANK_BALANCE = {
-  debutant: { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 0 },
-  bronze:   { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 5 },
-  silver:   { limitBonus12: 2, limitBonusOther: 5, questMult: 2, winBonus: 10 },
-  gold:     { limitBonus12: 4, limitBonusOther: 10, questMult: 3, winBonus: 15 },
-  emerald:  { limitBonus12: 6, limitBonusOther: 15, questMult: 4, winBonus: 20 },
-  saphir:   { limitBonus12: 8, limitBonusOther: 20, questMult: 5, winBonus: 25 },
+  debutant:   { limitBonus12: 0,  limitBonusOther: 0,  questMult: 1, winBonus: 0 },
+  bronze:     { limitBonus12: 0,  limitBonusOther: 0,  questMult: 1, winBonus: 5 },
+  silver:     { limitBonus12: 2,  limitBonusOther: 5,  questMult: 2, winBonus: 10 },
+  gold:       { limitBonus12: 4,  limitBonusOther: 10, questMult: 3, winBonus: 15 },
+  emerald:    { limitBonus12: 6,  limitBonusOther: 15, questMult: 4, winBonus: 20 },
+  saphir:     { limitBonus12: 8,  limitBonusOther: 20, questMult: 5, winBonus: 25 },
+  rubis:      { limitBonus12: 10, limitBonusOther: 25, questMult: 6, winBonus: 30 },
+  rubellite:  { limitBonus12: 12, limitBonusOther: 30, questMult: 7, winBonus: 35 },
+  amethyste:  { limitBonus12: 14, limitBonusOther: 35, questMult: 8, winBonus: 40 },
 };
 function myRankBalance(){
   // Le rang est calculé dans le script module (window.getMyTier) ; avant son init : Débutant.
@@ -1327,29 +1338,37 @@ function rankLimitBonus(limit){
   return limit === 12 ? r.limitBonus12 : r.limitBonusOther;
 }
 // Paliers de niveau des rangs (source unique, utilisée par pseudoTier et le panneau d'info).
-const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20, saphir: 25 };
+const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20, saphir: 25, rubis: 30, rubellite: 35, amethyste: 40 };
+// "ball" = couleur d'une bille du jeu (voir COLORS), affichée à la place d'un emoji dans le
+// panneau "Rangs et avantages". Pas de "ball" pour Débutant : garde son icône 🌱.
 const RANK_INFO = [
   { key: 'debutant', icon: '🌱', name: 'Débutant', from: 1 },
-  { key: 'bronze',   icon: '🥉', name: 'Bronze',   from: RANK_LEVELS.bronze },
-  { key: 'silver',   icon: '🥈', name: 'Argent',   from: RANK_LEVELS.silver },
-  { key: 'gold',     icon: '🥇', name: 'Or',       from: RANK_LEVELS.gold,
+  { key: 'bronze',   ball: 'var(--c3)', name: 'Bronze',   from: RANK_LEVELS.bronze },
+  { key: 'silver',   ball: 'var(--c1)', name: 'Argent',   from: RANK_LEVELS.silver },
+  { key: 'gold',     ball: 'var(--c2)', name: 'Or',       from: RANK_LEVELS.gold,
     secret: {
       locked:   '🎨 Thème "Neo-Gold" débloqué au rang Or.',
       unlocked: '🎨 Thème "Neo-Gold" activé : décor et contours dorés.'
     } },
-  { key: 'emerald',  icon: '💚', name: 'Émeraude', from: RANK_LEVELS.emerald,
+  { key: 'emerald',  ball: 'var(--c5)', name: 'Émeraude', from: RANK_LEVELS.emerald,
     secret: {
       locked:   '🎨 Thème "Neo-Emerald" débloqué au rang Émeraude.',
       unlocked: '🎨 Thème "Neo-Emerald" activé : décor et contours émeraude.'
     } },
-  { key: 'saphir',   icon: '💎', name: 'Saphir',   from: RANK_LEVELS.saphir,
+  { key: 'saphir',   ball: 'var(--c4)', name: 'Saphir',   from: RANK_LEVELS.saphir,
     secret: {
       locked:   '🎨 Thème "Neo-Saphir" débloqué au rang Saphir.',
       unlocked: '🎨 Thème "Neo-Saphir" activé : décor et contours saphir, en cascade.'
     } },
+  { key: 'rubis',      ball: 'var(--c0)', name: 'Rubis',      from: RANK_LEVELS.rubis },
+  { key: 'rubellite',  ball: 'var(--c7)', name: 'Rubellite',  from: RANK_LEVELS.rubellite },
+  { key: 'amethyste',  ball: 'var(--c6)', name: 'Améthyste',  from: RANK_LEVELS.amethyste },
 ];
 // Position d'un rang dans l'échelle (débutant = 0). Sert à comparer "au moins tel rang".
 function rankIndex(key){ return RANK_INFO.findIndex(r => r.key === key); }
+function rankIconHTML(r){
+  return r.ball ? `<span class="rank-ball" style="background:${r.ball}"></span>` : r.icon;
+}
 function rankAdvantageLines(key){
   const r = RANK_BALANCE[key];
   const lines = [];
@@ -1365,7 +1384,7 @@ function openRanksInfo(){
   const idx = RANK_INFO.findIndex(r => r.key === myTier);
   const next = RANK_INFO[idx + 1];
   const intro = next
-    ? `Tu es niveau ${myLevel}. Prochain rang : ${next.icon} ${next.name} au niveau ${next.from}.`
+    ? `Tu es niveau ${myLevel}. Prochain rang : ${rankIconHTML(next)} ${next.name} au niveau ${next.from}.`
     : `Tu es niveau ${myLevel} : rang maximum atteint 🎉`;
   const blocks = RANK_INFO.map((r, i) => {
     const to = RANK_INFO[i + 1] ? `Niv ${r.from} à ${RANK_INFO[i + 1].from - 1}` : `Niv ${r.from}+`;
@@ -1375,7 +1394,7 @@ function openRanksInfo(){
       extra = `<div class="rank-secret">${unlocked ? r.secret.unlocked : r.secret.locked}</div>`;
     }
     return `<div class="rank-block${r.key === myTier ? ' current' : ''}">
-      <div class="rank-block-title">${r.icon} ${r.name} <span class="rank-levels">${to}</span>${r.key === myTier ? '<span class="rank-current-tag">Toi</span>' : ''}</div>
+      <div class="rank-block-title">${rankIconHTML(r)} ${r.name} <span class="rank-levels">${to}</span>${r.key === myTier ? '<span class="rank-current-tag">Toi</span>' : ''}</div>
       <div class="rank-block-lines">${rankAdvantageLines(r.key).join('<br>')}</div>
       ${extra}
     </div>`;
@@ -1504,6 +1523,10 @@ function launchConfetti(){
 renderColorCountPicker();
 renderAttemptsPicker();
 updateXpBadgeOrdi();
+
+function replayVsOrdi(){
+  startGame('userGuesses');
+}
 
 function resetToMenu(){
   document.getElementById('menu').classList.remove('hidden');
@@ -1638,6 +1661,7 @@ function submitUserGuess(){
     const awardedWonXp = (!trainingMode && wonXp) ? window.addXp(wonXp) : 0;
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${awardedWonXp ? ` (+${awardedWonXp} XP)` : ''}`, 'win');
     document.getElementById('userInputArea').classList.add('hidden');
+    document.getElementById('replayBtn').classList.remove('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
     if(!trainingMode){
       recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'gagné', attempts: history.length, xp: awardedWonXp});
@@ -1656,6 +1680,7 @@ function submitUserGuess(){
     showSecretReveal(secretCode);
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.${lostXp ? ` (+${lostXp} XP)` : ''}`, '');
     document.getElementById('userInputArea').classList.add('hidden');
+    document.getElementById('replayBtn').classList.remove('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
     if(!trainingMode){
       window.addXp(lostXp);
@@ -2593,6 +2618,9 @@ const TIER_BANNER_VIDEOS = {
 };
 
 function pseudoTier(level){
+  if(level >= RANK_LEVELS.amethyste) return 'amethyste';
+  if(level >= RANK_LEVELS.rubellite) return 'rubellite';
+  if(level >= RANK_LEVELS.rubis) return 'rubis';
   if(level >= RANK_LEVELS.saphir) return 'saphir';
   if(level >= RANK_LEVELS.emerald) return 'emerald';
   if(level >= RANK_LEVELS.gold) return 'gold';
