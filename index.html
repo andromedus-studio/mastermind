@@ -89,6 +89,11 @@
     --accent: #21c481;
     --accent-soft: rgba(33,196,129,0.30);
   }
+  /* Rang Saphir : accent bleu dans toute l'interface (au-delà du thème Émeraude). */
+  body[data-tier="saphir"] {
+    --accent: #3b7dfa;
+    --accent-soft: rgba(59,125,250,0.30);
+  }
 
   body.theme-gold .bg-photo {
     filter: blur(1.5px) brightness(0.72) saturate(1.12);
@@ -110,12 +115,22 @@
   body.theme-gold .logo {
     filter: drop-shadow(0 0 10px rgba(255,205,88,0.32)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
   }
+  body.theme-saphir .bg-overlay {
+    background: radial-gradient(circle at 50% 35%, rgba(59,125,250,0.14) 0%, rgba(20,26,48,0.45) 55%, rgba(8,10,18,0.76) 100%);
+  }
+  body.theme-saphir .logo {
+    filter: drop-shadow(0 0 10px rgba(59,125,250,0.35)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
   /* Rang Émeraude — Neo-Emerald : lueur verte qui tourne autour des fenêtres (menu + pop-ups) */
+  /* En ::after (et pas ::before) pour ne pas entrer en conflit avec .duel-card::before,
+     qui définit déjà une barre décorative en haut des popups de duel — sinon les deux
+     règles se mélangent sur le même pseudo-élément et le contour ne s'affiche plus
+     correctement sur ces popups (juste un petit bandeau au lieu de tout le tour). */
   body.theme-emerald .card {
     position: relative;
     border-color: rgba(33,196,129,0.35);
   }
-  body.theme-emerald .card::before {
+  body.theme-emerald .card::after {
     content: '';
     position: absolute;
     inset: -3px;
@@ -136,10 +151,54 @@
   }
   @supports not (background: conic-gradient(from 0deg, red, blue)) {
     /* Repli pour les très vieux navigateurs : un halo statique plutôt que rien */
-    body.theme-emerald .card::before { background: none; box-shadow: 0 0 14px rgba(33,196,129,0.5); }
+    body.theme-emerald .card::after { background: none; box-shadow: 0 0 14px rgba(33,196,129,0.5); }
   }
   @media (prefers-reduced-motion: reduce) {
-    body.theme-emerald .card::before { animation: none; }
+    body.theme-emerald .card::after { animation: none; }
+  }
+
+  /* Rang Saphir — Neo-Saphir : aura bleue autour de chaque fenêtre, avec une lumière
+     (bleu foncé → bleu → blanc → bleu → bleu foncé) qui descend en continu sur le contour,
+     comme une cascade. */
+  body.theme-saphir .card {
+    position: relative;
+    border-color: rgba(59,125,250,0.4);
+    box-shadow:
+      0 0 0 1px rgba(59,125,250,0.25),
+      0 0 18px rgba(59,125,250,0.45),
+      0 0 40px rgba(59,125,250,0.22),
+      0 10px 30px rgba(0,0,0,0.38);
+  }
+  body.theme-saphir .card::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 21px;
+    padding: 3px;
+    /* Dégradé défini en pixels (pas en %) : une valeur en % ici n'aurait aucun effet
+       visible, car sans taille de fond explicite l'image de fond fait exactement la
+       taille de l'élément, ce qui annule le décalage en pourcentage — d'où l'absence
+       de mouvement constatée. En pixels, le défilement fonctionne quelle que soit la
+       hauteur de la fenêtre. */
+    background-image: repeating-linear-gradient(180deg,
+      #0d2a66 0px, #0d2a66 20px,
+      #3b7dfa 50px,
+      #eaf4ff 80px,
+      #3b7dfa 110px,
+      #0d2a66 140px);
+    background-position-y: 0px;
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: saphirCascade 2.6s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes saphirCascade {
+    from { background-position-y: 0px; }
+    to   { background-position-y: 140px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-saphir .card::after { animation: none; }
   }
 
   @keyframes brainmindGoldAura {
@@ -216,6 +275,12 @@
     margin-bottom: 14px;
     cursor: pointer;
     transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+  .mode-btn.locked {
+    opacity: 0.5;
+    filter: grayscale(0.6);
+    cursor: not-allowed;
+    pointer-events: none;
   }
   .xp-plus-badge {
     position: absolute;
@@ -354,62 +419,6 @@
     box-shadow: inset 0 2px 4px rgba(255,255,255,0.25), inset 0 -3px 5px rgba(0,0,0,0.25);
   }
   .swatch:active { transform: scale(0.9); }
-
-  /* --- Feedback input (mode: computer guesses) --- */
-  .fb-instructions { font-size: 13px; color: var(--ink-dim); text-align:center; margin-bottom: 14px; line-height: 1.5; }
-  .counters { display: flex; justify-content: center; gap: 24px; margin-bottom: 18px; }
-  .counter { text-align: center; }
-  .counter .clabel { font-size: 13px; color: var(--ink-dim); margin-bottom: 8px; }
-  .counter .crow { display: flex; align-items: center; gap: 10px; }
-  .counter .cval { font-size: 22px; font-weight: 800; width: 26px; text-align: center; }
-  .cbtn {
-    width: 34px; height: 34px; border-radius: 50%;
-    border: 1px solid rgba(255,255,255,0.2);
-    background: var(--panel-bg-light);
-    color: var(--ink);
-    font-size: 18px; font-weight: 700;
-    cursor: pointer;
-    display: flex; align-items:center; justify-content:center;
-  }
-  .cbtn:hover { border-color: var(--gold); }
-  .cbtn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .fb-total-warning { text-align: center; font-size: 12px; color: var(--danger); margin: -8px 0 14px; min-height: 14px; }
-
-  .remaining {
-    text-align: center;
-    font-size: 12px;
-    color: var(--ink-dim);
-    margin-bottom: 14px;
-  }
-  .remaining b { color: var(--gold); }
-
-  .poss-graph {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    gap: 5px;
-    height: 60px;
-    margin-bottom: 18px;
-    padding: 0 4px;
-  }
-  .pg-bar {
-    width: 16px;
-    min-height: 2px;
-    border-radius: 3px 3px 0 0;
-    background: var(--panel-bg-light);
-    position: relative;
-    transition: height 0.3s ease;
-  }
-  .pg-bar.current { background: var(--gold); }
-  .pg-bar .pg-val {
-    position: absolute;
-    top: -16px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 9px;
-    color: var(--ink-dim);
-    white-space: nowrap;
-  }
 
   .attempts-left { text-align: center; font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
   .serie-mind-banner {
@@ -671,6 +680,7 @@
   .pseudo-frame-silver { border-color: #c8ccd4; color: #dfe3e8; }
   .pseudo-frame-gold { border-color: #ffd700; color: #ffe066; box-shadow: 0 0 6px rgba(255,215,0,0.5); }
   .pseudo-frame-emerald { border-color: var(--accent); color: #86ffb8; box-shadow: 0 0 7px var(--accent-soft); }
+  .pseudo-frame-saphir { border-color: var(--accent); color: #9fc4ff; box-shadow: 0 0 7px var(--accent-soft); }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
@@ -726,6 +736,49 @@
     .player-banner-tier-emerald .player-banner-video,
     .player-banner-tier-emerald .player-banner-frame::after { animation: none; }
   }
+
+  /* --- BANNIÈRE SAPHIR PROPRE (même recette que l'Émeraude, teinte bleue) --- */
+  .player-banner-tier-saphir .player-banner-frame {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  /* Vidéo détourée proprement (fond réellement transparent) : même traitement que l'Émeraude. */
+  .player-banner-tier-saphir .player-banner-video,
+  .player-banner-tier-saphir .player-banner-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .player-banner-tier-saphir .player-banner-frame::before {
+    display: none !important;
+  }
+  .player-banner-tier-saphir .player-banner-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 40%, rgba(59, 125, 250, 0.28) 50%, transparent 60%);
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    mix-blend-mode: soft-light;
+    animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-saphir .player-banner-frame::before,
+    .player-banner-tier-saphir .player-banner-img,
+    .player-banner-tier-saphir .player-banner-video,
+    .player-banner-tier-saphir .player-banner-frame::after { animation: none; }
+  }
+  .player-banner-tier-saphir,
+  .player-banner-tier-saphir .player-banner-frame {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
   .player-banner-img, .player-banner-video { display: block; width: 100%; height: auto; }
   .player-banner-video { background: transparent !important; }
   .player-banner-rank {
@@ -734,7 +787,7 @@
     border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
     border: 2px solid var(--panel-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
-  .player-banner-me:not(.player-banner-tier-emerald) .player-banner-frame { box-shadow: 0 0 10px 1px var(--accent-soft); border-radius: 14px; }
+  .player-banner-me:not(.player-banner-tier-emerald):not(.player-banner-tier-saphir) .player-banner-frame { box-shadow: 0 0 10px 1px var(--accent-soft); border-radius: 14px; }
   /* Désactive le cadre rectangle vert autour des cartes de bannière Émeraude */
 .player-banner-tier-emerald,
 .player-banner-tier-emerald .player-banner-frame {
@@ -887,6 +940,11 @@
         <span class="big">🔍 Joueur vs Ordi</span>
         <span class="small">Un code secret est tiré au hasard, à toi de le deviner.</span>
       </button>
+      <button class="mode-btn" id="flashTile" onclick="openFlashPuzzle()">
+        <span class="xp-plus-badge" id="flashTileXpBadge">XP</span>
+        <span class="big">⚡ Puzzle Éclair</span>
+        <span class="small" id="flashTileSmall">Une grille aléatoire rien que pour toi. Un seul essai, puis 3h de recharge.</span>
+      </button>
       <button class="mode-btn" onclick="startSerieMind()">
         <span class="xp-plus-badge" id="xpBadgeSerie">XP</span>
         <span class="big">🎰 Série-Mind</span>
@@ -900,10 +958,6 @@
       <button class="mode-btn" onclick="startTraining()">
         <span class="big">🎓 Entraînement</span>
         <span class="small">Comme ci-dessus, mais avec une analyse et des conseils après chaque coup.</span>
-      </button>
-      <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('computerGuesses')">
-        <span class="big">🧠 Je cache un code</span>
-        <span class="small">Tu penses à une combinaison, l'ordinateur essaie de la deviner.</span>
       </button>
 
       <div id="sessionHistory"></div>
@@ -939,38 +993,6 @@
         <button class="btn" id="submitGuessBtn" onclick="submitUserGuess()" disabled>Valider la proposition</button>
       </div>
 
-      <!-- Feedback input (mode: computerGuesses) -->
-      <div id="feedbackInputArea" class="hidden">
-        <div class="current-row">
-          <div class="label">Ma proposition</div>
-          <div class="slots" id="computerGuessDisplay"></div>
-        </div>
-        <div class="fb-instructions">Combien de couleurs sont bien placées, et combien sont présentes mais mal placées ?</div>
-        <div class="counters">
-          <div class="counter">
-            <div class="clabel">Bien placés</div>
-            <div class="crow">
-              <button class="cbtn" onclick="changeCounter('black', -1)">−</button>
-              <div class="cval" id="blackVal">0</div>
-              <button class="cbtn" onclick="changeCounter('black', 1)">+</button>
-            </div>
-          </div>
-          <div class="counter">
-            <div class="clabel">Mal placés</div>
-            <div class="crow">
-              <button class="cbtn" onclick="changeCounter('white', -1)">−</button>
-              <div class="cval" id="whiteVal">0</div>
-              <button class="cbtn" onclick="changeCounter('white', 1)">+</button>
-            </div>
-          </div>
-        </div>
-        <div class="fb-total-warning" id="fbWarning"></div>
-        <div class="remaining" id="remaining"></div>
-        <div class="poss-graph" id="possGraph"></div>
-        <button class="btn" id="submitFeedbackBtn" onclick="submitFeedback()">Valider le feedback</button>
-      </div>
-
-      <button class="btn secondary hidden" id="undoBtn" onclick="undoLastMove()">↺ Annuler le dernier essai</button>
       <button class="btn secondary" onclick="resetToMenu()">↩ Changer de mode</button>
     </div>
 
@@ -1072,14 +1094,6 @@ let serieMindReserve = 0;    // banque accumulée, pas encore acquise tant que n
 let serieMindSavedMoveLimit = null; // limite d'essais du mode normal, restaurée en quittant Série-Mind
 const SERIE_MIND_START_ATTEMPTS = 8; // essais de la manche 1, -1 par manche ensuite
 
-// mode computerGuesses
-let candidates = [];
-let computerCurrentGuess = null;
-let fbCounters = {black: 0, white: 0};
-let possGraphHistory = []; // nombre de candidats restants après chaque coup
-
-// undo stack: snapshots taken before each move is applied
-let undoStack = [];
 
 function feedback(guess, secret){
   let black = 0;
@@ -1155,42 +1169,26 @@ function startGame(chosenMode){
   mode = chosenMode;
   history = [];
   solved = false;
-  undoStack = [];
   document.getElementById('menu').classList.add('hidden');
   document.getElementById('game').classList.remove('hidden');
-  document.getElementById('undoBtn').classList.add('hidden');
   document.getElementById('analysisPanel').innerHTML = '';
   document.getElementById('serieMindChoice').classList.add('hidden');
   hideSecretReveal();
   renderLegend();
   renderSerieMindBanner();
 
-  if(mode === 'userGuesses'){
-    secretCode = ALL_CODES[Math.floor(Math.random() * ALL_CODES.length)];
-    currentGuess = [null,null,null,null];
-    selectedSlot = 0;
-    analysisCandidates = ALL_CODES.slice();
-    document.getElementById('userInputArea').classList.remove('hidden');
-    document.getElementById('feedbackInputArea').classList.add('hidden');
-    document.getElementById('analysisPanel').innerHTML = '';
-    renderSlots();
-    renderPalette();
-    renderAttemptsLeft();
-    setStatus(trainingMode
-      ? '🎓 Mode entraînement — un code secret a été tiré au sort. Analyse activée après chaque coup.'
-      : 'Un code secret a été tiré au sort. À toi de jouer !');
-  } else {
-    candidates = ALL_CODES.slice();
-    computerCurrentGuess = [0,0,1,1]; // équivalent de 1,1,2,2
-    possGraphHistory = [ALL_CODES.length];
-    document.getElementById('userInputArea').classList.add('hidden');
-    document.getElementById('feedbackInputArea').classList.remove('hidden');
-    resetCounters();
-    renderComputerGuess();
-    renderRemaining();
-    renderPossGraph();
-    setStatus("Pense à un code, sans me le dire. Voici ma première proposition ci-dessous.");
-  }
+  secretCode = ALL_CODES[Math.floor(Math.random() * ALL_CODES.length)];
+  currentGuess = [null,null,null,null];
+  selectedSlot = 0;
+  analysisCandidates = ALL_CODES.slice();
+  document.getElementById('userInputArea').classList.remove('hidden');
+  document.getElementById('analysisPanel').innerHTML = '';
+  renderSlots();
+  renderPalette();
+  renderAttemptsLeft();
+  setStatus(trainingMode
+    ? '🎓 Mode entraînement — un code secret a été tiré au sort. Analyse activée après chaque coup.'
+    : 'Un code secret a été tiré au sort. À toi de jouer !');
   renderHistory();
 }
 
@@ -1309,13 +1307,14 @@ const MOVE_LIMIT_BONUS = { 6: 15, 8: 10, 10: 5, 12: 2 };
 //  - limitBonus12    : XP en plus quand la limite d'essais choisie est 12
 //  - limitBonusOther : XP en plus pour les limites 6 / 8 / 10 (Illimité : aucun bonus)
 //  - questMult       : multiplicateur des récompenses de quêtes
-//  - winBonus        : XP de base en plus à chaque victoire (duel, contre l'ordi, manche Série-Mind)
+//  - winBonus        : XP de base en plus à chaque victoire (duel, contre l'ordi, manche Série-Mind, défi du jour, puzzle du jour)
 const RANK_BALANCE = {
   debutant: { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 0 },
   bronze:   { limitBonus12: 0, limitBonusOther: 0, questMult: 1, winBonus: 5 },
   silver:   { limitBonus12: 2, limitBonusOther: 5, questMult: 2, winBonus: 10 },
   gold:     { limitBonus12: 4, limitBonusOther: 10, questMult: 3, winBonus: 15 },
   emerald:  { limitBonus12: 6, limitBonusOther: 15, questMult: 4, winBonus: 20 },
+  saphir:   { limitBonus12: 8, limitBonusOther: 20, questMult: 5, winBonus: 25 },
 };
 function myRankBalance(){
   // Le rang est calculé dans le script module (window.getMyTier) ; avant son init : Débutant.
@@ -1328,7 +1327,7 @@ function rankLimitBonus(limit){
   return limit === 12 ? r.limitBonus12 : r.limitBonusOther;
 }
 // Paliers de niveau des rangs (source unique, utilisée par pseudoTier et le panneau d'info).
-const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20 };
+const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20, saphir: 25 };
 const RANK_INFO = [
   { key: 'debutant', icon: '🌱', name: 'Débutant', from: 1 },
   { key: 'bronze',   icon: '🥉', name: 'Bronze',   from: RANK_LEVELS.bronze },
@@ -1343,13 +1342,18 @@ const RANK_INFO = [
       locked:   '🎨 Thème "Neo-Emerald" débloqué au rang Émeraude.',
       unlocked: '🎨 Thème "Neo-Emerald" activé : décor et contours émeraude.'
     } },
+  { key: 'saphir',   icon: '💎', name: 'Saphir',   from: RANK_LEVELS.saphir,
+    secret: {
+      locked:   '🎨 Thème "Neo-Saphir" débloqué au rang Saphir.',
+      unlocked: '🎨 Thème "Neo-Saphir" activé : décor et contours saphir, en cascade.'
+    } },
 ];
 // Position d'un rang dans l'échelle (débutant = 0). Sert à comparer "au moins tel rang".
 function rankIndex(key){ return RANK_INFO.findIndex(r => r.key === key); }
 function rankAdvantageLines(key){
   const r = RANK_BALANCE[key];
   const lines = [];
-  if(r.winBonus) lines.push(`⚔️ +${r.winBonus} XP à chaque victoire (duel, ordi, Série-Mind)`);
+  if(r.winBonus) lines.push(`⚔️ +${r.winBonus} XP à chaque victoire (duel, ordi, Série-Mind, défi du jour, puzzle du jour)`);
   if(r.limitBonusOther || r.limitBonus12) lines.push(`🎯 Bonus d'essais : +${r.limitBonusOther} XP (6 / 8 / 10 essais), +${r.limitBonus12} XP (12 essais)`);
   if(r.questMult > 1) lines.push(`📜 Récompenses de quêtes ×${r.questMult}`);
   if(!lines.length) lines.push('Aucun bonus pour l\'instant : monte de niveau pour en débloquer !');
@@ -1424,7 +1428,6 @@ function setAnalysisMode(checked){
 function setNumberMode(checked){
   numberMode = checked;
   if(mode === 'userGuesses'){ renderSlots(); renderPalette(); renderHistory(); }
-  if(mode === 'computerGuesses'){ renderComputerGuess(); renderHistory(); }
   renderLegend();
 }
 
@@ -1447,18 +1450,6 @@ function renderAttemptsLeft(){
   const left = moveLimit - history.length;
   el.className = 'attempts-left' + (left <= 2 ? ' low' : '');
   el.innerHTML = `<b>${left}</b> essai${left>1?'s':''} restant${left>1?'s':''} sur ${moveLimit}`;
-}
-
-function renderPossGraph(){
-  const el = document.getElementById('possGraph');
-  const maxVal = Math.max(...possGraphHistory);
-  el.innerHTML = possGraphHistory.map((count, idx) => {
-    const heightPct = Math.max(4, (Math.log(count + 1) / Math.log(maxVal + 1)) * 100);
-    const isCurrent = idx === possGraphHistory.length - 1;
-    return `<div class="pg-bar ${isCurrent ? 'current' : ''}" style="height:${heightPct}%">
-      <span class="pg-val">${count}</span>
-    </div>`;
-  }).join('');
 }
 
 function renderColorCountPicker(){
@@ -1487,7 +1478,7 @@ function renderSessionHistory(){
   if(sessionScores.length === 0){ el.innerHTML = ''; return; }
 
   const rows = sessionScores.map((s, idx) => {
-    const modeLabel = s.training ? '🎓 Entraînement' : (s.mode === 'computerGuesses' ? "L'ordinateur devine" : 'Tu devines');
+    const modeLabel = s.training ? '🎓 Entraînement' : 'Tu devines';
     const result = s.lost ? `<span style="color:var(--danger)">Perdu</span>` : `<b>${s.attempts} coups</b>`;
     return `<div class="sh-row"><span>Partie ${idx+1} · ${modeLabel} · ${s.numColors} couleurs</span>${result}</div>`;
   }).join('');
@@ -1719,118 +1710,6 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     </div>`;
 }
 
-/* ---------- Mode: computerGuesses ---------- */
-
-function resetCounters(){
-  fbCounters = {black: 0, white: 0};
-  updateCounterDisplay();
-}
-
-function renderComputerGuess(){
-  const el = document.getElementById('computerGuessDisplay');
-  el.innerHTML = computerCurrentGuess.map(ci => pegHTML(ci, 'slot filled')).join('');
-}
-
-function updateCounterDisplay(){
-  document.getElementById('blackVal').textContent = fbCounters.black;
-  document.getElementById('whiteVal').textContent = fbCounters.white;
-
-  const total = fbCounters.black + fbCounters.white;
-  const warningEl = document.getElementById('fbWarning');
-  warningEl.textContent = total > NB_TROUS ? `Le total ne peut pas dépasser ${NB_TROUS}.` : '';
-
-  document.getElementById('submitFeedbackBtn').disabled = total > NB_TROUS;
-}
-
-function changeCounter(which, delta){
-  const other = which === 'black' ? 'white' : 'black';
-  const newVal = fbCounters[which] + delta;
-  if(newVal < 0 || newVal > NB_TROUS) return;
-  if(newVal + fbCounters[other] > NB_TROUS) return;
-  fbCounters[which] = newVal;
-  updateCounterDisplay();
-}
-
-function renderRemaining(){
-  const el = document.getElementById('remaining');
-  if(!el) return;
-  el.innerHTML = `<b>${candidates.length}</b> combinaison${candidates.length>1?'s':''} encore possible${candidates.length>1?'s':''} sur ${ALL_CODES.length}`;
-}
-
-function submitFeedback(){
-  const black = fbCounters.black;
-  const white = fbCounters.white;
-
-  // snapshot for undo, taken before mutating state
-  undoStack.push({
-    mode: 'computerGuesses',
-    candidates: candidates.slice(),
-    computerCurrentGuess: computerCurrentGuess.slice(),
-    historyLength: history.length,
-    possGraphHistory: possGraphHistory.slice()
-  });
-  document.getElementById('undoBtn').classList.remove('hidden');
-
-  history.push({guess: computerCurrentGuess.slice(), black, white});
-  renderHistory();
-
-  if(black === NB_TROUS){
-    solved = true;
-    // Pas d'XP dans ce mode : le joueur saisit lui-même le feedback (noir/blanc)
-    // donné à l'ordinateur, il pourrait donc mentir pour se faire gagner de l'XP.
-    setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !`, 'win');
-    document.getElementById('feedbackInputArea').classList.add('hidden');
-    sessionScores.push({mode: 'computerGuesses', numColors: NB_COULEURS, attempts: history.length});
-    recordGameHistory({type: 'ordi', sub: 'cache', result: 'gagné', attempts: history.length, xp: 0});
-    launchConfetti();
-    return;
-  }
-
-  candidates = candidates.filter(c => feedback(computerCurrentGuess, c).code === black*10+white);
-  possGraphHistory.push(candidates.length);
-  renderPossGraph();
-
-  if(candidates.length === 0){
-    setStatus("⚠️ Aucune combinaison ne correspond à ce feedback. Un des feedbacks précédents est peut-être incorrect — tu peux annuler le dernier essai.");
-    document.getElementById('feedbackInputArea').classList.add('hidden');
-    return;
-  }
-
-  setStatus('Je réfléchis à mon prochain coup…', 'thinking');
-  document.getElementById('submitFeedbackBtn').disabled = true;
-
-  setTimeout(() => {
-    computerCurrentGuess = bestGuess(candidates);
-    resetCounters();
-    renderComputerGuess();
-    renderRemaining();
-    document.getElementById('submitFeedbackBtn').disabled = false;
-    setStatus(`Essai ${history.length + 1} : voici ma proposition. Indique le résultat ci-dessus.`);
-  }, 30);
-}
-
-function undoLastMove(){
-  const snap = undoStack.pop();
-  if(!snap) return;
-
-  history = history.slice(0, snap.historyLength);
-  renderHistory();
-
-  if(snap.mode === 'computerGuesses'){
-    candidates = snap.candidates;
-    computerCurrentGuess = snap.computerCurrentGuess;
-    possGraphHistory = snap.possGraphHistory;
-    resetCounters();
-    renderComputerGuess();
-    renderRemaining();
-    renderPossGraph();
-    document.getElementById('feedbackInputArea').classList.remove('hidden');
-    document.getElementById('submitFeedbackBtn').disabled = false;
-    setStatus(`Essai ${history.length + 1} : reprends la saisie du feedback pour cette proposition.`);
-  }
-
-  if(undoStack.length === 0) document.getElementById('undoBtn').classList.add('hidden');
-}
 </script>
 
 <!-- Écran de saisie du pseudo -->
@@ -1981,6 +1860,32 @@ function undoLastMove(){
     <div class="online-players-list" id="puzzleLeaderboard"></div>
 
     <button class="btn secondary" onclick="closePuzzleChallenge()">Fermer</button>
+  </div>
+</div>
+
+<!-- Puzzle Éclair (comme le puzzle du jour, mais grille renouvelée toutes les 3h) -->
+<div id="flashScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">⚡ Puzzle Éclair</div>
+    <p class="duel-sub" id="flashSub">Chargement…</p>
+
+    <div id="flashPlayArea" class="hidden">
+      <div class="online-players-title" style="margin-top:0;">Lignes déjà jouées</div>
+      <div class="history" id="flashGivenLines"></div>
+      <div class="current-row">
+        <div class="label">Ta réponse (un seul essai)</div>
+        <div class="slots" id="flashSlots"></div>
+      </div>
+      <div class="palette" id="flashPalette"></div>
+      <button class="btn" id="flashSubmitBtn" onclick="submitFlashGuess()" disabled>Valider ma réponse</button>
+    </div>
+
+    <div id="flashDoneArea" class="hidden">
+      <div class="analysis-panel" id="flashDoneMessage" style="text-align:center;"></div>
+      <div class="secret-reveal hidden" id="flashSecretReveal"></div>
+    </div>
+
+    <button class="btn secondary" onclick="closeFlashPuzzle()">Fermer</button>
   </div>
 </div>
 
@@ -2671,23 +2576,24 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
-// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20+).
-// Tant que images/banner-emerald.webp n'existe pas, la bannière Or est affichée à la place (onerror).
+// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25+).
 const TIER_BANNERS = {
   debutant: 'images/banner-debutant.webp',
   bronze: 'images/banner-bronze.webp',
   silver: 'images/banner-silver.webp',
   gold: 'images/banner-gold.webp',
-  emerald: 'images/banner-emerald.webp'
+  emerald: 'images/banner-emerald.webp',
+  saphir: 'images/banner-saphir.webp'
 };
 
-// Bannière Émeraude animée : WebM transparent généré à partir de la vidéo Dreamina.
-// Le fichier doit être placé dans le dossier images/ du jeu.
+// Bannières animées : WebM transparent (fond réellement transparent, pas juste noir).
 const TIER_BANNER_VIDEOS = {
-  emerald: 'images/emeraude_banniere_transparente.webm'
+  emerald: 'images/emeraude_banniere_transparente.webm',
+  saphir: 'images/saphir_banniere_transparente.webm'
 };
 
 function pseudoTier(level){
+  if(level >= RANK_LEVELS.saphir) return 'saphir';
   if(level >= RANK_LEVELS.emerald) return 'emerald';
   if(level >= RANK_LEVELS.gold) return 'gold';
   if(level >= RANK_LEVELS.silver) return 'silver';
@@ -3075,6 +2981,7 @@ function gameHistoryLabel(entry){
   if(entry.type === 'duel') typeLabel = '⚔️ Duel';
   else if(entry.type === 'daily') typeLabel = '🗓️ Défi du jour';
   else if(entry.type === 'puzzle') typeLabel = '🧩 Puzzle du jour';
+  else if(entry.type === 'flash') typeLabel = '⚡ Puzzle Éclair';
   else if(entry.type === 'quest') typeLabel = '🎯 Quête';
   else if(entry.type === 'ordi') typeLabel = ORDI_SUB_LABELS[entry.sub] || '🧠 Solo';
   else typeLabel = '🧠 Solo';
@@ -3157,21 +3064,26 @@ function setupPlayersXpListener(){
     updateMyLevelBadge();
     renderAttemptsPicker(); // les bonus d'essais dépendent du rang
     if(currentDuelId) renderDuelBanners(); // niveau/rang à jour pendant un duel
+    if(myPseudo && data[myPseudo]){
+      myFlashLockedUntil = data[myPseudo].flashLockedUntil || 0;
+      updateFlashTileUI();
+    }
   });
 }
 
 // Thème graphique de rang : donné directement dès que le niveau requis est atteint
 // (plus besoin de trouver un easter egg). Émeraude prime sur Or si les deux sont atteints.
-// Le thème Or a sa propre musique dédiée ; l'Émeraude garde la musique principale pour l'instant.
+// Or et Émeraude partagent la même musique dédiée.
 const MAIN_MUSIC_SRC = 'audio/music-main.mp3';
-const GOLD_THEME_MUSIC_SRC = 'audio/brainmind-secret.mp3';
+const THEME_MUSIC_SRC = 'audio/brainmind-secret.mp3';
 let currentRankTheme = null;
 // Images de décor dédiées par thème : appliquées seulement si elles existent vraiment
 // sur le serveur, pour ne jamais casser le fond normal si le fichier n'a pas encore été
 // mis en ligne.
 const THEME_BG_IMAGES = {
   'theme-gold': 'images/easter-egg-city.png',
-  'theme-emerald': 'images/easter-egg-emerald.png'
+  'theme-emerald': 'images/easter-egg-emerald.png',
+  'theme-saphir': 'images/easter-egg-saphir.png'
 };
 function applyThemeBackground(wanted){
   document.body.style.removeProperty('--bg-landscape');
@@ -3189,21 +3101,23 @@ function applyThemeBackground(wanted){
 }
 
 function applyRankTheme(tier){
-  const wanted = rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
+  const wanted = rankIndex(tier) >= rankIndex('saphir') ? 'theme-saphir'
+    : rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
     : rankIndex(tier) >= rankIndex('gold') ? 'theme-gold'
     : null;
   if(wanted === currentRankTheme) return;
-  document.body.classList.remove('theme-gold', 'theme-emerald');
+  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir');
   if(wanted) document.body.classList.add(wanted);
   currentRankTheme = wanted;
   applyThemeBackground(wanted);
   document.title = wanted === 'theme-gold' ? 'BrainMind — Neo-Gold'
     : wanted === 'theme-emerald' ? 'BrainMind — Neo-Emerald'
+    : wanted === 'theme-saphir' ? 'BrainMind — Neo-Saphir'
     : 'BrainMind — 8 couleurs';
 
   const mainMusic = document.getElementById('bgMusic');
   if(!mainMusic) return;
-  const wantedSrc = wanted === 'theme-gold' ? GOLD_THEME_MUSIC_SRC : MAIN_MUSIC_SRC;
+  const wantedSrc = wanted ? THEME_MUSIC_SRC : MAIN_MUSIC_SRC;
   if(mainMusic.dataset.currentSrc === wantedSrc) return;
   const wasPlaying = !mainMusic.paused && !mainMusic.ended;
   const volume = mainMusic.volume || 0.35;
@@ -3213,10 +3127,10 @@ function applyRankTheme(tier){
   mainMusic.volume = volume;
   mainMusic.load();
   if(wasPlaying && soundOn) mainMusic.play().catch(() => {});
-  // Si la musique du thème Or n'existe pas encore sur GitHub, on revient proprement
+  // Si la musique du thème n'existe pas encore sur GitHub, on revient proprement
   // à la musique principale au lieu de laisser le lecteur dans un état d'erreur.
   mainMusic.addEventListener('error', function onErr(){
-    if(mainMusic.dataset.currentSrc !== GOLD_THEME_MUSIC_SRC) return;
+    if(mainMusic.dataset.currentSrc !== THEME_MUSIC_SRC) return;
     mainMusic.removeEventListener('error', onErr);
     mainMusic.src = MAIN_MUSIC_SRC;
     mainMusic.dataset.currentSrc = MAIN_MUSIC_SRC;
@@ -3240,15 +3154,23 @@ function updateMyLevelBadge(){
 }
 
 // Bannière d'ornement perso affichée sur l'écran principal, sous le titre du jeu.
+let myBannerKey = '';
 function renderMyBanner(){
   const wrap = document.getElementById('myBannerWrap');
   if(!wrap) return;
-  if(!myPseudo){ wrap.innerHTML = ''; return; }
+  if(!myPseudo){ wrap.innerHTML = ''; myBannerKey = ''; return; }
   const info = levelFromXp(playerXpCache[myPseudo] || 0);
-  wrap.innerHTML = playerBannerCardHTML(myPseudo, info.level, {
-    isMe: true,
-    subHTML: `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`
-  });
+  const subHTML = `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
+  const key = `${myPseudo}|${info.level}`;
+  if(key === myBannerKey){
+    // Même joueur/même rang : on met juste le texte à jour, sans recharger la vidéo/l'image
+    // (évite le clignotement à chaque tick XP d'un joueur en ligne, quel qu'il soit).
+    const sub = wrap.querySelector('.player-banner-sub');
+    if(sub) sub.textContent = subHTML;
+    return;
+  }
+  myBannerKey = key;
+  wrap.innerHTML = playerBannerCardHTML(myPseudo, info.level, { isMe: true, subHTML });
 }
 
 function escapeHtml(s){
@@ -3413,6 +3335,11 @@ async function submitPseudo(){
     updatePresenceStatus('online');
     setupInviteListener();
     openPuzzleChallenge();
+  } else if(pseudoScreenPurpose === 'flash'){
+    document.getElementById('menu').classList.remove('hidden');
+    updatePresenceStatus('online');
+    setupInviteListener();
+    openFlashPuzzle();
   } else {
     document.getElementById('menu').classList.remove('hidden');
     updatePresenceStatus('online');
@@ -3644,6 +3571,11 @@ const ALL_CODES_8 = (() => {
 const PUZZLE_MAX_LINES = 5; // nombre max de lignes déjà jouées données au joueur
 const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai unique)
 
+// Puzzle Éclair : puzzle personnel et aléatoire (pas la même grille pour tout le monde).
+// Une fois la réponse donnée (trouvée ou non), le mode se verrouille 3h pour ce joueur.
+const FLASH_LOCK_HOURS = 3;
+const FLASH_XP_WIN = 20; // récompense pour la ligne finale trouvée (essai unique)
+
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
 // Le nombre de lignes nécessaires varie (souvent 3 à 5) : peu importe tant que
@@ -3803,7 +3735,7 @@ function submitPuzzleGuess(){
 
   if(solved){
     const isGolden = isGoldenChallengeToday(puzzleDateKey);
-    const puzzleBaseXp = PUZZLE_XP_WIN * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
+    const puzzleBaseXp = (PUZZLE_XP_WIN + rankWinBonus()) * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
     const puzzleXp = addXp(puzzleBaseXp);
     recordGameHistory({type: 'puzzle', result: 'gagné', attempts: 1, xp: puzzleXp});
     finishedData.xp = puzzleXp;
@@ -3868,6 +3800,151 @@ function renderPuzzleLeaderboard(players){
 function closePuzzleChallenge(){
   if(puzzleLeaderboardRef) off(puzzleLeaderboardRef);
   document.getElementById('puzzleScreen').classList.add('hidden');
+}
+
+// --- Puzzle Éclair (déduction pure, personnel : chaque joueur a sa propre grille aléatoire) ---
+
+let myFlashLockedUntil = 0; // timestamp (ms) : 0 ou passé = débloqué
+let flashSecret = null;
+let flashLines = [];
+let flashGuess = [null,null,null,null];
+let flashSelectedSlot = 0;
+let flashFinished = false;
+let flashStartedAt = null;
+
+// Rafraîchit l'affichage de la tuile du menu (verrouillée + décompte, ou jouable).
+function updateFlashTileUI(){
+  const tile = document.getElementById('flashTile');
+  const small = document.getElementById('flashTileSmall');
+  const badge = document.getElementById('flashTileXpBadge');
+  if(!tile) return;
+  const remaining = myFlashLockedUntil - serverNow().getTime();
+  const locked = remaining > 0;
+  tile.classList.toggle('locked', locked);
+  if(locked){
+    const totalMin = Math.max(1, Math.ceil(remaining / 60000));
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if(badge){ badge.textContent = '🔒'; badge.classList.remove('golden'); }
+    if(small) small.textContent = `Verrouillé — encore ${h > 0 ? `${h}h ` : ''}${m}min`;
+  } else {
+    if(small) small.textContent = 'Une grille aléatoire rien que pour toi. Un seul essai, puis 3h de recharge.';
+    // Le badge XP (texte + doré si événement en cours) est déjà remis à jour par
+    // updateDailyTileGoldenState ; on ne fait que retirer l'état "verrouillé" ici.
+  }
+}
+
+async function openFlashPuzzle(){
+  if(!myPseudo){
+    pseudoScreenPurpose = 'flash';
+    showPseudoScreen();
+    return;
+  }
+  if(myFlashLockedUntil - serverNow().getTime() > 0) return; // sécurité : tuile normalement déjà verrouillée
+
+  document.getElementById('flashScreen').classList.remove('hidden');
+  document.getElementById('flashDoneArea').classList.add('hidden');
+  document.getElementById('flashPlayArea').classList.remove('hidden');
+  document.getElementById('flashSub').textContent = 'Une grille rien que pour toi : à toi de trouver le code en un seul essai.';
+
+  const data = generatePuzzleData();
+  if(!data){
+    document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
+    return;
+  }
+  flashSecret = data.secret;
+  flashLines = data.lines;
+  flashFinished = false;
+  flashGuess = [null,null,null,null];
+  flashSelectedSlot = 0;
+  flashStartedAt = Date.now();
+  renderFlashGivenLines();
+  renderFlashSlots();
+  renderFlashPalette();
+}
+
+function renderFlashGivenLines(){
+  const el = document.getElementById('flashGivenLines');
+  el.innerHTML = flashLines.map((h, idx) => {
+    const pegs = h.guess.map(ci => window.pegHTML(ci, 'peg')).join('');
+    const fpegs = [];
+    for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
+    for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
+    while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
+    return `<div class="row"><span class="num">${idx+1}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
+  }).join('');
+}
+
+function renderFlashSlots(){
+  const el = document.getElementById('flashSlots');
+  el.innerHTML = flashGuess.map((ci, idx) => {
+    const sel = idx === flashSelectedSlot ? 'selected' : '';
+    if(ci !== null){
+      return `<div class="slot filled ${sel}" style="background:${window.COLORS[ci].css}" onclick="selectFlashSlot(${idx})"></div>`;
+    }
+    return `<div class="slot ${sel}" style="background:var(--slot-empty)" onclick="selectFlashSlot(${idx})"></div>`;
+  }).join('');
+}
+
+function renderFlashPalette(){
+  const el = document.getElementById('flashPalette');
+  el.innerHTML = window.COLORS.slice(0, 8).map((c, idx) => {
+    return window.pegHTML(idx, 'swatch').replace('<div', `<div onclick="pickFlashColor(${idx})" title="${c.name}"`);
+  }).join('');
+}
+
+function selectFlashSlot(idx){
+  flashSelectedSlot = idx;
+  renderFlashSlots();
+}
+
+function pickFlashColor(colorIdx){
+  flashGuess[flashSelectedSlot] = colorIdx;
+  if(flashSelectedSlot < 3) flashSelectedSlot++;
+  renderFlashSlots();
+  document.getElementById('flashSubmitBtn').disabled = flashGuess.some(c => c === null);
+}
+
+function submitFlashGuess(){
+  if(flashGuess.some(c => c === null) || flashFinished) return;
+  const guessSnapshot = flashGuess.slice();
+  const fb = window.feedbackFor(guessSnapshot, flashSecret, 8);
+  const solved = fb.black === 4;
+
+  flashFinished = true;
+  const lockUntil = Date.now() + FLASH_LOCK_HOURS * 3600 * 1000;
+  myFlashLockedUntil = lockUntil;
+  updateFlashTileUI();
+  set(ref(db, `players/${myPseudo}/flashLockedUntil`), lockUntil);
+
+  let xp = 0;
+  if(solved){
+    xp = addXp(FLASH_XP_WIN + rankWinBonus());
+    recordGameHistory({type: 'flash', result: 'gagné', attempts: 1, xp});
+  } else {
+    recordGameHistory({type: 'flash', result: 'perdu', attempts: 1, xp: 0});
+  }
+  showFlashDoneState({ solved, xp });
+}
+
+function showFlashDoneState(finishedData){
+  document.getElementById('flashPlayArea').classList.add('hidden');
+  document.getElementById('flashDoneArea').classList.remove('hidden');
+  const msg = finishedData.solved
+    ? `🎉 Bien joué, tu as trouvé le code du premier coup !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`
+    : `😔 Ce n'était pas le bon code. Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`;
+  document.getElementById('flashDoneMessage').textContent = msg;
+  const revealEl = document.getElementById('flashSecretReveal');
+  if(!finishedData.solved && flashSecret){
+    revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${flashSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
+    revealEl.classList.remove('hidden');
+  } else {
+    revealEl.classList.add('hidden');
+  }
+}
+
+function closeFlashPuzzle(){
+  document.getElementById('flashScreen').classList.add('hidden');
 }
 
 function ensureDailySecret(dateKey){
@@ -4019,7 +4096,7 @@ function submitDailyGuess(){
     if(solved){
       const bonus = Math.max(0, DAILY_MAX_ATTEMPTS - finishedData.attempts) * XP_DAILY_BONUS_PER_SAVED;
       const isGolden = isGoldenChallengeToday(dailyDateKey);
-      const dailyBaseXp = (XP_DAILY_BASE + bonus) * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
+      const dailyBaseXp = (XP_DAILY_BASE + bonus + rankWinBonus()) * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
       const dailyXp = addXp(dailyBaseXp);
       finishedData.xp = dailyXp;
       recordGameHistory({type: 'daily', result: 'gagné', attempts: finishedData.attempts, xp: dailyXp});
@@ -4418,6 +4495,11 @@ window.selectPuzzleSlot = selectPuzzleSlot;
 window.pickPuzzleColor = pickPuzzleColor;
 window.submitPuzzleGuess = submitPuzzleGuess;
 window.closePuzzleChallenge = closePuzzleChallenge;
+window.openFlashPuzzle = openFlashPuzzle;
+window.selectFlashSlot = selectFlashSlot;
+window.pickFlashColor = pickFlashColor;
+window.submitFlashGuess = submitFlashGuess;
+window.closeFlashPuzzle = closeFlashPuzzle;
 window.cancelInvite = cancelInvite;
 window.acceptInvite = acceptInvite;
 window.declineInvite = declineInvite;
@@ -4444,6 +4526,13 @@ function updateDailyTileGoldenState(){
     b.textContent = eventLabel;
     b.classList.toggle('golden', eventMultiplier > 1);
   });
+
+  const flashBadge = document.getElementById('flashTileXpBadge');
+  if(flashBadge && (myFlashLockedUntil - serverNow().getTime()) <= 0){
+    flashBadge.textContent = eventLabel;
+    flashBadge.classList.toggle('golden', eventMultiplier > 1);
+  }
+  updateFlashTileUI(); // fait défiler le décompte du verrou même sans nouvel événement Firebase
 
   if(dailyBadge) dailyBadge.textContent = label;
   if(puzzleBadge) puzzleBadge.textContent = label;
