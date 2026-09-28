@@ -73,7 +73,7 @@
     z-index: -1;
   }
 
-  .app { width: 100%; max-width: 460px; }
+  .app { width: 100%; max-width: 460px; position: relative; z-index: 1; }
 
   .logo {
     display: block;
@@ -93,6 +93,11 @@
   body[data-tier="saphir"] {
     --accent: #3b7dfa;
     --accent-soft: rgba(59,125,250,0.30);
+  }
+  /* Rang Rubis : accent rouge dans toute l'interface (au-delà du thème Saphir). */
+  body[data-tier="rubis"] {
+    --accent: #e0453f;
+    --accent-soft: rgba(224,69,63,0.30);
   }
 
   body.theme-gold .bg-photo {
@@ -199,6 +204,63 @@
   }
   @media (prefers-reduced-motion: reduce) {
     body.theme-saphir .card::after { animation: none; }
+  }
+
+  /* Rang Rubis — Neo-Ruby : ambiance lave/feu rouge-orangé. */
+  body.theme-rubis .bg-photo {
+    filter: blur(2px) brightness(0.70) saturate(1.22);
+  }
+  body.theme-rubis .bg-overlay {
+    background: radial-gradient(circle at 50% 38%, rgba(255,92,38,0.20) 0%, rgba(224,69,63,0.14) 24%, rgba(40,18,16,0.46) 58%, rgba(14,6,6,0.78) 100%);
+  }
+  /* Pulsation rouge/orange globale : elle passe légèrement à travers les fenêtres/cartes. */
+  body.theme-rubis::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(255,108,42,0.14) 0%, rgba(255,108,42,0.06) 24%, transparent 55%),
+      radial-gradient(circle at 50% 75%, rgba(224,69,63,0.10) 0%, transparent 48%);
+    mix-blend-mode: screen;
+    opacity: 0.55;
+    animation: rubisAmbientPulse 2.8s ease-in-out infinite;
+  }
+  body.theme-rubis .card {
+    position: relative;
+    /* Légèrement translucide pour laisser apparaître l'ambiance rouge/orange du décor. */
+    background: rgba(47,35,64,0.84);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+  }
+  @keyframes rubisAmbientPulse {
+    0%, 100% { opacity: 0.35; transform: scale(1); }
+    50% { opacity: 0.78; transform: scale(1.035); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-rubis::after { animation: none; opacity: 0.45; }
+  }
+  body.theme-rubis .logo {
+    filter: drop-shadow(0 0 10px rgba(224,69,63,0.35)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
+  body.theme-rubis .card {
+    border: 1.5px solid #e0453f;
+    box-shadow:
+      0 0 0 1px rgba(224,69,63,0.30),
+      0 0 8px rgba(255,140,60,0.75),
+      0 0 24px rgba(224,69,63,0.45),
+      inset 0 0 10px rgba(255,120,60,0.20),
+      0 10px 30px rgba(0,0,0,0.38);
+    animation: rubisFlicker 2.2s ease-in-out infinite;
+  }
+  @keyframes rubisFlicker {
+    0%, 100% { border-color: #e0453f; box-shadow: 0 0 0 1px rgba(224,69,63,0.28), 0 0 6px rgba(255,140,60,0.6), 0 0 16px rgba(224,69,63,0.35), inset 0 0 8px rgba(255,120,60,0.16), 0 10px 30px rgba(0,0,0,0.38); }
+    30% { border-color: #ff8a3d; box-shadow: 0 0 0 1px rgba(255,140,60,0.45), 0 0 14px rgba(255,170,90,0.9), 0 0 34px rgba(224,69,63,0.55), inset 0 0 14px rgba(255,140,60,0.28), 0 10px 30px rgba(0,0,0,0.38); }
+    60% { border-color: #e0453f; box-shadow: 0 0 0 1px rgba(224,69,63,0.30), 0 0 9px rgba(255,140,60,0.7), 0 0 20px rgba(224,69,63,0.4), inset 0 0 10px rgba(255,120,60,0.2), 0 10px 30px rgba(0,0,0,0.38); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-rubis .card { animation: none; }
   }
 
   @keyframes brainmindGoldAura {
@@ -686,6 +748,7 @@
   .pseudo-frame-gold { border-color: #ffd700; color: #ffe066; box-shadow: 0 0 6px rgba(255,215,0,0.5); }
   .pseudo-frame-emerald { border-color: var(--accent); color: #86ffb8; box-shadow: 0 0 7px var(--accent-soft); }
   .pseudo-frame-saphir { border-color: var(--accent); color: #9fc4ff; box-shadow: 0 0 7px var(--accent-soft); }
+  .pseudo-frame-rubis { border-color: var(--accent); color: #ff9a94; box-shadow: 0 0 7px var(--accent-soft); }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
@@ -780,6 +843,48 @@
   }
   .player-banner-tier-saphir,
   .player-banner-tier-saphir .player-banner-frame {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* --- BANNIÈRE RUBIS PROPRE (même recette, teinte rouge/orangée) --- */
+  .player-banner-tier-rubis .player-banner-frame {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .player-banner-tier-rubis .player-banner-video,
+  .player-banner-tier-rubis .player-banner-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .player-banner-tier-rubis .player-banner-frame::before {
+    display: none !important;
+  }
+  .player-banner-tier-rubis .player-banner-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 40%, rgba(224, 69, 63, 0.28) 50%, transparent 60%);
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    mix-blend-mode: soft-light;
+    animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-rubis .player-banner-frame::before,
+    .player-banner-tier-rubis .player-banner-img,
+    .player-banner-tier-rubis .player-banner-video,
+    .player-banner-tier-rubis .player-banner-frame::after { animation: none; }
+  }
+  .player-banner-tier-rubis,
+  .player-banner-tier-rubis .player-banner-frame {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
@@ -1360,7 +1465,11 @@ const RANK_INFO = [
       locked:   '🎨 Thème "Neo-Saphir" débloqué au rang Saphir.',
       unlocked: '🎨 Thème "Neo-Saphir" activé : décor et contours saphir, en cascade.'
     } },
-  { key: 'rubis',      ball: 'var(--c0)', name: 'Rubis',      from: RANK_LEVELS.rubis },
+  { key: 'rubis',      ball: 'var(--c0)', name: 'Rubis',      from: RANK_LEVELS.rubis,
+    secret: {
+      locked:   '🎨 Thème "Neo-Ruby" débloqué au rang Rubis.',
+      unlocked: '🎨 Thème "Neo-Ruby" activé : décor et contours rubis, façon flamme.'
+    } },
   { key: 'rubellite',  ball: 'var(--c7)', name: 'Rubellite',  from: RANK_LEVELS.rubellite },
   { key: 'amethyste',  ball: 'var(--c6)', name: 'Améthyste',  from: RANK_LEVELS.amethyste },
 ];
@@ -2033,6 +2142,12 @@ function xpForAttempts(attempts){
   return XP_SOLO_FALLBACK;
 }
 let lastPresenceData = {};
+// Un onglet tué brutalement (batterie vidée, OS qui tue l'appli, coupure réseau brutale sur
+// mobile...) ne déclenche pas toujours onDisconnect côté Firebase : sans garde-fou, ce joueur
+// reste "en ligne" indéfiniment aux yeux des autres. On rafraîchit notre "at" régulièrement
+// (voir startPresenceHeartbeat) et on ignore, à l'affichage, toute présence trop ancienne.
+const PRESENCE_STALE_MS = 3 * 60 * 1000; // 3 minutes sans rafraîchissement = considéré hors-ligne
+let myPresenceStatus = 'online';
 let myPseudo = null;
 let deviceId = null;
 let pseudoScreenPurpose = 'startup'; // 'startup' ou 'duel'
@@ -2564,24 +2679,36 @@ function setupPresence(){
     if(snap.val() === true){
       const myPresenceRef = ref(db, 'presence/' + deviceId);
       onDisconnect(myPresenceRef).remove();
-      updatePresenceStatus('online');
+      updatePresenceStatus(myPresenceStatus);
     }
   });
 
   onValue(ref(db, 'presence'), (snap) => {
     const data = snap.val() || {};
     lastPresenceData = data;
-    const count = Object.keys(data).length;
+    const now = serverNow().getTime();
+    const count = Object.values(data).filter(p => p && now - (p.at || 0) < PRESENCE_STALE_MS).length;
     document.getElementById('onlineCount').textContent = `🟢 ${count} joueur${count>1?'s':''} en ligne`;
     renderOnlinePlayers(data);
   });
 
   setupPlayersXpListener();
+  startPresenceHeartbeat();
+}
+
+// Réaffirme régulièrement notre présence (voir PRESENCE_STALE_MS ci-dessus) : sans ça, un
+// onglet resté ouvert plusieurs minutes sans que Firebase ne rafraîchisse "at" finirait par
+// être filtré comme hors-ligne chez les autres joueurs même s'il est toujours bien connecté.
+function startPresenceHeartbeat(){
+  setInterval(() => {
+    if(deviceId) updatePresenceStatus(myPresenceStatus);
+  }, 60000);
 }
 
 function updatePresenceStatus(status){
   if(!deviceId) return;
-  set(ref(db, 'presence/' + deviceId), { pseudo: myPseudo || null, status, at: Date.now() });
+  myPresenceStatus = status;
+  set(ref(db, 'presence/' + deviceId), { pseudo: myPseudo || null, status, at: serverNow().getTime() });
 }
 
 // XP nécessaire pour passer du niveau `level` au niveau `level+1`.
@@ -2601,20 +2728,22 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
-// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25+).
+// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30+).
 const TIER_BANNERS = {
   debutant: 'images/banner-debutant.webp',
   bronze: 'images/banner-bronze.webp',
   silver: 'images/banner-silver.webp',
   gold: 'images/banner-gold.webp',
   emerald: 'images/banner-emerald.webp',
-  saphir: 'images/banner-saphir.webp'
+  saphir: 'images/banner-saphir.webp',
+  rubis: 'images/banner-rubis.webp'
 };
 
 // Bannières animées : WebM transparent (fond réellement transparent, pas juste noir).
 const TIER_BANNER_VIDEOS = {
   emerald: 'images/emeraude_banniere_transparente.webm',
-  saphir: 'images/saphir_banniere_transparente.webm'
+  saphir: 'images/saphir_banniere_transparente.webm',
+  rubis: 'images/rubis_banniere_transparente.webm'
 };
 
 function pseudoTier(level){
@@ -3106,12 +3235,14 @@ const MAIN_MUSIC_SRC = 'audio/music-main.mp3';
 const THEME_MUSIC_SRC = 'audio/brainmind-secret.mp3';
 let currentRankTheme = null;
 // Images de décor dédiées par thème : appliquées seulement si elles existent vraiment
+// Le fond Rubis doit être nommé exactement : images/background-rubis.png
 // sur le serveur, pour ne jamais casser le fond normal si le fichier n'a pas encore été
 // mis en ligne.
 const THEME_BG_IMAGES = {
   'theme-gold': 'images/easter-egg-city.png',
   'theme-emerald': 'images/easter-egg-emerald.png',
-  'theme-saphir': 'images/easter-egg-saphir.png'
+  'theme-saphir': 'images/easter-egg-saphir.png',
+  'theme-rubis': 'images/background-rubis.png'
 };
 function applyThemeBackground(wanted){
   document.body.style.removeProperty('--bg-landscape');
@@ -3129,18 +3260,20 @@ function applyThemeBackground(wanted){
 }
 
 function applyRankTheme(tier){
-  const wanted = rankIndex(tier) >= rankIndex('saphir') ? 'theme-saphir'
+  const wanted = rankIndex(tier) >= rankIndex('rubis') ? 'theme-rubis'
+    : rankIndex(tier) >= rankIndex('saphir') ? 'theme-saphir'
     : rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
     : rankIndex(tier) >= rankIndex('gold') ? 'theme-gold'
     : null;
   if(wanted === currentRankTheme) return;
-  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir');
+  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir', 'theme-rubis');
   if(wanted) document.body.classList.add(wanted);
   currentRankTheme = wanted;
   applyThemeBackground(wanted);
   document.title = wanted === 'theme-gold' ? 'BrainMind — Neo-Gold'
     : wanted === 'theme-emerald' ? 'BrainMind — Neo-Emerald'
     : wanted === 'theme-saphir' ? 'BrainMind — Neo-Saphir'
+    : wanted === 'theme-rubis' ? 'BrainMind — Neo-Ruby'
     : 'BrainMind — 8 couleurs';
 
   const mainMusic = document.getElementById('bgMusic');
@@ -3206,8 +3339,9 @@ function escapeHtml(s){
 }
 
 function renderOnlinePlayers(data){
+  const now = serverNow().getTime();
   const others = Object.values(data)
-    .filter(p => p && p.pseudo && p.pseudo !== myPseudo)
+    .filter(p => p && p.pseudo && p.pseudo !== myPseudo && now - (p.at || 0) < PRESENCE_STALE_MS)
     .sort((a,b) => a.pseudo.localeCompare(b.pseudo, 'fr', {sensitivity:'base'}));
 
   const badge = document.getElementById('onlinePlayersBadge');
