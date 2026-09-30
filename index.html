@@ -10,6 +10,11 @@
     inherits: false;
     initial-value: 0deg;
   }
+  @property --amethyste-ring-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 360deg;
+  }
   :root {
     --board-bg: #241a30;
     --panel-bg: #2f2340;
@@ -98,6 +103,16 @@
   body[data-tier="rubis"] {
     --accent: #e0453f;
     --accent-soft: rgba(224,69,63,0.30);
+  }
+  /* Rang Rubellite : accent rose. */
+  body[data-tier="rubellite"] {
+    --accent: #ee6fa0;
+    --accent-soft: rgba(238,111,160,0.30);
+  }
+  /* Rang Améthyste : accent mauve. */
+  body[data-tier="amethyste"] {
+    --accent: #a15ee0;
+    --accent-soft: rgba(161,94,224,0.30);
   }
 
   body.theme-gold .bg-photo {
@@ -261,6 +276,152 @@
   }
   @media (prefers-reduced-motion: reduce) {
     body.theme-rubis .card { animation: none; }
+  }
+
+  /* Rang Rubellite — Neo-Rubellite : rose soie. Le contour "respire" doucement et un reflet
+     clair traverse les fenêtres de temps en temps. Ambiance rose qui pulse lentement en fond. */
+  body.theme-rubellite .bg-photo {
+    filter: blur(1.5px) brightness(0.74) saturate(1.2);
+  }
+  body.theme-rubellite .bg-overlay {
+    background: radial-gradient(circle at 50% 38%, rgba(238,111,160,0.22) 0%, rgba(200,70,130,0.14) 26%, rgba(42,18,32,0.46) 58%, rgba(16,6,12,0.78) 100%);
+  }
+  body.theme-rubellite::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 50% 35%, rgba(255,140,190,0.14) 0%, rgba(255,140,190,0.06) 26%, transparent 56%),
+      radial-gradient(circle at 50% 80%, rgba(238,111,160,0.10) 0%, transparent 50%);
+    mix-blend-mode: screen;
+    opacity: 0.5;
+    animation: rubelliteAmbient 4.6s ease-in-out infinite;
+  }
+  body.theme-rubellite .logo {
+    filter: drop-shadow(0 0 10px rgba(238,111,160,0.38)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
+  body.theme-rubellite .card {
+    position: relative;
+    background: rgba(47,35,64,0.86);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1.5px solid #ee6fa0;
+    box-shadow:
+      0 0 0 1px rgba(238,111,160,0.28),
+      0 0 8px rgba(255,150,195,0.70),
+      0 0 24px rgba(238,111,160,0.40),
+      inset 0 0 10px rgba(255,150,195,0.18),
+      0 10px 30px rgba(0,0,0,0.38);
+    animation: rubelliteBreath 3.8s ease-in-out infinite;
+  }
+  /* Reflet rose clair qui balaie la fenêtre (en ::after, comme Émeraude/Saphir) */
+  body.theme-rubellite .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 35%, rgba(255,190,215,0.20) 50%, transparent 65%);
+    background-size: 300% 100%;
+    background-position: 160% 0;
+    animation: rubelliteSheen 5.5s ease-in-out infinite;
+  }
+  @keyframes rubelliteBreath {
+    0%, 100% { border-color: #ee6fa0; box-shadow: 0 0 0 1px rgba(238,111,160,0.25), 0 0 6px rgba(255,150,195,0.55), 0 0 16px rgba(238,111,160,0.30), inset 0 0 8px rgba(255,150,195,0.14), 0 10px 30px rgba(0,0,0,0.38); }
+    50% { border-color: #ffa3c8; box-shadow: 0 0 0 1px rgba(255,163,200,0.42), 0 0 13px rgba(255,180,212,0.95), 0 0 34px rgba(238,111,160,0.55), inset 0 0 14px rgba(255,160,200,0.28), 0 10px 30px rgba(0,0,0,0.38); }
+  }
+  @keyframes rubelliteSheen {
+    0%, 55% { background-position: 160% 0; }
+    80%, 100% { background-position: -60% 0; }
+  }
+  @keyframes rubelliteAmbient {
+    0%, 100% { opacity: 0.30; transform: scale(1); }
+    50% { opacity: 0.72; transform: scale(1.03); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-rubellite .card,
+    body.theme-rubellite .card::after { animation: none; }
+    body.theme-rubellite::after { animation: none; opacity: 0.45; }
+  }
+
+  /* Rang Améthyste — Neo-Améthyste : cristal mauve. Deux faisceaux de lumière opposés tournent
+     en sens inverse autour des fenêtres, avec une lueur qui pulse, et des étincelles scintillent
+     en fond. */
+  body.theme-amethyste .bg-photo {
+    filter: blur(1.5px) brightness(0.68) saturate(1.2);
+  }
+  body.theme-amethyste .bg-overlay {
+    background: radial-gradient(circle at 50% 38%, rgba(161,94,224,0.24) 0%, rgba(110,60,170,0.16) 26%, rgba(26,14,44,0.48) 58%, rgba(10,6,20,0.80) 100%);
+  }
+  body.theme-amethyste::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(236,215,255,0.95) 0 1.2px, transparent 2.6px),
+      radial-gradient(circle at 70% 60%, rgba(214,180,255,0.90) 0 1.2px, transparent 2.6px),
+      radial-gradient(circle at 45% 85%, rgba(255,255,255,0.90) 0 1px, transparent 2.4px),
+      radial-gradient(circle at 50% 40%, rgba(161,94,224,0.10) 0%, transparent 55%);
+    background-size: 180px 180px, 240px 240px, 300px 300px, 100% 100%;
+    mix-blend-mode: screen;
+    opacity: 0.5;
+    animation: amethysteTwinkle 3.6s ease-in-out infinite;
+  }
+  body.theme-amethyste .logo {
+    filter: drop-shadow(0 0 10px rgba(161,94,224,0.42)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
+  body.theme-amethyste .card {
+    position: relative;
+    border: 1.5px solid rgba(161,94,224,0.55);
+    box-shadow:
+      0 0 0 1px rgba(138,79,201,0.30),
+      0 0 16px rgba(161,94,224,0.50),
+      0 0 38px rgba(138,79,201,0.28),
+      inset 0 0 10px rgba(190,140,255,0.14),
+      0 10px 30px rgba(0,0,0,0.38);
+    animation: amethysteGlow 4.2s ease-in-out infinite;
+  }
+  body.theme-amethyste .card::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 21px;
+    padding: 3px;
+    background: conic-gradient(from var(--amethyste-ring-angle, 360deg),
+      transparent 0deg,
+      rgba(161,94,224,0.9) 25deg, #f1e4ff 45deg, rgba(161,94,224,0.9) 65deg,
+      transparent 90deg, transparent 180deg,
+      rgba(161,94,224,0.9) 205deg, #f1e4ff 225deg, rgba(161,94,224,0.9) 245deg,
+      transparent 270deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: amethysteRingSpin 4.6s linear infinite;
+    pointer-events: none;
+  }
+  /* L'angle décroît de 360° à 0° : rotation dans le sens inverse de l'Émeraude. */
+  @keyframes amethysteRingSpin {
+    to { --amethyste-ring-angle: 0deg; }
+  }
+  @keyframes amethysteGlow {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(138,79,201,0.28), 0 0 12px rgba(161,94,224,0.40), 0 0 30px rgba(138,79,201,0.22), inset 0 0 8px rgba(190,140,255,0.10), 0 10px 30px rgba(0,0,0,0.38); }
+    50% { box-shadow: 0 0 0 1px rgba(170,110,235,0.42), 0 0 20px rgba(185,130,250,0.62), 0 0 48px rgba(138,79,201,0.36), inset 0 0 14px rgba(200,155,255,0.20), 0 10px 30px rgba(0,0,0,0.38); }
+  }
+  @keyframes amethysteTwinkle {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 0.85; }
+  }
+  @supports not (background: conic-gradient(from 0deg, red, blue)) {
+    body.theme-amethyste .card::after { background: none; box-shadow: 0 0 14px rgba(161,94,224,0.5); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-amethyste .card,
+    body.theme-amethyste .card::after { animation: none; }
+    body.theme-amethyste::after { animation: none; opacity: 0.45; }
   }
 
   @keyframes brainmindGoldAura {
@@ -749,6 +910,8 @@
   .pseudo-frame-emerald { border-color: var(--accent); color: #86ffb8; box-shadow: 0 0 7px var(--accent-soft); }
   .pseudo-frame-saphir { border-color: var(--accent); color: #9fc4ff; box-shadow: 0 0 7px var(--accent-soft); }
   .pseudo-frame-rubis { border-color: var(--accent); color: #ff9a94; box-shadow: 0 0 7px var(--accent-soft); }
+  .pseudo-frame-rubellite { border-color: var(--accent); color: #ffb3d1; box-shadow: 0 0 7px var(--accent-soft); }
+  .pseudo-frame-amethyste { border-color: var(--accent); color: #d6b8ff; box-shadow: 0 0 7px var(--accent-soft); }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
@@ -885,6 +1048,90 @@
   }
   .player-banner-tier-rubis,
   .player-banner-tier-rubis .player-banner-frame {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* --- BANNIÈRE RUBELLITE PROPRE (même recette, reflet rose) --- */
+  .player-banner-tier-rubellite .player-banner-frame {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .player-banner-tier-rubellite .player-banner-video,
+  .player-banner-tier-rubellite .player-banner-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .player-banner-tier-rubellite .player-banner-frame::before {
+    display: none !important;
+  }
+  .player-banner-tier-rubellite .player-banner-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 40%, rgba(238, 111, 160, 0.30) 50%, transparent 60%);
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    mix-blend-mode: soft-light;
+    animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-rubellite .player-banner-frame::before,
+    .player-banner-tier-rubellite .player-banner-img,
+    .player-banner-tier-rubellite .player-banner-video,
+    .player-banner-tier-rubellite .player-banner-frame::after { animation: none; }
+  }
+  .player-banner-tier-rubellite,
+  .player-banner-tier-rubellite .player-banner-frame {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* --- BANNIÈRE AMÉTHYSTE PROPRE (même recette, reflet mauve) --- */
+  .player-banner-tier-amethyste .player-banner-frame {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .player-banner-tier-amethyste .player-banner-video,
+  .player-banner-tier-amethyste .player-banner-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .player-banner-tier-amethyste .player-banner-frame::before {
+    display: none !important;
+  }
+  .player-banner-tier-amethyste .player-banner-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 40%, rgba(161, 94, 224, 0.30) 50%, transparent 60%);
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    mix-blend-mode: soft-light;
+    animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-amethyste .player-banner-frame::before,
+    .player-banner-tier-amethyste .player-banner-img,
+    .player-banner-tier-amethyste .player-banner-video,
+    .player-banner-tier-amethyste .player-banner-frame::after { animation: none; }
+  }
+  .player-banner-tier-amethyste,
+  .player-banner-tier-amethyste .player-banner-frame {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
@@ -1470,8 +1717,16 @@ const RANK_INFO = [
       locked:   '🎨 Thème "Neo-Ruby" débloqué au rang Rubis.',
       unlocked: '🎨 Thème "Neo-Ruby" activé : décor et contours rubis, façon flamme.'
     } },
-  { key: 'rubellite',  ball: 'var(--c7)', name: 'Rubellite',  from: RANK_LEVELS.rubellite },
-  { key: 'amethyste',  ball: 'var(--c6)', name: 'Améthyste',  from: RANK_LEVELS.amethyste },
+  { key: 'rubellite',  ball: 'var(--c7)', name: 'Rubellite',  from: RANK_LEVELS.rubellite,
+    secret: {
+      locked:   '🎨 Thème "Neo-Rubellite" débloqué au rang Rubellite.',
+      unlocked: '🎨 Thème "Neo-Rubellite" activé : décor et contours rose soie, avec reflet.'
+    } },
+  { key: 'amethyste',  ball: 'var(--c6)', name: 'Améthyste',  from: RANK_LEVELS.amethyste,
+    secret: {
+      locked:   '🎨 Thème "Neo-Améthyste" débloqué au rang Améthyste.',
+      unlocked: '🎨 Thème "Neo-Améthyste" activé : décor et contours cristal mauve, faisceaux tournants.'
+    } },
 ];
 // Position d'un rang dans l'échelle (débutant = 0). Sert à comparer "au moins tel rang".
 function rankIndex(key){ return RANK_INFO.findIndex(r => r.key === key); }
@@ -2728,7 +2983,7 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
-// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30+).
+// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30-34), rubellite (35-39), améthyste (40+).
 const TIER_BANNERS = {
   debutant: 'images/banner-debutant.webp',
   bronze: 'images/banner-bronze.webp',
@@ -2736,14 +2991,18 @@ const TIER_BANNERS = {
   gold: 'images/banner-gold.webp',
   emerald: 'images/banner-emerald.webp',
   saphir: 'images/banner-saphir.webp',
-  rubis: 'images/banner-rubis.webp'
+  rubis: 'images/banner-rubis.webp',
+  rubellite: 'images/banner-rubellite.webp',
+  amethyste: 'images/banner-amethyste.webp'
 };
 
 // Bannières animées : WebM transparent (fond réellement transparent, pas juste noir).
 const TIER_BANNER_VIDEOS = {
   emerald: 'images/emeraude_banniere_transparente.webm',
   saphir: 'images/saphir_banniere_transparente.webm',
-  rubis: 'images/rubis_banniere_transparente.webm'
+  rubis: 'images/rubis_banniere_transparente.webm',
+  rubellite: 'images/rubellite_banniere_transparente.webm',
+  amethyste: 'images/amethyste_banniere_transparente.webm'
 };
 
 function pseudoTier(level){
@@ -3242,7 +3501,9 @@ const THEME_BG_IMAGES = {
   'theme-gold': 'images/easter-egg-city.png',
   'theme-emerald': 'images/easter-egg-emerald.png',
   'theme-saphir': 'images/easter-egg-saphir.png',
-  'theme-rubis': 'images/background-rubis.png'
+  'theme-rubis': 'images/background-rubis.png',
+  'theme-rubellite': 'images/background-rubellite.png',
+  'theme-amethyste': 'images/background-amethyste.png'
 };
 function applyThemeBackground(wanted){
   document.body.style.removeProperty('--bg-landscape');
@@ -3260,13 +3521,15 @@ function applyThemeBackground(wanted){
 }
 
 function applyRankTheme(tier){
-  const wanted = rankIndex(tier) >= rankIndex('rubis') ? 'theme-rubis'
+  const wanted = rankIndex(tier) >= rankIndex('amethyste') ? 'theme-amethyste'
+    : rankIndex(tier) >= rankIndex('rubellite') ? 'theme-rubellite'
+    : rankIndex(tier) >= rankIndex('rubis') ? 'theme-rubis'
     : rankIndex(tier) >= rankIndex('saphir') ? 'theme-saphir'
     : rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
     : rankIndex(tier) >= rankIndex('gold') ? 'theme-gold'
     : null;
   if(wanted === currentRankTheme) return;
-  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir', 'theme-rubis');
+  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir', 'theme-rubis', 'theme-rubellite', 'theme-amethyste');
   if(wanted) document.body.classList.add(wanted);
   currentRankTheme = wanted;
   applyThemeBackground(wanted);
@@ -3274,6 +3537,8 @@ function applyRankTheme(tier){
     : wanted === 'theme-emerald' ? 'BrainMind — Neo-Emerald'
     : wanted === 'theme-saphir' ? 'BrainMind — Neo-Saphir'
     : wanted === 'theme-rubis' ? 'BrainMind — Neo-Ruby'
+    : wanted === 'theme-rubellite' ? 'BrainMind — Neo-Rubellite'
+    : wanted === 'theme-amethyste' ? 'BrainMind — Neo-Améthyste'
     : 'BrainMind — 8 couleurs';
 
   const mainMusic = document.getElementById('bgMusic');
