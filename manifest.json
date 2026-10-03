@@ -1,0 +1,15 @@
+{
+  "name": "BrainMind",
+  "short_name": "BrainMind",
+  "description": "Le Mastermind nouvelle génération : défis quotidiens, duels en ligne, quêtes, rangs et bannières.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#241a30",
+  "theme_color": "#241a30",
+  "lang": "fr",
+  "icons": [
+    { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
