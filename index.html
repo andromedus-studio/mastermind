@@ -1239,7 +1239,7 @@
 </style>
 </head>
 <body>
-<!-- ═══════════════ ÉCRAN DE LANCEMENT : fondu studio → fondu jeu → bouton Jouer ═══════════════ -->
+<!-- ═══════════════ ÉCRAN DE LANCEMENT : fondu studio → artwork du jeu + bouton Jouer ═══════════════ -->
 <style>
   #splashScreen {
     position: fixed;
@@ -1295,22 +1295,42 @@
     animation: splashFadeIn 0.9s ease 0.6s forwards;
   }
   @keyframes splashFadeIn { to { opacity: 1; } }
-  /* --- Phase 2 : logo BrainMind sur le fond du logo, fondu noir avant --- */
-  /* Le fond exact est recopié automatiquement depuis les coins de images/logo.png (voir le script) ;
-     #241a30 n'est qu'une valeur de repli si le logo est transparent. */
-  #splashPhase2 { background: #241a30; opacity: 0; transition: opacity 0.9s ease; }
-  #splashPhase2.show { opacity: 1; }
-  .splash-game-logo {
-    width: 100%;
-    max-width: 310px;
+  /* --- Phase 2 : artwork plein écran (logo BrainMind sur sa ville néon) + bouton JOUER --- */
+  /* Remplit tout l'écran, garde son propre décor, avec un léger zoom cinéma à l'arrivée. */
+  #splashPhase2 {
+    position: absolute;
+    inset: 0;
+    max-width: none;
+    padding: 0;
+    background: #0a0a14; /* bleu nuit de l'artwork (visible le temps du chargement) */
+    overflow: hidden;
     opacity: 0;
-    transform: scale(0.92);
-    transition: opacity 0.8s ease 0.15s, transform 0.8s ease 0.15s;
-    filter: drop-shadow(0 0 22px rgba(217,164,65,0.30)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+    transition: opacity 0.9s ease;
   }
-  #splashPhase2.show .splash-game-logo { opacity: 1; transform: scale(1); }
+  #splashPhase2.show { opacity: 1; }
+  .splash-hero {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    transform: scale(1.07);
+    transition: transform 6s ease-out;
+  }
+  #splashPhase2.show .splash-hero { transform: scale(1); } /* zoom lent vers l'extérieur */
+  .splash-hero-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,0.12) 0%, transparent 30%, transparent 55%, rgba(2,2,10,0.38) 80%, rgba(2,2,10,0.62) 100%);
+  }
   #splashPlayBtn {
-    margin-top: 38px;
+    position: absolute;
+    bottom: 11%;
+    left: 50%;
+    margin-top: 0;
     background: linear-gradient(135deg, #ffe08a, #d9a441);
     color: #1a1420;
     border: none;
@@ -1321,21 +1341,41 @@
     letter-spacing: 3px;
     font-family: inherit;
     cursor: pointer;
+    z-index: 2;
     opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 0.6s ease 0.6s, transform 0.6s ease 0.6s, filter 0.15s ease;
+    transform: translate(-50%, 16px);
+    transition: opacity 0.6s ease 0.7s, transform 0.6s ease 0.7s, filter 0.15s ease;
     animation: splashPlayPulse 2.6s ease-in-out infinite;
   }
-  #splashPhase2.show #splashPlayBtn { opacity: 1; transform: translateY(0); }
+  #splashPhase2.show #splashPlayBtn { opacity: 1; transform: translate(-50%, 0); }
   #splashPlayBtn:active { filter: brightness(1.15); }
   @keyframes splashPlayPulse {
     0%, 100% { box-shadow: 0 0 14px rgba(217,164,65,0.45), inset 0 2px 4px rgba(255,255,255,0.35); }
     50%      { box-shadow: 0 0 34px rgba(255,224,138,0.85), inset 0 2px 4px rgba(255,255,255,0.35); }
   }
+  /* Repli si l'artwork est absent : logo simple centré sur le fond du jeu */
+  .splash-game-logo {
+    display: none;
+    width: 100%;
+    max-width: 310px;
+    margin: 0 auto;
+    filter: drop-shadow(0 0 22px rgba(217,164,65,0.30)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
+  #splashPhase2.no-hero { background: #241a30; }
+  #splashPhase2.no-hero .splash-hero,
+  #splashPhase2.no-hero .splash-hero-veil { display: none; }
+  #splashPhase2.no-hero .splash-game-logo { display: block; opacity: 0; animation: splashFadeIn 0.9s ease 0.2s forwards; }
+  #splashPhase2.no-hero #splashPlayBtn {
+    position: static;
+    transform: none;
+    margin-top: 38px;
+    transition: opacity 0.6s ease 0.6s, transform 0.6s ease 0.6s, filter 0.15s ease;
+  }
+  #splashPhase2.no-hero.show #splashPlayBtn { opacity: 1; }
   @media (prefers-reduced-motion: reduce) {
     #splashPhase1, #splashPhase2 { transition: none; }
     .splash-studio-logo, .splash-studio-fallback, .splash-tagline { animation: none; opacity: 1; }
-    .splash-game-logo, #splashPlayBtn { transition: none; opacity: 1; transform: none; }
+    .splash-hero { transition: none; transform: none; }
     #splashPlayBtn { animation: none; }
   }
 </style>
@@ -1347,51 +1387,30 @@
     <div class="splash-tagline">présente</div>
   </div>
   <div class="splash-phase" id="splashPhase2">
+    <img id="splashHero" class="splash-hero" src="images/splash-brainmind.png" alt="BrainMind">
+    <div class="splash-hero-veil"></div>
     <img class="splash-game-logo" src="images/logo.png" alt="BrainMind">
     <button id="splashPlayBtn" type="button">JOUER</button>
   </div>
 </div>
 <script>
-  // Écran de lancement : fondu noir → logo studio → fondu noir → logo du jeu + bouton Jouer → menu.
-  // Un tap pendant le logo studio permet de passer directement au logo du jeu.
+  // Écran de lancement : fondu noir → logo studio → fondu noir → artwork BrainMind + JOUER → menu.
+  // Un tap pendant le logo studio permet de passer directement à l'écran du jeu.
   (function () {
     var splash = document.getElementById('splashScreen');
     var phase1 = document.getElementById('splashPhase1');
     var phase2 = document.getElementById('splashPhase2');
+    var hero = document.getElementById('splashHero');
     var btn = document.getElementById('splashPlayBtn');
-    var stage = 0; // 0 = logo studio, 1 = logo du jeu
+    var stage = 0; // 0 = logo studio, 1 = écran du jeu
 
-    // Fond de la phase 2 : on recopie la couleur réelle du fond du logo BrainMind
-    // (échantillonnage des 4 coins de images/logo.png) pour un raccord invisible
-    // entre le logo et l'arrière-plan de l'écran.
-    function applyLogoBackground() {
-      var img = new Image();
-      img.onload = function () {
-        try {
-          var c = document.createElement('canvas');
-          c.width = img.naturalWidth;
-          c.height = img.naturalHeight;
-          var ctx = c.getContext('2d');
-          ctx.drawImage(img, 0, 0);
-          var w = img.naturalWidth, h = img.naturalHeight;
-          var pts = [[2, 2], [w - 3, 2], [2, h - 3], [w - 3, h - 3]];
-          var r = 0, g = 0, b = 0, n = 0;
-          for (var i = 0; i < pts.length; i++) {
-            var d = ctx.getImageData(pts[i][0], pts[i][1], 1, 1).data;
-            if (d[3] < 250) continue; // coin transparent : on l'ignore
-            r += d[0]; g += d[1]; b += d[2]; n++;
-          }
-          if (n > 0) {
-            phase2.style.background = 'rgb(' + Math.round(r / n) + ',' + Math.round(g / n) + ',' + Math.round(b / n) + ')';
-          }
-        } catch (e) { /* logo inaccessible : on garde le fond de repli */ }
-      };
-      img.src = 'images/logo.png';
-    }
+    // Si l'artwork est absent, bascule sur le repli (logo simple sur fond du jeu).
+    hero.addEventListener('error', function () {
+      phase2.classList.add('no-hero');
+    });
 
     function startPhase2() {
       phase1.style.display = 'none';
-      applyLogoBackground();
       phase2.style.display = 'flex';
       // Deux images d'avance : laisse le navigateur peindre la phase 2 avant le fondu.
       requestAnimationFrame(function () {
@@ -1406,7 +1425,7 @@
     }
     setTimeout(leavePhase1, 3300); // logo studio visible environ 2 secondes
     splash.addEventListener('click', function (e) {
-      if (e.target !== btn) leavePhase1(); // tap n'importe où = passer au logo du jeu
+      if (e.target !== btn) leavePhase1(); // tap n'importe où = passer à l'écran du jeu
     });
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
