@@ -1,15 +1,28 @@
 {
+  "id": "./",
   "name": "BrainMind",
   "short_name": "BrainMind",
   "description": "Le Mastermind nouvelle génération : défis quotidiens, duels en ligne, quêtes, rangs et bannières.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#241a30",
   "theme_color": "#241a30",
   "lang": "fr",
+  "categories": ["games", "puzzle", "board"],
   "icons": [
+    { "src": "images/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "images/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "images/screenshot-1.png",
+      "sizes": "540x960",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "description": "Le menu du jeu avec ses modes"
+    }
   ]
 }
