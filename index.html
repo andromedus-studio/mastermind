@@ -4990,4 +4990,142 @@ setInterval(updateDailyTileGoldenState, 30000);
   }
 </script>
 </body>
+<!-- ═══════════════ ÉCRAN DE LANCEMENT : logo studio → logo du jeu → bouton Jouer ═══════════════ -->
+<style>
+  #splashScreen {
+    position: fixed;
+    inset: 0;
+    background: #000000; /* même noir que le logo du studio */
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.6s ease;
+  }
+  #splashScreen.fadeout { opacity: 0; pointer-events: none; }
+  .splash-phase {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 460px;
+    padding: 24px;
+    text-align: center;
+  }
+  #splashPhase1 { display: flex; }
+  .splash-studio-logo {
+    width: 100%;
+    max-width: 240px;
+    opacity: 0;
+    animation: splashFadeIn 0.9s ease forwards;
+    filter: drop-shadow(0 0 26px rgba(212,175,55,0.28));
+  }
+  .splash-studio-fallback {
+    display: none;
+    font-size: 26px;
+    font-weight: 900;
+    letter-spacing: 5px;
+    background: linear-gradient(180deg, #e8e8e8, #a8a8a8 55%, #d4af37);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    opacity: 0;
+    animation: splashFadeIn 0.9s ease forwards;
+  }
+  .splash-tagline {
+    margin-top: 22px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #a8a8a8;
+    opacity: 0;
+    animation: splashFadeIn 0.9s ease 0.5s forwards;
+  }
+  @keyframes splashFadeIn { to { opacity: 1; } }
+  .splash-game-logo {
+    width: 100%;
+    max-width: 310px;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+    filter: drop-shadow(0 0 22px rgba(217,164,65,0.30)) drop-shadow(0 6px 16px rgba(0,0,0,0.5));
+  }
+  #splashPhase2.show .splash-game-logo { opacity: 1; transform: scale(1); }
+  #splashPlayBtn {
+    margin-top: 38px;
+    background: linear-gradient(135deg, #ffe08a, #d9a441);
+    color: #1a1420;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 66px;
+    font-size: 21px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    font-family: inherit;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.6s ease 0.45s, transform 0.6s ease 0.45s, filter 0.15s ease;
+    animation: splashPlayPulse 2.6s ease-in-out infinite;
+  }
+  #splashPhase2.show #splashPlayBtn { opacity: 1; transform: translateY(0); }
+  #splashPlayBtn:active { filter: brightness(1.15); }
+  @keyframes splashPlayPulse {
+    0%, 100% { box-shadow: 0 0 14px rgba(217,164,65,0.45), inset 0 2px 4px rgba(255,255,255,0.35); }
+    50%      { box-shadow: 0 0 34px rgba(255,224,138,0.85), inset 0 2px 4px rgba(255,255,255,0.35); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .splash-studio-logo, .splash-studio-fallback, .splash-tagline { animation: none; opacity: 1; }
+    .splash-game-logo, #splashPlayBtn { transition: none; opacity: 1; transform: none; }
+    #splashPlayBtn { animation: none; }
+  }
+</style>
+<div id="splashScreen">
+  <div class="splash-phase" id="splashPhase1">
+    <img class="splash-studio-logo" src="images/logo_studio.png" alt="Andromedus Studio"
+         onerror="this.style.display='none'; document.getElementById('splashStudioFallback').style.display='block';">
+    <div id="splashStudioFallback" class="splash-studio-fallback">ANDROMEDUS STUDIO</div>
+    <div class="splash-tagline">présente</div>
+  </div>
+  <div class="splash-phase" id="splashPhase2">
+    <img class="splash-game-logo" src="images/logo.png" alt="BrainMind">
+    <button id="splashPlayBtn" type="button">JOUER</button>
+  </div>
+</div>
+<script>
+  // Écran de lancement : phase 1 (logo studio) → phase 2 (logo du jeu + bouton Jouer) → menu.
+  // Un tap pendant la phase 1 permet de passer directement à la phase 2.
+  (function () {
+    var splash = document.getElementById('splashScreen');
+    var phase1 = document.getElementById('splashPhase1');
+    var phase2 = document.getElementById('splashPhase2');
+    var btn = document.getElementById('splashPlayBtn');
+    var moved = false;
+    function toPhase2() {
+      if (moved) return;
+      moved = true;
+      phase1.style.display = 'none';
+      phase2.style.display = 'flex';
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          phase2.classList.add('show');
+        });
+      });
+    }
+    setTimeout(toPhase2, 2700);
+    splash.addEventListener('click', function (e) {
+      if (e.target !== btn) toPhase2(); // tap n'importe où = passer au logo du jeu
+    });
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      splash.classList.add('fadeout');
+      setTimeout(function () {
+        if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+      }, 650);
+    });
+  })();
+</script>
+<!-- ═══════════════ FIN ÉCRAN DE LANCEMENT ═══════════════ -->
 </html>
