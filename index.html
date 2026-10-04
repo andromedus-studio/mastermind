@@ -826,7 +826,7 @@
   .duel-card {
     box-sizing: border-box;
     width: 100%;
-    max-width: 400px;
+    max-width: 460px;
     max-height: 88vh;
     overflow-y: auto;
     text-align: center;
@@ -917,7 +917,7 @@
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
-  .player-banner-card { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 320px; }
+  .player-banner-card { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 430px; }
   .player-banner-frame { position: relative; width: 100%; overflow: hidden; border-radius: 14px; }
   /* Émeraude : petite aura circulaire derrière le logo, sans halo carré autour de la bannière */
   /* --- BANNIÈRE ÉMERAUDE PROPRE --- */
@@ -1139,6 +1139,18 @@
     box-shadow: none !important;
   }
   .player-banner-img, .player-banner-video { display: block; width: 100%; height: auto; }
+  /* Barres de défilement invisibles partout (le défilement tactile/roulette reste fonctionnel) */
+  .duel-card, .banner-players-list, .online-players-list, .rank-info-scroll, .history {
+    scrollbar-width: none;      /* Firefox */
+    -ms-overflow-style: none;   /* anciens Edge/IE */
+  }
+  .duel-card::-webkit-scrollbar,
+  .banner-players-list::-webkit-scrollbar,
+  .online-players-list::-webkit-scrollbar,
+  .rank-info-scroll::-webkit-scrollbar,
+  .history::-webkit-scrollbar {
+    display: none;              /* Chrome, Android, Edge */
+  }
   .player-banner-video { background: transparent !important; }
   .player-banner-rank {
     position: absolute; top: -8px; right: -8px;
@@ -1158,10 +1170,10 @@
   /* Bannière perso affichée sous le titre du jeu, sur l'écran principal */
   .my-banner-wrap { display: flex; justify-content: center; margin: 4px 0 2px; }
   .my-banner-wrap:empty { display: none; margin: 0; }
-  .my-banner-wrap .player-banner-card { max-width: 240px; }
+  .my-banner-wrap .player-banner-card { max-width: 100%; }
   /* Texte (pseudo + niveau/XP) superposé directement sur la bannière, sous le titre du palier */
   .player-banner-overlay {
-    position: absolute; top: 54%; left: 50%; transform: translate(-50%, -50%);
+    position: absolute; top: 53%; left: 50%; transform: translate(-50%, -50%);
     width: 64%; text-align: center; pointer-events: none; z-index: 4;
   }
   .player-banner-overlay .player-banner-name {
@@ -1170,7 +1182,7 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .player-banner-overlay .player-banner-sub {
-    font-size: 11px; color: #f2ece2; margin-top: 2px; white-space: nowrap;
+    font-size: 11px; color: #f2ece2; margin-top: 5px; white-space: nowrap;
     text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.7);
   }
   .player-banner-below {
@@ -1217,7 +1229,7 @@
   .duel-vs .vs { color: var(--ink-dim); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
   /* Bannières de rang réduites dans l'écran de duel (texte proportionnel à la largeur de la bannière) */
   .duel-vs { gap: 8px; }
-  .duel-banner-slot { flex: 1 1 0; min-width: 0; max-width: 170px; display: flex; justify-content: center; }
+  .duel-banner-slot { flex: 1 1 0; min-width: 0; max-width: 200px; display: flex; justify-content: center; }
   .duel-banner-slot .player-banner-card { max-width: 100%; }
   .duel-banner-slot .player-banner-frame { container-type: inline-size; }
   .duel-banner-slot .player-banner-name { font-size: 11px; font-size: 7.5cqw; }
@@ -1319,6 +1331,11 @@
     transition: transform 6s ease-out;
   }
   #splashPhase2.show .splash-hero { transform: scale(1); } /* zoom lent vers l'extérieur */
+  /* Sur PC (grands écrans), afficher l'artwork en entier au lieu de le zoomer/rognier */
+  @media (min-width: 700px) {
+    .splash-hero { object-fit: contain; }
+    #splashPhase2.show .splash-hero { transform: none; }
+  }
   .splash-hero-veil {
     position: absolute;
     inset: 0;
@@ -3184,7 +3201,21 @@ function levelFromXp(totalXp){
 }
 
 // Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30-34), rubellite (35-39), améthyste (40+).
+// Deux formats d'image par palier : PNG (nouvelles versions, priorité) et WEBP (anciennes, repli).
+// Pour les paliers animés, la vidéo WebM (TIER_BANNER_VIDEOS) passe avant tout, et le PNG du
+// même palier sert de repli si la vidéo est absente.
 const TIER_BANNERS = {
+  debutant: 'images/banner-debutant.png',
+  bronze: 'images/banner-bronze.png',
+  silver: 'images/banner-silver.png',
+  gold: 'images/banner-gold.png',
+  emerald: 'images/banner-emerald.png',
+  saphir: 'images/banner-saphir.png',
+  rubis: 'images/banner-rubis.png',
+  rubellite: 'images/banner-rubellite.png',
+  amethyste: 'images/banner-amethyste.png'
+};
+const TIER_BANNERS_WEBP = {
   debutant: 'images/banner-debutant.webp',
   bronze: 'images/banner-bronze.webp',
   silver: 'images/banner-silver.webp',
@@ -3195,6 +3226,29 @@ const TIER_BANNERS = {
   rubellite: 'images/banner-rubellite.webp',
   amethyste: 'images/banner-amethyste.webp'
 };
+// Repli en cascade pour une bannière image : PNG -> WEBP -> bannière or.
+function bannerImgFallback(img){
+  var tier = img.getAttribute('data-tier') || 'gold';
+  if (!img.hasAttribute('data-tried-webp')) {
+    img.setAttribute('data-tried-webp', '1');
+    img.src = TIER_BANNERS_WEBP[tier] || TIER_BANNERS_WEBP.gold;
+  } else if (!img.hasAttribute('data-tried-gold')) {
+    img.setAttribute('data-tried-gold', '1');
+    img.src = TIER_BANNERS_WEBP.gold;
+  }
+}
+// Repli d'une bannière vidéo : si le WebM du palier est absent, on affiche le PNG du même palier.
+function bannerVideoFallback(sourceEl){
+  var video = sourceEl.parentNode;
+  var tier = video.getAttribute('data-tier') || 'gold';
+  var img = document.createElement('img');
+  img.className = 'player-banner-img';
+  img.setAttribute('data-tier', tier);
+  img.alt = tier;
+  img.src = TIER_BANNERS[tier] || TIER_BANNERS.gold;
+  img.onerror = function(){ bannerImgFallback(img); };
+  if (video.parentNode) video.parentNode.replaceChild(img, video);
+}
 
 // Bannières animées : WebM transparent (fond réellement transparent, pas juste noir).
 const TIER_BANNER_VIDEOS = {
@@ -3204,6 +3258,12 @@ const TIER_BANNER_VIDEOS = {
   rubellite: 'images/rubellite_banniere_transparente.webm',
   amethyste: 'images/amethyste_banniere_transparente.webm'
 };
+
+// Bannières animées (WebM) — interrupteur :
+// - false : toutes les bannières affichent le PNG (pendant la préparation des vidéos).
+// - true  : les rangs émeraude à améthyste utilisent leur vidéo animée
+//           (repli automatique sur le PNG si la vidéo est absente).
+const BANNERS_ANIMEES = false;
 
 function pseudoTier(level){
   if(level >= RANK_LEVELS.amethyste) return 'amethyste';
@@ -3225,9 +3285,9 @@ function playerBannerCardHTML(pseudo, level, extra){
   extra = extra || {};
   const tier = pseudoTier(level);
   const safe = escapeHtml(pseudo);
-  const bannerMedia = TIER_BANNER_VIDEOS[tier]
-    ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" poster="${TIER_BANNERS.gold}" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm"></video>`
-    : `<img class="player-banner-img" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="this.onerror=null;this.src='${TIER_BANNERS.gold}'">`;
+  const bannerMedia = (BANNERS_ANIMEES && TIER_BANNER_VIDEOS[tier])
+    ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" data-tier="${tier}" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm" onerror="bannerVideoFallback(this)"></video>`
+    : `<img class="player-banner-img" data-tier="${tier}" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="bannerImgFallback(this)">`;
   return `<div class="player-banner-card player-banner-tier-${tier}${extra.isMe ? ' player-banner-me' : ''}">
     <div class="player-banner-frame">
       ${bannerMedia}
@@ -3658,7 +3718,7 @@ function openLeaderboard(){
     return playerBannerCardHTML(p.pseudo, p.info.level, {
       rank: i + 1,
       isMe,
-      subHTML: `Nv ${p.info.level} · ${p.info.xpIntoLevel}/${p.info.xpForNext} XP`
+      subHTML: `Nv ${p.info.level}`
     });
   }).join('');
 }
@@ -3786,7 +3846,7 @@ function renderMyBanner(){
   if(!wrap) return;
   if(!myPseudo){ wrap.innerHTML = ''; myBannerKey = ''; return; }
   const info = levelFromXp(playerXpCache[myPseudo] || 0);
-  const subHTML = `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
+  const subHTML = `Nv ${info.level}`;
   const key = `${myPseudo}|${info.level}`;
   if(key === myBannerKey){
     // Même joueur/même rang : on met juste le texte à jour, sans recharger la vidéo/l'image
@@ -3830,7 +3890,7 @@ function renderOnlinePlayers(data){
     const safePseudo = escapeHtml(p.pseudo);
     const info = levelFromXp(playerXpCache[p.pseudo] || 0);
     return playerBannerCardHTML(p.pseudo, info.level, {
-      subHTML: `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`,
+      subHTML: `Nv ${info.level}`,
       belowHTML: `<div class="player-banner-below">
         ${statusLabel ? `<span class="online-player-status">${statusLabel}</span>` : ''}
         <button class="challenge-btn" onclick="challengePlayer('${safePseudo.replace(/'/g, "\\'")}')">⚔️ Défier</button>
