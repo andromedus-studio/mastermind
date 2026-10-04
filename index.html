@@ -59,32 +59,20 @@
     overscroll-behavior-y: none;
   }
 
-  /* Couche 1 (derrière) : la même image en "cover" mais fortement floutée et
-     assombrie — elle remplit l'écran, donc aucune bande noire autour. */
+  /* Fond d'écran : plein écran (cover) — en attendant de vraies illustrations
+     au format portrait, on garde l'ancien affichage plein cadre. */
   .bg-photo {
     position: fixed;
     inset: -20px;
     background-image: var(--bg-landscape);
     background-size: cover;
     background-position: center;
-    filter: blur(14px) brightness(0.65);
+    filter: blur(2px) brightness(0.75);
     transform: scale(1.05);
     z-index: -2;
   }
-  /* Couche 2 (par-dessus) : l'illustration ENTIÈRE, nette, centrée verticalement.
-     Fini le zoom qui rogne : on voit toute l'illustration, sur PC comme sur tel. */
-  .bg-photo-full {
-    position: fixed;
-    inset: 0;
-    background-image: var(--bg-landscape);
-    background-size: contain;
-    background-position: center;
-    background-repeat: no-repeat;
-    z-index: -1;
-  }
   @media (max-width: 640px) {
     .bg-photo { background-image: var(--bg-portrait); }
-    .bg-photo-full { background-image: var(--bg-portrait); }
   }
 
   .bg-overlay {
@@ -1557,7 +1545,6 @@
 </script>
 <!-- ═══════════════ FIN ÉCRAN DE LANCEMENT ═══════════════ -->
 <div class="bg-photo"></div>
-<div class="bg-photo-full"></div>
 <div class="bg-overlay"></div>
 
 <button class="sound-toggle info-toggle" id="ranksInfoBtn" onclick="openRanksInfo()" title="Rangs et avantages" aria-label="Rangs et avantages">ℹ️</button>
@@ -4169,7 +4156,15 @@ window.removeFriend = removeFriend;
 window.renderPlayersPanel = renderPlayersPanel;
 
 function toggleOnlinePlayersPanel(){
-  document.getElementById('onlinePlayersScreen').classList.toggle('hidden');
+  const screen = document.getElementById('onlinePlayersScreen');
+  const willShow = screen.classList.contains('hidden');
+  screen.classList.toggle('hidden');
+  // À chaque ouverture : la barre de recherche repart vide (plus de vieux texte)
+  if(willShow){
+    const input = document.getElementById('friendSearchInput');
+    if(input) input.value = '';
+    renderPlayersPanel();
+  }
 }
 
 function setupQueueWatch(){
