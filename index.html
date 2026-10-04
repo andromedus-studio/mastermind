@@ -59,18 +59,32 @@
     overscroll-behavior-y: none;
   }
 
+  /* Couche 1 (derrière) : la même image en "cover" mais fortement floutée et
+     assombrie — elle remplit l'écran, donc aucune bande noire autour. */
   .bg-photo {
     position: fixed;
     inset: -20px;
     background-image: var(--bg-landscape);
     background-size: cover;
     background-position: center;
-    filter: blur(2px) brightness(0.75);
+    filter: blur(14px) brightness(0.65);
     transform: scale(1.05);
     z-index: -2;
   }
+  /* Couche 2 (par-dessus) : l'illustration ENTIÈRE, nette, centrée verticalement.
+     Fini le zoom qui rogne : on voit toute l'illustration, sur PC comme sur tel. */
+  .bg-photo-full {
+    position: fixed;
+    inset: 0;
+    background-image: var(--bg-landscape);
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: -1;
+  }
   @media (max-width: 640px) {
     .bg-photo { background-image: var(--bg-portrait); }
+    .bg-photo-full { background-image: var(--bg-portrait); }
   }
 
   .bg-overlay {
@@ -1233,10 +1247,10 @@
   }
   .player-banner-video { background: transparent !important; }
   .player-banner-rank {
-    position: absolute; top: -8px; right: -8px;
-    background: var(--gold); color: #1a1420; font-weight: 800; font-size: 12px; line-height: 1;
-    border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
-    border: 2px solid var(--panel-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    position: absolute; top: 6px; right: 6px;
+    background: var(--gold); color: #1a1420; font-weight: 800; font-size: 13px; line-height: 1;
+    border-radius: 999px; min-width: 24px; height: 24px; padding: 0 8px; display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--panel-bg); box-shadow: 0 1px 4px rgba(0,0,0,0.55), 0 0 12px rgba(217,164,65,0.65);
     z-index: 5; /* toujours au-dessus des effets de bannière (reflets Émeraude/Saphir, etc.) */
   }
   .player-banner-me:not(.player-banner-tier-emerald):not(.player-banner-tier-saphir):not(.player-banner-tier-arcenciel) .player-banner-frame { box-shadow: 0 0 10px 1px var(--accent-soft); border-radius: 14px; }
@@ -1307,6 +1321,14 @@
   }
   .duel-avatar.opponent { border-color: var(--c0); color: var(--c0); }
   .duel-vs .vs { color: var(--ink-dim); font-weight: 700; font-size: 11px; letter-spacing: 1px; }
+  /* Chronos visibles de duel (le mien à gauche sous ma bannière, celui de l'adversaire à droite) */
+  .duel-clock-row { display: flex; justify-content: center; gap: 10px; margin: 2px 0 10px; }
+  .duel-clock {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12.5px; font-weight: 800; padding: 4px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+    font-variant-numeric: tabular-nums; color: var(--ink-dim);
+  }
   /* Bannières de rang réduites dans l'écran de duel (texte proportionnel à la largeur de la bannière) */
   .duel-vs { gap: 8px; }
   .duel-banner-slot { flex: 1 1 0; min-width: 0; max-width: 200px; display: flex; justify-content: center; }
@@ -1535,8 +1557,9 @@
 </script>
 <!-- ═══════════════ FIN ÉCRAN DE LANCEMENT ═══════════════ -->
 <div class="bg-photo"></div>
+<div class="bg-photo-full"></div>
 <div class="bg-overlay"></div>
-<button class="sound-toggle" id="soundToggle" onclick="toggleSound()" title="Musique">🔇</button>
+
 <button class="sound-toggle info-toggle" id="ranksInfoBtn" onclick="openRanksInfo()" title="Rangs et avantages" aria-label="Rangs et avantages">ℹ️</button>
 <audio id="bgMusic" loop preload="auto"><source src="audio/music-main.mp3" type="audio/mpeg"></audio>
 <div class="app">
@@ -1564,10 +1587,10 @@
       <button class="cc-option toggle-btn" id="numberModeBtn" onclick="toggleNumberMode()" style="width:100%; max-width:none; margin-bottom:20px; padding:12px;">🔢 Chiffres au lieu de couleurs</button>
 
       <div class="icon-row-big" id="extraIcons">
-        <button class="online-icon-btn" id="onlinePlayersBtn" onclick="toggleOnlinePlayersPanel()" title="Joueurs en ligne">
+        <button class="online-icon-btn" id="onlinePlayersBtn" onclick="toggleOnlinePlayersPanel()" title="Amis &amp; joueurs en ligne">
           👥<span class="online-badge hidden" id="onlinePlayersBadge">0</span>
         </button>
-        <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 15 des joueurs">🏆</button>
+        <button class="online-icon-btn" onclick="openLeaderboard()" title="Top 100 des joueurs">🏆</button>
         <button class="online-icon-btn" onclick="openMyGameHistory()" title="Mes dernières parties">📜</button>
         <button class="online-icon-btn" onclick="openQuestsPanel()" title="Quêtes du jour et de la semaine">🎯</button>
         <button class="online-icon-btn" onclick="openSettings()" title="Paramètres">⚙️</button>
@@ -1685,14 +1708,17 @@ generateCodes();
 let sessionScores = []; // {mode, numColors, attempts}
 
 let soundOn = false;
+try { soundOn = localStorage.getItem('brainmind_sound') === '1'; } catch(e) {}
 
+// Le réglage du son vit dans Paramètres. Le choix (ON/OFF) est gardé en mémoire
+// sur l'appareil et réappliqué automatiquement à chaque visite du joueur.
 function setSoundState(on){
   const audio = document.getElementById('bgMusic');
-  const btn = document.getElementById('soundToggle');
   soundOn = on;
+  try { localStorage.setItem('brainmind_sound', on ? '1' : '0'); } catch(e) {}
   if(on){
     audio.volume = 0.35;
-    audio.play().catch(() => { soundOn = false; updateSoundButton(); });
+    audio.play().catch(() => {});
   } else {
     audio.pause();
   }
@@ -1701,18 +1727,31 @@ function setSoundState(on){
 
 function updateSoundButton(){
   const btn = document.getElementById('soundToggle');
-  btn.textContent = soundOn ? '🔊' : '🔇';
-  btn.classList.toggle('playing', soundOn);
+  if(btn){
+    btn.textContent = soundOn ? '🔊' : '🔇';
+    btn.classList.toggle('playing', soundOn);
+  }
+  // Met à jour l'interrupteur des Paramètres s'il est affiché
+  const stateEl = document.getElementById('settingsSoundState');
+  if(stateEl) stateEl.textContent = soundOn ? '🔊 Activée' : '🔇 Coupée';
+  const btnEl = document.getElementById('settingsSoundBtn');
+  if(btnEl) btnEl.textContent = soundOn ? 'Couper la musique' : 'Activer la musique';
 }
 
 function toggleSound(){
   setSoundState(!soundOn);
 }
 
-// Tentative de démarrage automatique de la musique. Les navigateurs bloquent
-// souvent l'autoplay avec son : si ça échoue, le premier clic sur le bouton
-// son (un vrai geste utilisateur) permettra de la démarrer normalement.
-window.addEventListener('load', () => setSoundState(true));
+// Réapplique la préférence mémorisée au chargement. Les navigateurs bloquent
+// souvent l'autoplay : dans ce cas, le premier geste utilisateur la démarre.
+window.addEventListener('load', () => setSoundState(soundOn));
+document.addEventListener('pointerdown', function onFirstGesture(){
+  const audio = document.getElementById('bgMusic');
+  if(soundOn && audio && audio.paused && !audio.ended){
+    audio.volume = 0.35;
+    audio.play().catch(() => {});
+  }
+}, { once: true });
 
 // Coupe la musique quand l'onglet passe en arrière-plan ou qu'on quitte la
 // page, pour éviter qu'elle continue de jouer après avoir quitté le jeu.
@@ -1727,6 +1766,27 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => {
   document.getElementById('bgMusic').pause();
 });
+
+// --- Coupe VRAIMENT la musique quand l'app passe en arrière-plan ou est quittée.
+// Certains téléphones ne déclenchent pas toujours visibilitychange dans l'app :
+// on ajoute blur, une vérification régulière, et le bouton pause de la
+// notification Android (Media Session) fonctionne aussi depuis l'écran verrouillé. ---
+function pauseMusicHard(){
+  const audio = document.getElementById('bgMusic');
+  if(audio && !audio.paused) audio.pause();
+}
+window.addEventListener('blur', pauseMusicHard);
+window.addEventListener('focus', () => {
+  const audio = document.getElementById('bgMusic');
+  if(soundOn && audio && audio.paused && !audio.ended) audio.play().catch(() => {});
+});
+setInterval(() => { if(document.hidden) pauseMusicHard(); }, 2000);
+try {
+  if(navigator.mediaSession){
+    if(window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'BrainMind', artist: 'Andromedus Studio' });
+    navigator.mediaSession.setActionHandler('pause', pauseMusicHard);
+  }
+} catch(e) {}
 
 let mode = null;
 let history = []; // {guess:[...], black, white}
@@ -2450,10 +2510,13 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
   </div>
 </div>
 
-<!-- Panneau des joueurs en ligne -->
+<!-- Panneau Amis & joueurs : recherche de pseudo, liste d'amis, joueurs en ligne -->
 <div id="onlinePlayersScreen" class="hidden duel-overlay">
   <div class="card duel-card">
-    <div class="duel-title">👥 Joueurs en ligne</div>
+    <div class="duel-title">👥 Amis &amp; joueurs</div>
+    <input type="text" id="friendSearchInput" placeholder="🔍 Rechercher un pseudo…" autocomplete="off" autocapitalize="none" spellcheck="false"
+           oninput="renderPlayersPanel()"
+           style="width:100%; box-sizing:border-box; margin:6px 0 10px; padding:10px 12px; font-family:inherit; font-size:13px; color:#fff; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); border-radius:10px; outline:none;">
     <div class="online-players-list banner-players-list" id="onlinePlayersList"></div>
     <button class="btn secondary" onclick="toggleOnlinePlayersPanel()">Fermer</button>
   </div>
@@ -2462,7 +2525,7 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
 <!-- Classement top 15 par niveau -->
 <div id="leaderboardScreen" class="hidden duel-overlay">
   <div class="card duel-card">
-    <div class="duel-title">🏆 Top 15 des joueurs</div>
+    <div class="duel-title">🏆 Top 100 des joueurs</div>
     <div class="online-players-list banner-players-list" id="leaderboardList"></div>
     <button class="btn secondary" onclick="closeLeaderboard()">Fermer</button>
   </div>
@@ -2629,6 +2692,10 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
         <span class="vs">VS</span>
         <div class="duel-banner-slot" id="duelOppBanner"></div>
       </div>
+      <div class="duel-clock-row">
+        <span class="duel-clock" title="Ton temps restant">⏱️ <span id="duelMyClock">3:00</span></span>
+        <span class="duel-clock" title="Temps restant de l'adversaire">⏳ <span id="duelOppClock">3:00</span></span>
+      </div>
       <div class="duel-opponent-status" id="duelOpponentStatus"></div>
       <div class="duel-sub" id="duelAttemptsCounter" style="text-align:center; font-size:12px; color:var(--ink-dim); margin-bottom:6px;"></div>
       <div class="history" id="duelHistory"></div>
@@ -2714,6 +2781,10 @@ let opponentPseudo = null;
 let duelSecret = null;
 let duelStartedAt = null;
 let duelGuess = [null,null,null,null];
+// Chrono de duel : 3 minutes par joueur. À zéro, c'est la défaite.
+const DUEL_TIME_MS = 3 * 60 * 1000;
+let duelClockInterval = null;
+let duelClockSyncInterval = null;
 let duelSelectedSlot = 0;
 let duelHistory = [];
 let duelFinished = false;
@@ -3023,8 +3094,14 @@ async function renderSettings(){
     <div class="rank-block settings-block">
       <div class="rank-block-title">👤 ${escapeHtml(myPseudo)}</div>
       <div><span class="settings-status">${status}</span></div>
+      <div style="margin-top:4px;"><span class="settings-status">⭐ XP total : ${(playerXpCache[myPseudo] || 0).toLocaleString('fr-FR')} · Niveau ${levelFromXp(playerXpCache[myPseudo] || 0).level}</span></div>
       ${linked ? '' : `<p class="settings-note">Relie ton compte à Google pour retrouver ta progression si tu changes de téléphone.</p>
       <button class="btn" onclick="settingsLinkGoogle()">Sauvegarder avec Google</button>`}
+    </div>
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">🔊 Musique</div>
+      <div><span class="settings-status" id="settingsSoundState">${soundOn ? '🔊 Activée' : '🔇 Coupée'}</span></div>
+      <button class="btn secondary" id="settingsSoundBtn" onclick="toggleSound()">${soundOn ? 'Couper la musique' : 'Activer la musique'}</button>
     </div>
     <div class="rank-block settings-block">
       <div class="rank-block-title">🔑 Code de secours</div>
@@ -3279,7 +3356,9 @@ function xpForLevel(level){
 function levelFromXp(totalXp){
   let level = 1;
   let remaining = totalXp || 0;
-  while(remaining >= xpForLevel(level)){
+  // Niveau maximum : 50. Arrivé à 50, le joueur y reste mais son expérience
+  // continue de monter (xpIntoLevel s'accumule sans limite).
+  while(level < 50 && remaining >= xpForLevel(level)){
     remaining -= xpForLevel(level);
     level++;
   }
@@ -3796,7 +3875,7 @@ function openLeaderboard(){
   const top = Object.entries(playerXpCache)
     .map(([pseudo, xp]) => ({pseudo, xp, info: levelFromXp(xp)}))
     .sort((a,b) => b.xp - a.xp)
-    .slice(0, 15);
+    .slice(0, 100);
   if(top.length === 0){
     el.innerHTML = `<div class="online-players-empty">Aucun joueur classé pour l'instant.</div>`;
     return;
@@ -3806,7 +3885,7 @@ function openLeaderboard(){
     return playerBannerCardHTML(p.pseudo, p.info.level, {
       rank: i + 1,
       isMe,
-      subHTML: `Nv ${p.info.level}`
+      subHTML: `Nv ${p.info.level} · ⭐ ${p.xp.toLocaleString('fr-FR')} XP`
     });
   }).join('');
 }
@@ -3954,16 +4033,67 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// --- Panneau Amis & joueurs : liste d'amis persistante (Firebase), recherche
+// de pseudo sur tous les joueurs connus, et joueurs en ligne avec Défier. ---
+let myFriends = {};          // { pseudoDeLAmi: true }
+let friendsWatchRef = null;
+
+// Les amis sont gardés sur l'appareil (toujours disponibles, même hors ligne)
+// ET de façon optimiste dans la base en ligne : si la base accepte l'écriture,
+// la liste se retrouve aussi sur les autres appareils du même joueur.
+function loadLocalFriends(){
+  try { return JSON.parse(localStorage.getItem('brainmind_friends') || '{}') || {}; } catch(e) { return {}; }
+}
+function saveLocalFriends(){
+  try { localStorage.setItem('brainmind_friends', JSON.stringify(myFriends)); } catch(e) {}
+}
+myFriends = loadLocalFriends();
+
+function watchMyFriends(){
+  if(friendsWatchRef || !myPseudo) return;
+  friendsWatchRef = ref(db, 'friends/' + myPseudo);
+  onValue(friendsWatchRef, (snap) => {
+    const fbFriends = snap.val() || {};
+    let changed = false;
+    Object.keys(fbFriends).forEach(p => { if(!myFriends[p]){ myFriends[p] = true; changed = true; } });
+    if(changed) saveLocalFriends();
+    renderPlayersPanel();
+  });
+}
+function addFriend(pseudo){
+  if(!myFriends[pseudo]){
+    myFriends[pseudo] = true;
+    saveLocalFriends();
+    renderPlayersPanel();
+  }
+  set(ref(db, 'friends/' + myPseudo + '/' + pseudo), true).catch(() => {});
+}
+function removeFriend(pseudo){
+  if(myFriends[pseudo]){
+    delete myFriends[pseudo];
+    saveLocalFriends();
+    renderPlayersPanel();
+  }
+  remove(ref(db, 'friends/' + myPseudo + '/' + pseudo)).catch(() => {});
+}
+function renderPlayersPanel(){
+  renderOnlinePlayers(lastPresenceData || {});
+}
+
 function renderOnlinePlayers(data){
+  lastPresenceData = data || {};
+  if(myPseudo && !friendsWatchRef) watchMyFriends();
   const now = serverNow().getTime();
-  const others = Object.values(data)
+  const online = Object.values(lastPresenceData)
     .filter(p => p && p.pseudo && p.pseudo !== myPseudo && now - (p.at || 0) < PRESENCE_STALE_MS)
     .sort((a,b) => a.pseudo.localeCompare(b.pseudo, 'fr', {sensitivity:'base'}));
+  const onlineByPseudo = {};
+  online.forEach(p => onlineByPseudo[p.pseudo] = p);
 
   const badge = document.getElementById('onlinePlayersBadge');
   if(badge){
-    if(others.length > 0){
-      badge.textContent = others.length;
+    if(online.length > 0){
+      badge.textContent = online.length;
       badge.classList.remove('hidden');
     } else {
       badge.classList.add('hidden');
@@ -3972,23 +4102,71 @@ function renderOnlinePlayers(data){
 
   const el = document.getElementById('onlinePlayersList');
   if(!el) return;
-  if(others.length === 0){
-    el.innerHTML = `<div class="online-players-empty">Personne d'autre en ligne pour le moment.</div>`;
-    return;
-  }
-  el.innerHTML = others.map(p => {
-    const statusLabel = p.status === 'in_duel' ? '⚔️ en duel' : p.status === 'searching' ? '🔍 en recherche' : '';
-    const safePseudo = escapeHtml(p.pseudo);
-    const info = levelFromXp(playerXpCache[p.pseudo] || 0);
-    return playerBannerCardHTML(p.pseudo, info.level, {
+
+  const searchInput = document.getElementById('friendSearchInput');
+  const q = ((searchInput && searchInput.value) || '').trim().toLowerCase();
+
+  // Carte d'un joueur : bannière + statut + boutons Défier (si en ligne) et Ami
+  const cardFor = (pseudo, presence) => {
+    const onlineNow = !!presence;
+    const isFriend = !!myFriends[pseudo];
+    const safePseudo = escapeHtml(pseudo);
+    const safeJs = safePseudo.replace(/'/g, "\\'");
+    const info = levelFromXp(playerXpCache[pseudo] || 0);
+    const statusLabel = !onlineNow ? '😴 hors ligne'
+      : presence.status === 'in_duel' ? '⚔️ en duel'
+      : presence.status === 'searching' ? '🔍 en recherche'
+      : '🟢 en ligne';
+    const duelAction = (onlineNow && presence.status !== 'in_duel')
+      ? `<button class="challenge-btn" onclick="challengePlayer('${safeJs}')">⚔️ Défier</button>`
+      : '';
+    const friendAction = isFriend
+      ? `<button class="challenge-btn" onclick="removeFriend('${safeJs}')">❌ Retirer</button>`
+      : `<button class="challenge-btn" onclick="addFriend('${safeJs}')">➕ Ami</button>`;
+    return playerBannerCardHTML(pseudo, info.level, {
       subHTML: `Nv ${info.level}`,
       belowHTML: `<div class="player-banner-below">
-        ${statusLabel ? `<span class="online-player-status">${statusLabel}</span>` : ''}
-        <button class="challenge-btn" onclick="challengePlayer('${safePseudo.replace(/'/g, "\\'")}')">⚔️ Défier</button>
+        <span class="online-player-status">${statusLabel}</span>
+        ${duelAction}
+        ${friendAction}
       </div>`
     });
-  }).join('');
+  };
+
+  let html = '';
+  if(q){
+    // Recherche active : on parcourt TOUS les joueurs connus, même hors ligne
+    const matches = Object.keys(playerXpCache)
+      .filter(p => p !== myPseudo && p.toLowerCase().includes(q))
+      .sort((a,b) => a.localeCompare(b, 'fr', {sensitivity:'base'}))
+      .slice(0, 30);
+    html = matches.length > 0
+      ? matches.map(p => cardFor(p, onlineByPseudo[p])).join('')
+      : `<div class="online-players-empty">Aucun joueur trouvé pour « ${escapeHtml(q)} ».</div>`;
+  } else {
+    const friends = Object.keys(myFriends).filter(p => p !== myPseudo);
+    const friendsSorted = friends
+      .sort((a,b) => (onlineByPseudo[b] ? 1 : 0) - (onlineByPseudo[a] ? 1 : 0)
+        || a.localeCompare(b, 'fr', {sensitivity:'base'}));
+    const onlineNonFriends = online.map(p => p.pseudo).filter(p => !myFriends[p]);
+    if(friendsSorted.length > 0){
+      html += `<div class="rank-block-title" style="margin:6px 0 2px;">💛 Mes amis</div>`;
+      html += friendsSorted.map(p => cardFor(p, onlineByPseudo[p])).join('');
+    }
+    if(onlineNonFriends.length > 0){
+      html += `<div class="rank-block-title" style="margin:6px 0 2px;">🟢 En ligne</div>`;
+      html += onlineNonFriends.map(p => cardFor(p, onlineByPseudo[p])).join('');
+    }
+    if(friendsSorted.length === 0 && onlineNonFriends.length === 0){
+      html = `<div class="online-players-empty">Personne d'autre en ligne. Utilise la recherche 🔍 pour trouver et ajouter des amis !</div>`;
+    }
+  }
+  el.innerHTML = html;
 }
+
+window.addFriend = addFriend;
+window.removeFriend = removeFriend;
+window.renderPlayersPanel = renderPlayersPanel;
 
 function toggleOnlinePlayersPanel(){
   document.getElementById('onlinePlayersScreen').classList.toggle('hidden');
@@ -4990,6 +5168,7 @@ function enterDuel(duelId){
   updateDuelAttemptsCounter();
   document.getElementById('duelSubmitBtn').disabled = true;
   document.getElementById('duelAbandonRow').classList.remove('hidden');
+  startDuelClocks();
   document.getElementById('duelAbandonConfirm').classList.add('hidden');
   duelBannerKey = '';
   document.getElementById('duelMyBanner').innerHTML = '';
@@ -5008,12 +5187,22 @@ function enterDuel(duelId){
     opponentPseudo = players.find(p => p !== myPseudo) || '…';
     renderDuelBanners();
 
+    // Chrono de l'adversaire : mis à jour depuis la base toutes les 5 s
+    const oppClockEl = document.getElementById('duelOppClock');
+    if(oppClockEl){
+      const oppRemaining = (data.clocks && data.clocks[opponentPseudo] !== undefined)
+        ? Math.max(0, Number(data.clocks[opponentPseudo]))
+        : DUEL_TIME_MS;
+      oppClockEl.dataset.remaining = oppRemaining;
+      oppClockEl.textContent = formatClock(oppRemaining);
+    }
+
     const oppMovesObj = (data.moves && data.moves[opponentPseudo]) ? data.moves[opponentPseudo] : {};
     const oppMovesCount = Object.keys(oppMovesObj).length;
     const oppResult = data.finished && data.finished[opponentPseudo];
     const statusEl = document.getElementById('duelOpponentStatus');
     if(oppResult && oppResult.forfeited){
-      statusEl.textContent = `${opponentPseudo} a abandonné la partie`;
+      statusEl.textContent = oppResult.timeout ? `⏱️ ${opponentPseudo} n'a plus de temps !` : `${opponentPseudo} a abandonné la partie`;
     } else if(oppResult){
       statusEl.textContent = `${opponentPseudo} a trouvé en ${oppResult.attempts} coup(s), ${(oppResult.timeMs/1000).toFixed(1)}s`;
     } else {
@@ -5117,6 +5306,53 @@ function updateDuelAttemptsCounter(){
   el.textContent = `Essai ${duelHistory.length + 1} / ${DUEL_MAX_ATTEMPTS}`;
 }
 
+// --- Chronos de duel : 3 minutes par joueur, visibles des deux côtés.
+// Mon chrono tourne localement ; il est partagé à l'adversaire via la base
+// toutes les 5 secondes (et inversement). À zéro : défaite sur le temps. ---
+function formatClock(ms){
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+function startDuelClocks(){
+  stopDuelClocks();
+  const myEl = document.getElementById('duelMyClock');
+  if(myEl) myEl.textContent = formatClock(DUEL_TIME_MS);
+  duelClockInterval = setInterval(() => {
+    if(duelFinished){ stopDuelClocks(); return; }
+    const remaining = Math.max(0, DUEL_TIME_MS - (Date.now() - duelStartedAt));
+    if(myEl){
+      myEl.textContent = formatClock(remaining);
+      myEl.style.color = remaining < 30000 ? '#ff8a80' : '';
+    }
+    const oppEl = document.getElementById('duelOppClock');
+    if(oppEl && oppEl.dataset.remaining !== undefined){
+      const oppRemaining = Math.max(0, Number(oppEl.dataset.remaining));
+      oppEl.textContent = formatClock(oppRemaining);
+    }
+    if(remaining <= 0) duelTimeout();
+  }, 500);
+  duelClockSyncInterval = setInterval(() => {
+    if(!currentDuelId || duelFinished) return;
+    const remaining = Math.max(0, DUEL_TIME_MS - (Date.now() - duelStartedAt));
+    set(ref(db, `duels/${currentDuelId}/clocks/${myPseudo}`), remaining).catch(() => {});
+  }, 5000);
+}
+function stopDuelClocks(){
+  if(duelClockInterval){ clearInterval(duelClockInterval); duelClockInterval = null; }
+  if(duelClockSyncInterval){ clearInterval(duelClockSyncInterval); duelClockSyncInterval = null; }
+}
+function duelTimeout(){
+  if(duelFinished || !currentDuelId) return;
+  duelFinished = true;
+  stopDuelClocks();
+  set(ref(db, `duels/${currentDuelId}/finished/${myPseudo}`), { attempts: duelHistory.length, timeMs: DUEL_TIME_MS, forfeited: true, timeout: true });
+  if(duelDisconnectRef) onDisconnect(duelDisconnectRef).cancel();
+  document.getElementById('duelSubmitBtn').disabled = true;
+  document.getElementById('duelAbandonRow').classList.add('hidden');
+  document.getElementById('duelResult').innerHTML = `<div class="analysis-panel" style="text-align:center;">⏱️ Temps écoulé ! Le code n'a pas été trouvé à temps : défaite.</div>`;
+}
+
 function checkDuelEnd(data){
   if(duelResultShown) return;
   const myResult = (data.finished && data.finished[myPseudo]) || null;
@@ -5138,6 +5374,7 @@ function checkDuelEnd(data){
 }
 
 function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
+  stopDuelClocks();
   duelResultShown = true;
   duelFinished = true;
 
@@ -5225,6 +5462,7 @@ function confirmAbandon(){
 }
 
 function leaveDuel(){
+  stopDuelClocks();
   if(duelListenerRef) off(duelListenerRef);
   if(duelDisconnectRef){ onDisconnect(duelDisconnectRef).cancel(); duelDisconnectRef = null; }
   updatePresenceStatus('online');
