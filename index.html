@@ -631,6 +631,28 @@
     box-shadow: 0 0 18px rgba(255,193,57,0.20), inset 0 0 18px rgba(255,211,102,0.06);
   }
   .special-xp-banner.active { display: block; }
+  /* Annonce de l'admin : message d'info affiché dans le menu, avec bouton de fermeture */
+  .announcement-banner {
+    display: none;
+    text-align: center;
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    position: relative;
+    color: #eaf4ff;
+    background: linear-gradient(135deg, rgba(38,68,140,0.92), rgba(22,14,44,0.96));
+    border: 1px solid rgba(130,180,255,0.55);
+    box-shadow: 0 0 18px rgba(90,140,255,0.22), inset 0 0 18px rgba(130,180,255,0.06);
+  }
+  .announcement-banner.active { display: block; }
+  .announcement-banner .ann-title { font-weight: 900; font-size: 14px; margin-bottom: 3px; }
+  .announcement-banner .ann-text { font-size: 12.5px; line-height: 1.55; white-space: pre-line; opacity: 0.95; }
+  .announcement-banner .ann-close {
+    position: absolute; top: 4px; right: 6px;
+    background: none; border: none; color: inherit; font-size: 15px;
+    cursor: pointer; opacity: 0.65; padding: 2px 6px;
+  }
+  .announcement-banner .ann-close:hover { opacity: 1; }
   .special-xp-banner .event-title { font-weight: 900; font-size: 14px; }
   .special-xp-banner .event-message { margin-top: 3px; font-size: 11px; opacity: 0.9; }
   .mode-btn.golden-challenge {
@@ -1592,6 +1614,11 @@
 
       <div id="saveReminder" class="save-reminder hidden" onclick="openSettings()">🛡️ Ta progression n'est pas sauvegardée · Paramètres ›</div>
 
+      <div id="announcementBanner" class="announcement-banner" role="status">
+        <button class="ann-close" id="annClose" onclick="dismissAnnouncement()" title="Fermer l'annonce">✕</button>
+        <div class="ann-title" id="annTitle">📣 Annonce</div>
+        <div class="ann-text" id="annText"></div>
+      </div>
       <div id="specialXpEventBanner" class="special-xp-banner" aria-live="polite">
         <div class="event-title" id="specialXpEventTitle"></div>
         <div class="event-message" id="specialXpEventMessage"></div>
@@ -3354,6 +3381,7 @@ window.addEventListener('load', () => {
     let proceed = true;
     if(ok) proceed = await verifyOwnershipAtStartup();   // réclame le pseudo AVANT d'écouter ses invitations
     if(proceed === false) return;                        // rechargement en cours (renommage / conflit)
+    setupLiveConfig();   // événement XP + annonce du panneau admin (lecture en direct)
     setupPresence();
     setupQueueWatch();
     if(myPseudo) setupInviteListener();
@@ -3582,6 +3610,10 @@ function getParisDateTimeKey(date = new Date()){
 }
 
 function getActiveXpEvent(date = serverNow()){
+  // 0. Événement lancé en direct depuis le panneau admin : priorité absolue
+  if(liveXpEvent && liveXpEvent.until > date.getTime()){
+    return { title: liveXpEvent.title, message: liveXpEvent.message, start: '2000-01-01T00:00:00', multiplier: liveXpEvent.multiplier };
+  }
   const nowKey = getParisDateTimeKey(date);
   // 1. Un événement en cours passe toujours avant un événement à venir
   const running = SPECIAL_XP_EVENTS.find(e => nowKey >= e.start && nowKey <= e.end);
@@ -3600,10 +3632,52 @@ function getActiveXpEvent(date = serverNow()){
 }
 
 function getActiveXpMultiplier(){
+  // Événement lancé en direct depuis le panneau admin : priorité absolue
+  if(liveXpEvent && liveXpEvent.until > serverNow().getTime()){
+    return Math.max(1, Number(liveXpEvent.multiplier) || 2);
+  }
   const nowKey = getParisDateTimeKey(serverNow());
   const event = SPECIAL_XP_EVENTS.find(e => nowKey >= e.start && nowKey <= e.end);
   return event ? Math.max(1, Number(event.multiplier) || 1) : 1;
 }
+
+// --- Événement XP et annonce pilotés depuis le panneau admin (base : config/) ---
+// L'événement en direct passe avant les événements codés en dur. Si la lecture
+// est refusée par les règles de sécurité, on reste silencieusement en mode normal.
+let liveXpEvent = null;
+let announcement = null;
+function setupLiveConfig(){
+  onValue(ref(db, 'config/xpEvent'), (snap) => {
+    const ev = snap.val();
+    liveXpEvent = (ev && Number(ev.until) > serverNow().getTime())
+      ? { title: ev.title || '⚡ Bonus XP !', message: ev.message || '', multiplier: Math.max(1, Number(ev.multiplier) || 2), until: Number(ev.until) }
+      : null;
+    renderSpecialXpEvent();
+  }, () => {});
+  onValue(ref(db, 'config/announcement'), (snap) => {
+    const ann = snap.val();
+    announcement = (ann && ann.text) ? ann : null;
+    renderAnnouncement();
+  }, () => {});
+}
+function renderAnnouncement(){
+  const el = document.getElementById('announcementBanner');
+  if(!el) return;
+  if(!announcement || !announcement.text){ el.classList.remove('active'); return; }
+  const annId = 'ann_' + (announcement.at || 0);
+  try { if(localStorage.getItem('brainmind_annDismissed') === annId){ el.classList.remove('active'); return; } } catch(e) {}
+  document.getElementById('annTitle').textContent = announcement.title || '📣 Annonce';
+  document.getElementById('annText').textContent = announcement.text;
+  el.classList.add('active');
+}
+function dismissAnnouncement(){
+  const el = document.getElementById('announcementBanner');
+  if(el) el.classList.remove('active');
+  if(announcement){
+    try { localStorage.setItem('brainmind_annDismissed', 'ann_' + (announcement.at || 0)); } catch(e) {}
+  }
+}
+window.dismissAnnouncement = dismissAnnouncement;
 
 // opts.ignoreEvent = true : le multiplicateur d'événement ne s'applique pas (ex. quêtes).
 function addXp(amount, opts = {}){

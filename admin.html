@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>BrainMind · Admin</title>
+<title>BrainMind Â· Admin</title>
 <style>
   :root {
     --bg: #171220; --panel: #241a30; --panel2: #2f2340; --ink: #f2ece2; --dim: #b9aec6;
@@ -23,6 +23,9 @@
   button.primary { background: var(--gold); color: #1a1420; font-weight: 700; border-color: var(--gold); }
   button.danger { color: var(--bad); }
   input[type=text], input[type=search] { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 0; }
+  select, textarea { font: inherit; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; min-width: 0; }
+  select { cursor: pointer; }
+  textarea { width: 100%; min-height: 90px; resize: vertical; }
   code { background: rgba(0,0,0,0.35); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
   .muted { color: var(--dim); }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -53,7 +56,7 @@
 </head>
 <body>
 <header>
-  <h1>🛠️ BrainMind · Admin</h1>
+  <h1>ð ï¸ BrainMind Â· Admin</h1>
   <div id="who" class="muted"></div>
 </header>
 
@@ -61,26 +64,28 @@
   <!-- Connexion -->
   <section id="loginView" class="card center hidden">
     <h2>Connexion administrateur</h2>
-    <p class="muted">Connecte-toi avec le même compte Google que celui que tu as lié dans le jeu.</p>
+    <p class="muted">Connecte-toi avec le mÃªme compte Google que celui que tu as liÃ© dans le jeu.</p>
     <button class="primary" id="loginBtn">Se connecter avec Google</button>
     <p id="loginErr" class="muted"></p>
   </section>
 
-  <!-- Connecté mais pas admin -->
+  <!-- ConnectÃ© mais pas admin -->
   <section id="denyView" class="card center hidden">
-    <h2>Accès non autorisé</h2>
-    <p class="muted">Ce compte n'est pas administrateur. Pour t'autoriser : dans la console Firebase → Realtime Database, crée le nœud <code id="denyPath"></code> avec la valeur <code>true</code>, puis recharge cette page.</p>
+    <h2>AccÃ¨s non autorisÃ©</h2>
+    <p class="muted">Ce compte n'est pas administrateur. Pour t'autoriser : dans la console Firebase â Realtime Database, crÃ©e le nÅud <code id="denyPath"></code> avec la valeur <code>true</code>, puis recharge cette page.</p>
     <p>Ton identifiant : <code id="denyUid"></code></p>
-    <button id="denyLogout">Se déconnecter</button>
+    <button id="denyLogout">Se dÃ©connecter</button>
   </section>
 
   <!-- Administration -->
   <section id="adminView" class="hidden">
     <div class="cards" id="summary"></div>
     <div class="toolbar">
-      <input type="search" id="search" placeholder="Rechercher un pseudo…">
-      <button id="refreshBtn">↻ Actualiser</button>
-      <button id="reserveBtn">🛡️ Réserver un pseudo</button>
+      <input type="search" id="search" placeholder="Rechercher un pseudoâ¦">
+      <button id="refreshBtn">â» Actualiser</button>
+      <button id="eventBtn">⚡ Événement XP</button>
+      <button id="annBtn">📣 Message aux joueurs</button>
+      <button id="reserveBtn">ð¡ï¸ RÃ©server un pseudo</button>
     </div>
     <div class="tablewrap">
       <table>
@@ -94,7 +99,7 @@
             <th data-k="losses" class="num">D</th>
             <th data-k="rate" class="num">% V</th>
             <th data-k="status">Statut</th>
-            <th data-k="seen">Dernière activité</th>
+            <th data-k="seen">DerniÃ¨re activitÃ©</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -128,13 +133,28 @@ const auth = getAuth(app);
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-// --- Mêmes règles que le jeu (à garder synchronisées avec index.html) ---
-const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20 };
-const TIER_ICONS = { debutant: '🌱', bronze: '🥉', silver: '🥈', gold: '🥇', emerald: '💚' };
+// --- MÃªmes rÃ¨gles que le jeu (Ã  garder synchronisÃ©es avec index.html) ---
+const RANK_LEVELS = { bronze: 5, silver: 10, gold: 15, emerald: 20, saphir: 25, rubis: 30, rubellite: 35, amethyste: 40, arcenciel: 45 };
+const TIER_ICONS = { debutant: '🌱', bronze: '🥉', silver: '🥈', gold: '🥇', emerald: '💚', saphir: '💙', rubis: '❤️', rubellite: '💗', amethyste: '💜', arcenciel: '🌈' };
+const TIER_NAMES = { debutant: 'Débutant', bronze: 'Bronze', silver: 'Argent', gold: 'Or', emerald: 'Émeraude', saphir: 'Saphir', rubis: 'Rubis', rubellite: 'Rubellite', amethyste: 'Améthyste', arcenciel: 'Arc-en-ciel' };
+const MAX_LEVEL = 50; // même plafond que le jeu : au-delà, l'XP s'accumule sans monter de niveau
+function xpForLevel(level){ return 50 * level; }
 function levelFromXp(totalXp){
   let level = 1, remaining = totalXp || 0;
-  while(remaining >= 50 * level){ remaining -= 50 * level; level++; }
+  while(level < MAX_LEVEL && remaining >= xpForLevel(level)){ remaining -= xpForLevel(level); level++; }
   return level;
+}
+function tierOf(level){
+  if(level >= RANK_LEVELS.arcenciel) return 'arcenciel';
+  if(level >= RANK_LEVELS.amethyste) return 'amethyste';
+  if(level >= RANK_LEVELS.rubellite) return 'rubellite';
+  if(level >= RANK_LEVELS.rubis) return 'rubis';
+  if(level >= RANK_LEVELS.saphir) return 'saphir';
+  if(level >= RANK_LEVELS.emerald) return 'emerald';
+  if(level >= RANK_LEVELS.gold) return 'gold';
+  if(level >= RANK_LEVELS.silver) return 'silver';
+  if(level >= RANK_LEVELS.bronze) return 'bronze';
+  return 'debutant';
 }
 function tierOf(level){
   if(level >= RANK_LEVELS.emerald) return 'emerald';
@@ -145,11 +165,11 @@ function tierOf(level){
 }
 const pseudoKey = (p) => String(p).normalize('NFC').trim().toLowerCase();
 function validatePseudo(v){
-  if(v.length < 2 || v.length > 16) return 'Le pseudo doit faire entre 2 et 16 caractères.';
-  if(/[.#$\[\]\/\u0000-\u001f\u007f]/.test(v)) return 'Caractères interdits : . # $ [ ] /';
+  if(v.length < 2 || v.length > 16) return 'Le pseudo doit faire entre 2 et 16 caractÃ¨res.';
+  if(/[.#$\[\]\/\u0000-\u001f\u007f]/.test(v)) return 'CaractÃ¨res interdits : . # $ [ ] /';
   return '';
 }
-const MODE_LABELS = { vsordi: 'Joueur vs Ordi', cache: 'Je cache un code', seriemind: 'Série-Mind', duel: 'Duel', daily: 'Défi du jour', puzzle: 'Puzzle du jour', ordi: 'Ordi', quest: 'Quête' };
+const MODE_LABELS = { vsordi: 'Joueur vs Ordi', cache: 'Je cache un code', seriemind: 'SÃ©rie-Mind', duel: 'Duel', daily: 'DÃ©fi du jour', puzzle: 'Puzzle du jour', ordi: 'Ordi', quest: 'QuÃªte' };
 
 let DATA = { players: {}, owners: {}, accounts: {}, priv: {} };
 // Le hash du code de secours est dans accountsPrivate/<uid> (anciennes fiches : dans pseudoOwners)
@@ -162,7 +182,7 @@ function toast(msg, isErr){
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 3500);
 }
 function fmtDate(ts){
-  if(!ts) return '—';
+  if(!ts) return 'â';
   return new Date(ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 function showView(name){
@@ -177,7 +197,7 @@ $('loginBtn').onclick = async () => {
 };
 $('denyLogout').onclick = () => signOut(auth);
 function whoHTML(){
-  return currentUser && !currentUser.isAnonymous ? `<button id="logoutBtn">Déconnexion</button>` : '';
+  return currentUser && !currentUser.isAnonymous ? `<button id="logoutBtn">DÃ©connexion</button>` : '';
 }
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
@@ -196,14 +216,15 @@ onAuthStateChanged(auth, async (user) => {
   await loadAll();
 });
 
-// ---------------- Données ----------------
+// ---------------- DonnÃ©es ----------------
 async function loadAll(){
   try {
-    const [p, o, a, pv] = await Promise.all([get(ref(db, 'players')), get(ref(db, 'pseudoOwners')), get(ref(db, 'accounts')), get(ref(db, 'accountsPrivate'))]);
+    const [p, o, a, pv, cfg] = await Promise.all([get(ref(db, 'players')), get(ref(db, 'pseudoOwners')), get(ref(db, 'accounts')), get(ref(db, 'accountsPrivate')), get(ref(db, 'config'))]);
     DATA.players = p.val() || {};
     DATA.owners = o.val() || {};
     DATA.accounts = a.val() || {};
     DATA.priv = pv.val() || {};
+    DATA.config = cfg.val() || {};
     render();
   } catch(e){
     toast('Lecture impossible : ' + (e.code || e.message), true);
@@ -233,8 +254,8 @@ function buildRows(){
   });
 }
 const STATUS_LABEL = {
-  google: ['🟢 Google', 'ok'], guest: ['🟡 Protégé (invité)', 'warn'],
-  reserved: ['🛡️ Réservé', 'warn'], none: ['⚪ Non protégé', 'bad']
+  google: ['ð¢ Google', 'ok'], guest: ['ð¡ ProtÃ©gÃ© (invitÃ©)', 'warn'],
+  reserved: ['ð¡ï¸ RÃ©servÃ©', 'warn'], none: ['âª Non protÃ©gÃ©', 'bad']
 };
 function render(){
   const rows = buildRows();
@@ -248,33 +269,41 @@ function render(){
   });
   const real = rows.filter(r => r.status !== 'reserved');
   const totalGames = real.reduce((s, r) => s + r.games, 0);
-  $('summary').innerHTML = [
+  const stats = [
     ['Joueurs', real.length], ['Comptes protégés', real.filter(r => r.owner).length],
     ['Liés à Google', real.filter(r => r.status === 'google').length], ['Non protégés', real.filter(r => r.status === 'none').length],
     ['Parties comptées', totalGames]
-  ].map(([l, v]) => `<div class="stat"><b>${v}</b><span class="muted">${l}</span></div>`).join('');
+  ];
+  const ev = (DATA.config || {}).xpEvent;
+  if(ev && Number(ev.until) > Date.now()){
+    const h = Math.max(0, (Number(ev.until) - Date.now()) / 3600000);
+    stats.push(['⚡ XP x' + (ev.multiplier || 2) + ' · ' + (h >= 10 ? Math.round(h) : h.toFixed(1)) + ' h', ev.title || 'Événement en cours']);
+  }
+  const ann = (DATA.config || {}).announcement;
+  if(ann && ann.text) stats.push(['📣', String(ann.title || ann.text).slice(0, 30)]);
+  $('summary').innerHTML = stats.map(([l, v]) => `<div class="stat"><b>${v}</b><span class="muted">${esc(l)}</span></div>`).join('');
   $('rows').innerHTML = shown.map(r => {
     const [lab, cls] = STATUS_LABEL[r.status];
     return `<tr class="row" data-p="${esc(r.pseudo)}">
       <td>${TIER_ICONS[r.tier]} <b>${esc(r.pseudo)}</b></td>
       <td class="num">${r.level}</td><td class="num">${r.xp}</td>
       <td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td>
-      <td class="num">${r.rate < 0 ? '—' : r.rate + ' %'}</td>
+      <td class="num">${r.rate < 0 ? 'â' : r.rate + ' %'}</td>
       <td><span class="pill ${cls}">${lab}</span></td>
       <td class="muted">${fmtDate(r.seen)}</td></tr>`;
   }).join('') || `<tr><td colspan="9" class="muted">Aucun joueur.</td></tr>`;
-  $('footnote').textContent = 'Les compteurs de parties démarrent à la date « depuis » de chaque joueur (mise à jour du jeu) ; l\'historique détaillé est limité à 30 parties.';
+  $('footnote').textContent = 'Les compteurs de parties dÃ©marrent Ã  la date Â« depuis Â» de chaque joueur (mise Ã  jour du jeu) ; l\'historique dÃ©taillÃ© est limitÃ© Ã  30 parties.';
   document.querySelectorAll('#rows tr.row').forEach(tr => tr.onclick = () => openDetail(tr.dataset.p));
 }
 $('search').oninput = render;
-$('refreshBtn').onclick = async () => { await loadAll(); toast('Données actualisées.'); };
+$('refreshBtn').onclick = async () => { await loadAll(); toast('DonnÃ©es actualisÃ©es.'); };
 document.querySelectorAll('th[data-k]').forEach(th => th.onclick = () => {
   const k = th.dataset.k;
   if(sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = (k === 'pseudo' || k === 'status') ? 1 : -1; }
   render();
 });
 
-// ---------------- Détail d'un joueur ----------------
+// ---------------- DÃ©tail d'un joueur ----------------
 function closeModal(){ $('modalWrap').classList.add('hidden'); }
 $('modalWrap').onclick = (e) => { if(e.target === $('modalWrap')) closeModal(); };
 function openDetail(pseudo){
@@ -294,28 +323,28 @@ function openDetail(pseudo){
   $('modal').innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <h2 style="margin:0">${TIER_ICONS[r.tier]} ${esc(pseudo)}</h2>
-      <button id="mClose">✕</button>
+      <button id="mClose">â</button>
     </div>
     <div class="kv">
-      <div>Niveau / XP</div><div>Niv ${r.level} · ${r.xp} XP</div>
+      <div>Niveau / XP</div><div>Niv ${r.level} Â· ${r.xp} XP</div>
       <div>Statut</div><div>${lab}</div>
-      <div>Compte créé</div><div>${fmtDate(r.owner && r.owner.at)}</div>
-      <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
-      <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '✅ généré' : '—'}</div>
-      <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
-      <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
+      <div>Compte crÃ©Ã©</div><div>${fmtDate(r.owner && r.owner.at)}</div>
+      <div>DerniÃ¨re activitÃ©</div><div>${fmtDate(r.seen)}</div>
+      <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? 'â gÃ©nÃ©rÃ©' : 'â'}</div>
+      <div>Parties</div><div>${r.games} (V ${r.wins} Â· D ${r.losses} Â· abandons ${st.abandons || 0})</div>
+      <div>XP gagnÃ©e (stats)</div><div>${st.xpGained || 0}${st.since ? ' Â· depuis le ' + fmtDate(st.since) : ''}</div>
     </div>
     <div class="actions">
-      <button id="aRename">✏️ Renommer</button>
-      <button id="aXp">🎚️ Modifier l'XP</button>
-      ${canReserve ? '<button id="aReserve">🛡️ Réserver le pseudo</button>' : ''}
-      ${canRelease ? '<button id="aRelease">🔓 Libérer le pseudo</button>' : ''}
-      <button id="aDelete" class="danger">🗑️ Supprimer</button>
+      <button id="aRename">âï¸ Renommer</button>
+      <button id="aXp">ðï¸ Modifier l'XP</button>
+      ${canReserve ? '<button id="aReserve">ð¡ï¸ RÃ©server le pseudo</button>' : ''}
+      ${canRelease ? '<button id="aRelease">ð LibÃ©rer le pseudo</button>' : ''}
+      <button id="aDelete" class="danger">ðï¸ Supprimer</button>
     </div>
     <h3>Par mode</h3>
     <table class="mini"><thead><tr><th>Mode</th><th class="num">Parties</th><th class="num">V</th><th class="num">D</th><th class="num">Abandons</th></tr></thead><tbody>${modeRows}</tbody></table>
-    <h3>Dernières parties</h3>
-    <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>Résultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>`;
+    <h3>DerniÃ¨res parties</h3>
+    <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>RÃ©sultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>`;
   $('modalWrap').classList.remove('hidden');
   $('mClose').onclick = closeModal;
   $('aRename').onclick = () => renamePlayer(pseudo);
@@ -327,7 +356,7 @@ function openDetail(pseudo){
 
 // ---------------- Actions ----------------
 async function renamePlayer(oldP){
-  const input = prompt(`Nouveau pseudo pour « ${oldP} » :`, oldP);
+  const input = prompt(`Nouveau pseudo pour Â« ${oldP} Â» :`, oldP);
   if(input === null) return;
   const newP = input.trim().normalize('NFC');
   if(newP === oldP) return;
@@ -335,16 +364,16 @@ async function renamePlayer(oldP){
   if(err){ toast(err, true); return; }
   const oldKey = pseudoKey(oldP), newKey = pseudoKey(newP);
   try {
-    // Données fraîches
+    // DonnÃ©es fraÃ®ches
     const [ownerOldS, ownerNewS, playerNewS, playerOldS, matchS] = await Promise.all([
       get(ref(db, 'pseudoOwners/' + oldKey)), get(ref(db, 'pseudoOwners/' + newKey)),
       get(ref(db, 'players/' + newP)), get(ref(db, 'players/' + oldP)), get(ref(db, 'matchResults/' + oldP))
     ]);
     const ownerOld = ownerOldS.val();
-    if(newKey !== oldKey && ownerNewS.exists()){ toast('Ce pseudo est déjà pris ou réservé.', true); return; }
-    if(playerNewS.exists()){ toast('Un joueur porte déjà ce pseudo.', true); return; }
-    if(!ownerOld && !confirm(`« ${oldP} » n'a pas de compte protégé : le renommage sera appliqué sur son téléphone à sa prochaine ouverture du jeu (mise à jour requise). Continuer ?`)) return;
-    if(!confirm(`Renommer « ${oldP} » en « ${newP} » ? Toute sa progression sera déplacée.`)) return;
+    if(newKey !== oldKey && ownerNewS.exists()){ toast('Ce pseudo est dÃ©jÃ  pris ou rÃ©servÃ©.', true); return; }
+    if(playerNewS.exists()){ toast('Un joueur porte dÃ©jÃ  ce pseudo.', true); return; }
+    if(!ownerOld && !confirm(`Â« ${oldP} Â» n'a pas de compte protÃ©gÃ© : le renommage sera appliquÃ© sur son tÃ©lÃ©phone Ã  sa prochaine ouverture du jeu (mise Ã  jour requise). Continuer ?`)) return;
+    if(!confirm(`Renommer Â« ${oldP} Â» en Â« ${newP} Â» ? Toute sa progression sera dÃ©placÃ©e.`)) return;
 
     const u = {};
     if(playerOldS.exists()){ u['players/' + newP] = playerOldS.val(); u['players/' + oldP] = null; }
@@ -357,8 +386,8 @@ async function renamePlayer(oldP){
       if(h) u['recovery/' + h + '/pseudo'] = newP;
     }
     u['renames/' + oldKey] = { to: newP, at: Date.now() };
-    await update(ref(db), u);   // une seule écriture atomique
-    toast(`« ${oldP} » est devenu « ${newP} ».`);
+    await update(ref(db), u);   // une seule Ã©criture atomique
+    toast(`Â« ${oldP} Â» est devenu Â« ${newP} Â».`);
     closeModal();
     await loadAll();
   } catch(e){
@@ -367,34 +396,34 @@ async function renamePlayer(oldP){
 }
 async function setXp(pseudo){
   const cur = (DATA.players[pseudo] || {}).xp || 0;
-  const input = prompt(`Nouvelle XP totale pour « ${pseudo} » (actuelle : ${cur}) :`, String(cur));
+  const input = prompt(`Nouvelle XP totale pour Â« ${pseudo} Â» (actuelle : ${cur}) :`, String(cur));
   if(input === null) return;
   const n = Math.round(Number(input));
   if(!Number.isFinite(n) || n < 0 || n > 10000000){ toast('Valeur invalide.', true); return; }
-  try { await set(ref(db, 'players/' + pseudo + '/xp'), n); toast('XP mise à jour.'); closeModal(); await loadAll(); }
+  try { await set(ref(db, 'players/' + pseudo + '/xp'), n); toast('XP mise Ã  jour.'); closeModal(); await loadAll(); }
   catch(e){ toast('Modification impossible : ' + (e.code || e.message), true); }
 }
 async function reservePseudo(pseudo){
-  if(!confirm(`Réserver « ${pseudo} » ? Personne ne pourra le réclamer tant que tu ne l'auras pas libéré.`)) return;
+  if(!confirm(`RÃ©server Â« ${pseudo} Â» ? Personne ne pourra le rÃ©clamer tant que tu ne l'auras pas libÃ©rÃ©.`)) return;
   try {
     await set(ref(db, 'pseudoOwners/' + pseudoKey(pseudo)), { uid: 'reserved', pseudo, at: Date.now(), reserved: true });
-    toast('Pseudo réservé.'); closeModal(); await loadAll();
+    toast('Pseudo rÃ©servÃ©.'); closeModal(); await loadAll();
   } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
 }
 async function releasePseudo(pseudo){
   const owner = DATA.owners[pseudoKey(pseudo)];
-  if(!confirm(`Libérer « ${pseudo} » ? Le prochain appareil qui ouvre le jeu avec ce pseudo pourra le réclamer.`)) return;
+  if(!confirm(`LibÃ©rer Â« ${pseudo} Â» ? Le prochain appareil qui ouvre le jeu avec ce pseudo pourra le rÃ©clamer.`)) return;
   try {
     const u = { ['pseudoOwners/' + pseudoKey(pseudo)]: null };
     const h = recoveryHashOf(owner);
     if(h) u['recovery/' + h] = null;
     if(owner && owner.uid && owner.uid !== 'reserved') u['accountsPrivate/' + owner.uid + '/recoveryHash'] = null;
     await update(ref(db), u);
-    toast('Pseudo libéré.'); closeModal(); await loadAll();
+    toast('Pseudo libÃ©rÃ©.'); closeModal(); await loadAll();
   } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
 }
 async function deletePlayer(pseudo){
-  const typed = prompt(`Supprime définitivement « ${pseudo} » et toute sa progression.\nTape SUPPRIMER pour confirmer.`);
+  const typed = prompt(`Supprime dÃ©finitivement Â« ${pseudo} Â» et toute sa progression.\nTape SUPPRIMER pour confirmer.`);
   if(typed !== 'SUPPRIMER') return;
   const owner = DATA.owners[pseudoKey(pseudo)];
   try {
@@ -403,20 +432,108 @@ async function deletePlayer(pseudo){
     if(h) u['recovery/' + h] = null;
     if(owner && owner.uid && owner.uid !== 'reserved'){ u['accounts/' + owner.uid] = null; u['accountsPrivate/' + owner.uid] = null; }
     await update(ref(db), u);
-    toast('Joueur supprimé.'); closeModal(); await loadAll();
+    toast('Joueur supprimÃ©.'); closeModal(); await loadAll();
   } catch(e){ toast('Suppression impossible : ' + (e.code || e.message), true); }
 }
+// ---------------- Événement XP & annonce (config/) ----------------
+// Pilotage en direct : le jeu lit config/xpEvent et config/announcement,
+// donc tout ce qui est lancé ici s'affiche immédiatement chez les joueurs.
+async function openEventPanel(){
+  let cur = null;
+  try { cur = (await get(ref(db, 'config/xpEvent'))).val(); } catch(e) {}
+  const active = !!(cur && Number(cur.until) > Date.now());
+  const hoursLeft = active ? Math.max(0, (Number(cur.until) - Date.now()) / 3600000) : 0;
+  const mult = active ? (Number(cur.multiplier) || 2) : 2;
+  const multOpts = [2,3,4].map(m => `<option value="${m}"${m === mult ? ' selected' : ''}>XP x${m}</option>`).join('');
+  const durOpts = [[1,'1 heure'],[2,'2 heures'],[6,'6 heures'],[12,'12 heures'],[24,'24 heures'],[48,'2 jours'],[72,'3 jours'],[168,'1 semaine']]
+    .map(([h,l]) => `<option value="${h}"${h === 24 ? ' selected' : ''}>${l}</option>`).join('');
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0">⚡ Événement XP</h2>
+      <button id="mClose">✕</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:6px;">Lance un multiplicateur d'XP en direct pour tous les joueurs — visible immédiatement dans le jeu, sans mise à jour. Il s'arrête tout seul à la fin de la durée choisie.</p>
+    ${active
+      ? `<p><span class="pill warn">EN COURS · XP x${mult} · encore ${hoursLeft >= 10 ? Math.round(hoursLeft) : hoursLeft.toFixed(1)} h</span></p>`
+      : `<p class="muted">Aucun événement en cours.</p>`}
+    <div class="kv" style="margin-top:12px;">
+      <div>Titre</div><div><input type="text" id="evTitle" style="width:100%;" value="${active ? esc(cur.title || '') : '⚡ Bonus XP !'}" placeholder="Affiché en haut du jeu"></div>
+      <div>Multiplicateur</div><div><select id="evMult" style="width:100%;">${multOpts}</select></div>
+      <div>Message</div><div><input type="text" id="evMsg" style="width:100%;" value="${active ? esc(cur.message || '') : 'Tous les gains XP sont multipliés, profitez-en !'}" placeholder="Message affiché sous le titre"></div>
+      <div>Durée</div><div><select id="evHours" style="width:100%;">${durOpts}</select></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="evStart">🚀 ${active ? "Remplacer par cet événement" : "Lancer l'événement"}</button>
+      ${active ? '<button class="danger" id="evStop">⏹️ Arrêter maintenant</button>' : ''}
+    </div>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  $('evStart').onclick = async () => {
+    const title = $('evTitle').value.trim() || '⚡ Bonus XP !';
+    const message = $('evMsg').value.trim();
+    const multiplier = Number($('evMult').value) || 2;
+    const hours = Number($('evHours').value) || 24;
+    if(!confirm(`Lancer « ${title} » (XP x${multiplier}) pendant ${hours} h pour TOUS les joueurs ?`)) return;
+    try {
+      await set(ref(db, 'config/xpEvent'), { title, message, multiplier, hours, at: Date.now(), until: Date.now() + hours * 3600000 });
+      toast('Événement lancé : les joueurs le voient déjà !'); closeModal(); await loadAll();
+    } catch(e){ toast('Lancement impossible : ' + (e.code || e.message), true); }
+  };
+  if($('evStop')) $('evStop').onclick = async () => {
+    if(!confirm("Arrêter l'événement immédiatement ?")) return;
+    try { await remove(ref(db, 'config/xpEvent')); toast('Événement arrêté.'); closeModal(); await loadAll(); }
+    catch(e){ toast('Arrêt impossible : ' + (e.code || e.message), true); }
+  };
+}
+async function openAnnPanel(){
+  let cur = null;
+  try { cur = (await get(ref(db, 'config/announcement'))).val(); } catch(e) {}
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0">📣 Message aux joueurs</h2>
+      <button id="mClose">✕</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:6px;">Une annonce qui s'affiche dans le menu du jeu, pour tous les joueurs. Chacun peut la fermer d'un clic ; elle revient quand tu publies une nouvelle annonce.</p>
+    ${cur && cur.text ? `<p><span class="pill warn">PUBLIÉE le ${fmtDate(cur.at)}</span></p>` : '<p class="muted">Aucune annonce publiée.</p>'}
+    <div class="kv" style="margin-top:12px;">
+      <div>Titre</div><div><input type="text" id="annTitle" style="width:100%;" value="${cur && cur.title ? esc(cur.title) : '📣 Annonce'}" placeholder="Titre de l'annonce"></div>
+      <div>Message</div><div><textarea id="annText" placeholder="Ton message aux joueurs…">${cur && cur.text ? esc(cur.text) : ''}</textarea></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="annPublish">📤 Publier l'annonce</button>
+      ${cur && cur.text ? '<button class="danger" id="annClear">🧹 Effacer l\'annonce</button>' : ''}
+    </div>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  $('annPublish').onclick = async () => {
+    const title = $('annTitle').value.trim() || '📣 Annonce';
+    const text = $('annText').value.trim();
+    if(!text){ toast('Écris un message avant de publier.', true); return; }
+    try {
+      await set(ref(db, 'config/announcement'), { title, text, at: Date.now() });
+      toast('Annonce publiée : elle s\'affiche dans le jeu !'); closeModal(); await loadAll();
+    } catch(e){ toast('Publication impossible : ' + (e.code || e.message), true); }
+  };
+  if($('annClear')) $('annClear').onclick = async () => {
+    if(!confirm("Effacer l'annonce pour tous les joueurs ?")) return;
+    try { await remove(ref(db, 'config/announcement')); toast('Annonce effacée.'); closeModal(); await loadAll(); }
+    catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+}
+$('eventBtn').onclick = openEventPanel;
+$('annBtn').onclick = openAnnPanel;
+
 $('reserveBtn').onclick = async () => {
-  const input = prompt('Pseudo à réserver (par ex. un nom officiel) :');
+  const input = prompt('Pseudo Ã  rÃ©server (par ex. un nom officiel) :');
   if(input === null) return;
   const p = input.trim().normalize('NFC');
   const err = validatePseudo(p);
   if(err){ toast(err, true); return; }
   try {
     const existing = await get(ref(db, 'pseudoOwners/' + pseudoKey(p)));
-    if(existing.exists()){ toast('Ce pseudo est déjà pris ou réservé.', true); return; }
+    if(existing.exists()){ toast('Ce pseudo est dÃ©jÃ  pris ou rÃ©servÃ©.', true); return; }
     await set(ref(db, 'pseudoOwners/' + pseudoKey(p)), { uid: 'reserved', pseudo: p, at: Date.now(), reserved: true });
-    toast('Pseudo réservé.'); await loadAll();
+    toast('Pseudo rÃ©servÃ©.'); await loadAll();
   } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
 };
 </script>
