@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#241a30">
 <title>BrainMind — 8 couleurs</title>
@@ -45,6 +45,9 @@
   }
 
   * { box-sizing: border-box; }
+  /* Empêche le zoom sur mobile : double-tap et pincement ne zooment plus rien. */
+  html, body { touch-action: manipulation; }
+  body { -webkit-text-size-adjust: 100%; }
 
   body {
     margin: 0;
@@ -1291,6 +1294,9 @@
   .duel-result-card { text-align: center; animation: popIn 0.25s ease; }
   @keyframes popIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .duel-result-emoji { font-size: 60px; line-height: 1; margin-bottom: 4px; }
+  /* Icônes de victoire / défaite (images PNG) : trophée et bouclier brisé. */
+  .duel-result-icon { width: 130px; height: auto; margin: 2px auto 6px; display: block; animation: iconPop 0.35s ease; filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55)); }
+  @keyframes iconPop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .duel-result-title { font-size: 28px; font-weight: 900; letter-spacing: 1px; margin-bottom: 8px; }
   .duel-result-title.win { color: var(--gold); text-shadow: 0 0 18px rgba(255,199,79,0.5); }
   .duel-result-title.lose { color: var(--ink-dim); }
@@ -1633,6 +1639,7 @@
       <div class="history" id="history"></div>
       <div class="secret-reveal hidden" id="secretReveal"></div>
       <div class="serie-mind-banner hidden" id="serieMindBanner"></div>
+      <img class="duel-result-icon hidden" id="ordiResultIcon" alt="" src="" style="width:110px;">
       <div class="status" id="status"></div>
       <div id="analysisPanel"></div>
 
@@ -1704,10 +1711,12 @@ function setSoundState(on){
   soundOn = on;
   try { localStorage.setItem('brainmind_sound', on ? '1' : '0'); } catch(e) {}
   if(on){
+    prepareMediaSession();
     audio.volume = 0.35;
     audio.play().catch(() => {});
   } else {
     audio.pause();
+    clearMediaNotification();
   }
   updateSoundButton();
 }
@@ -1735,6 +1744,7 @@ window.addEventListener('load', () => setSoundState(soundOn));
 document.addEventListener('pointerdown', function onFirstGesture(){
   const audio = document.getElementById('bgMusic');
   if(soundOn && audio && audio.paused && !audio.ended){
+    prepareMediaSession();
     audio.volume = 0.35;
     audio.play().catch(() => {});
   }
@@ -1760,19 +1770,54 @@ window.addEventListener('pagehide', () => {
 // notification Android (Media Session) fonctionne aussi depuis l'écran verrouillé. ---
 function pauseMusicHard(){
   const audio = document.getElementById('bgMusic');
-  if(audio && !audio.paused) audio.pause();
+  if(audio && !audio.paused){
+    audio.pause();
+    clearMediaNotification();
+  }
+}
+// Ferme proprement la notification/lecteur Android dès l'arrêt de la musique :
+// on retire la fiche « BrainMind » du Media Session pour que le player
+// disparaisse complètement de l'écran au lieu de rester en pause.
+function clearMediaNotification(){
+  try {
+    if(navigator.mediaSession){
+      navigator.mediaSession.metadata = null;
+      try { navigator.mediaSession.setActionHandler('pause', null); } catch(e) {}
+      try { navigator.mediaSession.setActionHandler('play', null); } catch(e) {}
+    }
+    const audio = document.getElementById('bgMusic');
+    if(audio && audio.src) { audio.removeAttribute('src'); audio.load(); }
+  } catch(e) {}
+}
+// Recharge la source et recrée la fiche média quand la musique repart.
+function prepareMediaSession(){
+  const audio = document.getElementById('bgMusic');
+  if(!audio) return;
+  if(!audio.getAttribute('src') && !audio.querySelector('source')){
+    audio.src = audio.dataset.baseSrc || 'audio/music-main.mp3';
+    audio.load();
+  }
+  try {
+    if(navigator.mediaSession && window.MediaMetadata){
+      navigator.mediaSession.metadata = new MediaMetadata({ title: 'BrainMind', artist: 'Andromedus Studio' });
+      navigator.mediaSession.setActionHandler('pause', pauseMusicHard);
+    }
+  } catch(e) {}
 }
 window.addEventListener('blur', pauseMusicHard);
 window.addEventListener('focus', () => {
   const audio = document.getElementById('bgMusic');
-  if(soundOn && audio && audio.paused && !audio.ended) audio.play().catch(() => {});
+  if(soundOn && audio && audio.paused && !audio.ended){
+    prepareMediaSession();
+    audio.volume = 0.35;
+    audio.play().catch(() => {});
+  }
 });
 setInterval(() => { if(document.hidden) pauseMusicHard(); }, 2000);
 try {
-  if(navigator.mediaSession){
-    if(window.MediaMetadata) navigator.mediaSession.metadata = new MediaMetadata({ title: 'BrainMind', artist: 'Andromedus Studio' });
-    navigator.mediaSession.setActionHandler('pause', pauseMusicHard);
-  }
+  const _bgMusic = document.getElementById('bgMusic');
+  if(_bgMusic && _bgMusic.currentSrc) _bgMusic.dataset.baseSrc = _bgMusic.currentSrc;
+  else if(_bgMusic) _bgMusic.dataset.baseSrc = 'audio/music-main.mp3';
 } catch(e) {}
 
 let mode = null;
@@ -1929,10 +1974,14 @@ function renderSerieMindBanner(){
   el.innerHTML = `🎰 Série-Mind — Manche ${serieMindRound} (${moveLimit} essai${moveLimit>1?'s':''})${bankText}`;
 }
 
-// Barème Série-Mind : même base que xpForAttempts, +10 XP de bonus fixe, + bonus de victoire du rang.
-// 1 essai=60, 2=50, 3=40, 4=30, 5=20, 6+ essais=15.
+// Barème Série-Mind (puzzle éclair) : plus généreux que la partie contre l'ordi,
+// car la manche se joue en un seul essai — un risque plus grand mérite mieux.
+// Base doublée + bonus fixe + bonus de victoire du rang :
+// 1er essai = 100+20, 2e = 80+20, 3e = 60+20, 4e = 40+20, 5e = 20+20, 6+ = 10+20 (+ rang).
+const SERIE_MIND_XP_MULT = 2;
+const SERIE_MIND_XP_FLAT = 20;
 function serieMindXpForAttempts(attempts){
-  return xpForAttempts(attempts) + 10 + rankWinBonus();
+  return xpForAttempts(attempts) * SERIE_MIND_XP_MULT + SERIE_MIND_XP_FLAT + rankWinBonus();
 }
 
 // Fin de manche réussie : les XP de la manche s'ajoutent à la banque, puis choix repartir / doubler.
@@ -2262,6 +2311,26 @@ function resetToMenu(){
 }
 
 function setStatus(text, cls){
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status' + (cls ? ' ' + cls : '');
+  // Icône de victoire / défaite (contre l'ordi) : trophée doré ou bouclier brisé,
+  // affichée au-dessus du message de statut. Ne concerne que les vraies parties.
+  const iconEl = document.getElementById('ordiResultIcon');
+  if(iconEl){
+    if(cls === 'win' && !trainingMode && NB_COULEURS === 8 && !serieMindActive){
+      iconEl.src = 'images/icone-victoire.png';
+      iconEl.alt = 'Trophée de victoire';
+      iconEl.classList.remove('hidden');
+    } else if(text.startsWith('😔 Perdu') && !serieMindActive){
+      iconEl.src = 'images/icone-defaite.png';
+      iconEl.alt = 'Bouclier brisé';
+      iconEl.classList.remove('hidden');
+    } else if(cls !== 'win'){
+      iconEl.classList.add('hidden');
+    }
+  }
+}
   const el = document.getElementById('status');
   el.textContent = text;
   el.className = 'status' + (cls ? ' ' + cls : '');
@@ -2654,7 +2723,8 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
 <!-- Grande fenêtre de récap de fin de duel -->
 <div id="duelResultScreen" class="hidden duel-overlay" style="z-index: 2100;">
   <div class="card duel-card duel-result-card">
-    <div class="duel-result-emoji" id="duelResultEmoji">🏆</div>
+    <div class="duel-result-emoji hidden" id="duelResultEmoji">🏆</div>
+    <img class="duel-result-icon hidden" id="duelResultIcon" alt="" src="">
     <div class="duel-result-title" id="duelResultTitle">VICTOIRE</div>
     <div class="duel-result-winner" id="duelResultWinner"></div>
     <div class="duel-result-recap" id="duelResultRecap"></div>
@@ -4525,7 +4595,7 @@ const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai 
 // Puzzle Éclair : puzzle personnel et aléatoire (pas la même grille pour tout le monde).
 // Une fois la réponse donnée (trouvée ou non), le mode se verrouille 3h pour ce joueur.
 const FLASH_LOCK_HOURS = 3;
-const FLASH_XP_WIN = 20; // récompense pour la ligne finale trouvée (essai unique)
+const FLASH_XP_WIN = 100; // récompense pour la ligne finale trouvée (essai unique) : bien plus payant que la partie contre l'ordi, car un seul essai et 3h d'attente.
 
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
@@ -5411,7 +5481,21 @@ function renderDuelResult(myResult, oppResult, myForfeit, oppForfeit){
 
   const bigEmoji = winner === null ? '🤝' : (won ? '🏆' : '💀');
   const bigTitle = winner === null ? 'ÉGALITÉ' : (won ? 'VICTOIRE' : 'DÉFAITE');
-  document.getElementById('duelResultEmoji').textContent = bigEmoji;
+  const iconEl = document.getElementById('duelResultIcon');
+  const emojiEl = document.getElementById('duelResultEmoji');
+  if(winner === null){
+    emojiEl.classList.remove('hidden');
+    if(iconEl) iconEl.classList.add('hidden');
+    emojiEl.textContent = bigEmoji;
+  } else if(iconEl && emojiEl){
+    // Icône dédiée : trophée doré si victoire, bouclier brisé si défaite.
+    emojiEl.classList.add('hidden');
+    iconEl.src = won ? 'images/icone-victoire.png' : 'images/icone-defaite.png';
+    iconEl.alt = won ? 'Trophée de victoire' : 'Bouclier brisé';
+    iconEl.classList.remove('hidden');
+  } else {
+    emojiEl.textContent = bigEmoji;
+  }
   const titleEl = document.getElementById('duelResultTitle');
   titleEl.textContent = bigTitle;
   titleEl.className = 'duel-result-title' + (winner === null ? '' : won ? ' win' : ' lose');
