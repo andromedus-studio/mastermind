@@ -122,6 +122,11 @@
     --accent: #a15ee0;
     --accent-soft: rgba(161,94,224,0.30);
   }
+  /* Rang Arc-en-ciel : accent blanc rosé. */
+  body[data-tier="arcenciel"] {
+    --accent: #ffd1ec;
+    --accent-soft: rgba(255,209,236,0.30);
+  }
 
   body.theme-gold .bg-photo {
     filter: blur(1.5px) brightness(0.72) saturate(1.12);
@@ -431,8 +436,6 @@
     body.theme-arcenciel .card::after { animation: none; }
     body.theme-arcenciel::after { animation: none; opacity: 0.45; }
   }
-  /* Bannière Arc-en-ciel : lueur douce multicolore autour du cadre */
-  .player-banner-tier-arcenciel .player-banner-frame { box-shadow: 0 0 12px 2px rgba(255,255,255,0.18); border-radius: 14px; }
 
   /* Rang Améthyste — Neo-Améthyste : cristal mauve. Deux faisceaux de lumière opposés tournent
      en sens inverse autour des fenêtres, avec une lueur qui pulse, et des étincelles scintillent
@@ -1022,6 +1025,14 @@
   .pseudo-frame-rubis { border-color: var(--accent); color: #ff9a94; box-shadow: 0 0 7px var(--accent-soft); }
   .pseudo-frame-rubellite { border-color: var(--accent); color: #ffb3d1; box-shadow: 0 0 7px var(--accent-soft); }
   .pseudo-frame-amethyste { border-color: var(--accent); color: #d6b8ff; box-shadow: 0 0 7px var(--accent-soft); }
+  /* Arc-en-ciel : texte en dégradé du spectre, cadre blanc rosé */
+  .pseudo-frame-arcenciel {
+    border-color: var(--accent); box-shadow: 0 0 7px var(--accent-soft);
+    color: #ffd1ec;
+    background-image: linear-gradient(90deg, #ff7a7a, #ffc766, #8cf27a, #6cc6ff, #c08cff);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
   .banner-players-list { align-items: center; gap: 16px; max-height: 420px; }
@@ -1242,6 +1253,50 @@
   }
   .player-banner-tier-amethyste,
   .player-banner-tier-amethyste .player-banner-frame {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* --- BANNIÈRE ARC-EN-CIEL PROPRE (même recette, reflet multicolore) --- */
+  .player-banner-tier-arcenciel .player-banner-frame {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  .player-banner-tier-arcenciel .player-banner-video,
+  .player-banner-tier-arcenciel .player-banner-img {
+    background: transparent !important;
+    mix-blend-mode: normal !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  .player-banner-tier-arcenciel .player-banner-frame::before {
+    display: none !important;
+  }
+  .player-banner-tier-arcenciel .player-banner-frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 30%,
+      rgba(255,90,90,0.30) 38%, rgba(255,195,70,0.30) 43%, rgba(130,235,100,0.30) 48%,
+      rgba(90,185,255,0.30) 53%, rgba(185,125,255,0.30) 58%, transparent 66%);
+    background-size: 250% 100%;
+    background-position: 150% 0;
+    mix-blend-mode: soft-light;
+    animation: emeraldBannerSweep 4.5s ease-in-out infinite;
+    z-index: 3;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-arcenciel .player-banner-frame::before,
+    .player-banner-tier-arcenciel .player-banner-img,
+    .player-banner-tier-arcenciel .player-banner-video,
+    .player-banner-tier-arcenciel .player-banner-frame::after { animation: none; }
+  }
+  .player-banner-tier-arcenciel,
+  .player-banner-tier-arcenciel .player-banner-frame {
     border: none !important;
     outline: none !important;
     box-shadow: none !important;
@@ -3446,7 +3501,7 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
-// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30-34), rubellite (35-39), améthyste (40+).
+// Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30-34), rubellite (35-39), améthyste (40-44), arc-en-ciel (45+).
 // Deux formats d'image par palier : PNG (nouvelles versions, priorité) et WEBP (anciennes, repli).
 // Pour les paliers animés, la vidéo WebM (TIER_BANNER_VIDEOS) passe avant tout, et le PNG du
 // même palier sert de repli si la vidéo est absente.
@@ -3471,7 +3526,8 @@ const TIER_BANNERS_WEBP = {
   saphir: 'images/banner-saphir.webp',
   rubis: 'images/banner-rubis.webp',
   rubellite: 'images/banner-rubellite.webp',
-  amethyste: 'images/banner-amethyste.webp'
+  amethyste: 'images/banner-amethyste.webp',
+  arcenciel: 'images/banner-arcenciel.webp'
 };
 // Repli en cascade pour une bannière image : PNG -> WEBP -> bannière or.
 function bannerImgFallback(img){
