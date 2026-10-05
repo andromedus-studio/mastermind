@@ -45,8 +45,9 @@
   }
 
   * { box-sizing: border-box; }
-  /* Empêche le zoom sur mobile : double-tap et pincement ne zooment plus rien. */
-  html, body { touch-action: manipulation; }
+  /* Empêche le zoom ET le "tirer pour rafraîchir" (pull-to-refresh) sur mobile :
+     scroll ou pas, l'app ne se recharge plus quand on tire l'écran vers le bas. */
+  html, body { touch-action: manipulation; overscroll-behavior-y: none; }
   body { -webkit-text-size-adjust: 100%; }
 
   body {
@@ -1974,12 +1975,11 @@ function renderSerieMindBanner(){
   el.innerHTML = `🎰 Série-Mind — Manche ${serieMindRound} (${moveLimit} essai${moveLimit>1?'s':''})${bankText}`;
 }
 
-// Barème Série-Mind (puzzle éclair) : plus généreux que la partie contre l'ordi,
-// car la manche se joue en un seul essai — un risque plus grand mérite mieux.
-// Base doublée + bonus fixe + bonus de victoire du rang :
-// 1er essai = 100+20, 2e = 80+20, 3e = 60+20, 4e = 40+20, 5e = 20+20, 6+ = 10+20 (+ rang).
-const SERIE_MIND_XP_MULT = 2;
-const SERIE_MIND_XP_FLAT = 20;
+// Barème Série-Mind : un peu plus généreux que la partie contre l'ordi (risque
+// de tout perdre en quitte-ou-double), mais sans excès :
+// 1er essai = 75+15, 2e = 60+15, 3e = 45+15, 4e = 30+15, 5e = 15+15, 6+ = 8+15 (+ rang).
+const SERIE_MIND_XP_MULT = 1.5;
+const SERIE_MIND_XP_FLAT = 15;
 function serieMindXpForAttempts(attempts){
   return xpForAttempts(attempts) * SERIE_MIND_XP_MULT + SERIE_MIND_XP_FLAT + rankWinBonus();
 }
