@@ -32,3 +32,4 @@ self.addEventListener('fetch', (e) => {
   // Icônes et fichiers statiques : cache d'abord
   e.respondWith(caches.match(e.request).then((cached) => cached || fetch(e.request)));
 });
+//redeploy
