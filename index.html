@@ -2624,6 +2624,7 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     <div class="rank-info-scroll" id="settingsBody"></div>
     <div class="settings-msg" id="settingsMsg"></div>
     <button class="btn secondary" onclick="closeSettings()">Fermer</button>
+    <div style="text-align:center; margin-top:10px; opacity:.55; font-size:.85em;">BrainMind v3.1 · anti-triche ✅</div>
   </div>
 </div>
 
@@ -4006,10 +4007,10 @@ function antiCheatActiveMode(){
   if(window.soloBoardActive && window.soloBoardActive()) return serieMindActive ? 'seriemind' : 'vsordi';
   return null;
 }
-document.addEventListener('visibilitychange', () => {
-  if(!document.hidden || !myPseudo) return;
+function countTabLeft(){
+  if(!myPseudo) return;
   const now = Date.now();
-  if(now - lastTabLeftCountedAt < 2000) return; // évite les doubles comptages (bug navigateur)
+  if(now - lastTabLeftCountedAt < 2000) return; // évite les doubles comptages (événements en cascade)
   const m = antiCheatActiveMode();
   if(!m) return;
   lastTabLeftCountedAt = now;
@@ -4021,8 +4022,13 @@ document.addEventListener('visibilitychange', () => {
     st.lastTabLeftAt = now;
     return st;
   }).catch(() => {});
-});
-
+}
+// Signal principal : l'onglet passe en arrière-plan (changement d'app, autre onglet, écran d'accueil)
+document.addEventListener('visibilitychange', () => { if(document.hidden) countTabLeft(); });
+// Signaux de secours : certains téléphones/navigation ne déclenchent pas toujours visibilitychange
+window.addEventListener('pagehide', countTabLeft);
+window.addEventListener('blur', countTabLeft);
+ 
 function trimGameHistory(){
   const histRef = ref(db, `players/${myPseudo}/history`);
   get(histRef).then(snap => {
