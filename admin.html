@@ -98,6 +98,7 @@
             <th data-k="wins" class="num">V</th>
             <th data-k="losses" class="num">D</th>
             <th data-k="rate" class="num">% V</th>
+           <th data-k="tableft" class="num">Sorties onglet</th>
             <th data-k="status">Statut</th>
             <th data-k="seen">Dernière activité</th>
           </tr>
@@ -241,6 +242,7 @@ function buildRows(){
     return {
       pseudo: p, xp, level, tier: tierOf(level), games, wins, losses,
       rate: (wins + losses) ? Math.round(100 * wins / (wins + losses)) : -1,
+     tabLeft: st.tabLeft || 0, tabLeftModes: st.tabLeftByMode || {}, tabLeftAt: st.lastTabLeftAt || 0,
       status, owner, acc, stats: st, hasPlayer: !!DATA.players[p],
       seen: (acc && acc.seen) || st.lastPlayed || 0
     };
@@ -282,9 +284,10 @@ function render(){
       <td class="num">${r.level}</td><td class="num">${r.xp}</td>
       <td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td>
       <td class="num">${r.rate < 0 ? '—' : r.rate + ' %'}</td>
+      <td class="num">${r.tabLeft ? `<span class="pill warn">🚪 ${r.tabLeft}</span>` : '—'}</td>
       <td><span class="pill ${cls}">${lab}</span></td>
       <td class="muted">${fmtDate(r.seen)}</td></tr>`;
-  }).join('') || `<tr><td colspan="9" class="muted">Aucun joueur.</td></tr>`;
+  }).join('') || `<tr><td colspan="10" class="muted">Aucun joueur.</td></tr>`;
   $('footnote').textContent = 'Les compteurs de parties démarrent à la date « depuis » de chaque joueur (mise à jour du jeu) ; l\'historique détaillé est limité à 30 parties.';
   document.querySelectorAll('#rows tr.row').forEach(tr => tr.onclick = () => openDetail(tr.dataset.p));
 }
@@ -325,6 +328,7 @@ function openDetail(pseudo){
       <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
       <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '✅ généré' : '—'}</div>
       <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
+      <div>Sorties d'onglet</div><div>${r.tabLeft ? `🚪 ${r.tabLeft}${Object.keys(r.tabLeftModes).length ? ' — ' + Object.entries(r.tabLeftModes).map(([m, n]) => `${MODE_LABELS[m] || m} : ${n}`).join(' · ') : ''} · dernière le ${fmtDate(r.tabLeftAt)}` : '— (aucune détectée)'}</div>
       <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
     </div>
     <div class="actions">

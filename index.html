@@ -1918,6 +1918,11 @@ let trainingMode = false;
 let numberMode = false;
 window.numberModeActive = () => numberMode;
 
+
+// --- Anti-triche (partie 1/2) : vrai si une partie "à réfléchir" contre l'ordi est en cours
+// (Joueur vs Ordi, entraînement, Série-Mind). Exposé pour le script Firebase (partie 2/2).
+window.soloBoardActive = () =>
+  mode === 'userGuesses' && !solved && !document.getElementById('game').classList.contains('hidden');
 // --- Mode Série-Mind (risque le tout pour le tout) ---
 let serieMindActive = false;
 let serieMindRound = 1;      // manche courante (1 à 9)
@@ -3985,6 +3990,39 @@ function bumpPlayerStats(entry){
   }).catch(() => {});
 }
 
+// --- Anti-triche (partie 2/2) : détecte les sorties d'onglet pendant une partie ---
+// Si le joueur masque l'onglet/la page en pleine partie (probablement pour aller
+// demander la réponse à ChatGPT/Gemini), on le compte dans son profil :
+// players/<pseudo>/stats/tabLeft (total), tabLeftByMode/<mode> (détail), lastTabLeftAt (date).
+// Seules les parties "à réfléchir" comptent : Joueur vs Ordi, entraînement, Série-Mind,
+// défi du jour, puzzle du jour, puzzle éclair. Les duels ne comptent pas
+// (l'abandon y est déjà sanctionné et le chrono continue de tourner).
+let lastTabLeftCountedAt = 0;
+function antiCheatActiveMode(){
+  const visible = (id) => !document.getElementById(id).classList.contains('hidden');
+  if(visible('dailyScreen') && !dailyFinished && dailyDateKey) return 'daily';
+  if(visible('puzzleScreen') && !puzzleFinished && puzzleDateKey) return 'puzzle';
+  if(visible('flashScreen') && !flashFinished) return 'flash';
+  if(window.soloBoardActive && window.soloBoardActive()) return serieMindActive ? 'seriemind' : 'vsordi';
+  return null;
+}
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden || !myPseudo) return;
+  const now = Date.now();
+  if(now - lastTabLeftCountedAt < 2000) return; // évite les doubles comptages (bug navigateur)
+  const m = antiCheatActiveMode();
+  if(!m) return;
+  lastTabLeftCountedAt = now;
+  runTransaction(ref(db, `players/${myPseudo}/stats`), (cur) => {
+    const st = cur || {};
+    st.tabLeft = (st.tabLeft || 0) + 1;
+    st.tabLeftByMode = st.tabLeftByMode || {};
+    st.tabLeftByMode[m] = (st.tabLeftByMode[m] || 0) + 1;
+    st.lastTabLeftAt = now;
+    return st;
+  }).catch(() => {});
+});
+
 function trimGameHistory(){
   const histRef = ref(db, `players/${myPseudo}/history`);
   get(histRef).then(snap => {
@@ -4766,6 +4804,28 @@ let puzzleFinished = false;
 let puzzleStartedAt = null;
 let puzzleLeaderboardRef = null;
 
+// --- Départ de chrono conservé (défi du jour, puzzle du jour) ---
+// À la 1re ouverture on mémorise l'heure de départ (base + appareil) ; aux ouvertures suivantes
+// on la relit au lieu de repartir de zéro. La valeur la plus ANCIENNE connue gagne, et on utilise
+// l'heure serveur pour que changer d'appareil ou d'horloge ne permette pas de tricher.
+function bmStartKey(kind, dateKey){ return `bm_start_${kind}_${dateKey}_${myPseudo}`; }
+function bmReadLocalStart(key){
+  try { const v = Number(localStorage.getItem(key)); return v > 0 ? v : 0; } catch(e){ return 0; }
+}
+function bmWriteLocalStart(key, v){
+  try { localStorage.setItem(key, String(v)); } catch(e){}
+}
+function resolveStartTime(kind, dateKey, dbValue, dbPath){
+  const key = bmStartKey(kind, dateKey);
+  const known = [dbValue, bmReadLocalStart(key)].filter(v => typeof v === 'number' && v > 0);
+  const start = known.length ? Math.min(...known) : serverNow().getTime();
+  bmWriteLocalStart(key, start);
+  if(start !== dbValue){
+    try { set(ref(db, dbPath), start).catch(() => {}); } catch(e){}
+  }
+  return start;
+}
+
 async function openPuzzleChallenge(){
   if(!myPseudo){
     pseudoScreenPurpose = 'puzzle';
@@ -4818,7 +4878,7 @@ async function loadMyPuzzleProgress(){
   puzzleFinished = false;
   puzzleGuess = [null,null,null,null];
   puzzleSelectedSlot = 0;
-  puzzleStartedAt = Date.now();
+  puzzleStartedAt = resolveStartTime('puzzle', puzzleDateKey, data && data.startedAt, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/startedAt`);
 
   document.getElementById('puzzlePlayArea').classList.remove('hidden');
   document.getElementById('puzzleDoneArea').classList.add('hidden');
@@ -4874,7 +4934,7 @@ function submitPuzzleGuess(){
   const guessSnapshot = puzzleGuess.slice();
   const fb = window.feedbackFor(guessSnapshot, puzzleSecret, 8);
   const solved = fb.black === 4;
-  const timeMs = Date.now() - puzzleStartedAt;
+  const timeMs = serverNow().getTime() - puzzleStartedAt;
 
   puzzleFinished = true;
   const finishedData = { guess: guessSnapshot, solved, timeMs };
@@ -4981,6 +5041,21 @@ function updateFlashTileUI(){
   }
 }
 
+// Grille Éclair en cours (sauvegardée sur l'appareil tant qu'on n'a pas répondu)
+function flashCurrentKey(){ return `bm_flash_current_${myPseudo}`; }
+function loadFlashCurrent(){
+  try {
+    const raw = localStorage.getItem(flashCurrentKey());
+    if(!raw) return null;
+    const d = JSON.parse(raw);
+    const okSecret = Array.isArray(d.secret) && d.secret.length === 4 && d.secret.every(n => Number.isInteger(n) && n >= 0 && n < 8);
+    const okLines = Array.isArray(d.lines) && d.lines.every(l => l && Array.isArray(l.guess) && typeof l.black === 'number' && typeof l.white === 'number');
+    return (okSecret && okLines) ? d : null;
+  } catch(e){ return null; }
+}
+function saveFlashCurrent(d){ try { localStorage.setItem(flashCurrentKey(), JSON.stringify(d)); } catch(e){} }
+function clearFlashCurrent(){ try { localStorage.removeItem(flashCurrentKey()); } catch(e){} }
+
 async function openFlashPuzzle(){
   if(!myPseudo){
     pseudoScreenPurpose = 'flash';
@@ -4994,17 +5069,23 @@ async function openFlashPuzzle(){
   document.getElementById('flashPlayArea').classList.remove('hidden');
   document.getElementById('flashSub').textContent = 'Une grille rien que pour toi : à toi de trouver le code en un seul essai.';
 
-  const data = generatePuzzleData();
+  // Grille conservée : si on quitte sans répondre puis qu'on revient, c'est la MÊME grille.
+  let data = loadFlashCurrent();
   if(!data){
-    document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
-    return;
+    data = generatePuzzleData();
+    if(!data){
+      document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
+      return;
+    }
+    data.startedAt = serverNow().getTime();
+    saveFlashCurrent(data);
   }
   flashSecret = data.secret;
   flashLines = data.lines;
   flashFinished = false;
   flashGuess = [null,null,null,null];
   flashSelectedSlot = 0;
-  flashStartedAt = Date.now();
+  flashStartedAt = data.startedAt || Date.now();
   renderFlashGivenLines();
   renderFlashSlots();
   renderFlashPalette();
@@ -5059,6 +5140,7 @@ function submitFlashGuess(){
   const solved = fb.black === 4;
 
   flashFinished = true;
+  clearFlashCurrent(); // la grille est jouée : la prochaine ouverture (après la recharge) en génère une nouvelle
   const lockUntil = Date.now() + FLASH_LOCK_HOURS * 3600 * 1000;
   myFlashLockedUntil = lockUntil;
   updateFlashTileUI();
@@ -5156,10 +5238,7 @@ async function loadMyDailyProgress(){
       .sort((a,b) => a.time - b.time)
       .map(m => ({ guess: m.guess, black: m.black, white: m.white }));
   }
-  dailyStartedAt = (data && data.startedAt) || Date.now();
-  if(!data || !data.startedAt){
-    set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/startedAt`), dailyStartedAt);
-  }
+  dailyStartedAt = resolveStartTime('daily', dailyDateKey, data && data.startedAt, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/startedAt`);
 
   document.getElementById('dailyPlayArea').classList.remove('hidden');
   document.getElementById('dailyDoneArea').classList.add('hidden');
@@ -5237,7 +5316,7 @@ function submitDailyGuess(){
 
   if(solved || outOfTries){
     dailyFinished = true;
-    const timeMs = Date.now() - dailyStartedAt;
+    const timeMs = serverNow().getTime() - dailyStartedAt;
     const finishedData = { attempts: dailyHistory.length, timeMs, solved };
     set(ref(db, `dailyChallenge/${dailyDateKey}/players/${myPseudo}/finished`), finishedData);
     if(solved){
