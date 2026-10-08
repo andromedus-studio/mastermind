@@ -1427,6 +1427,9 @@
   .duel-confirm-row { display: flex; gap: 10px; }
   .duel-confirm-row .btn { margin-top: 0; }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
 </head>
 <body>
 <!-- ═══════════════ ÉCRAN DE LANCEMENT : fondu studio → artwork du jeu + bouton Jouer ═══════════════ -->
@@ -3725,6 +3728,72 @@ function setupLiveConfig(){
     announcement = (ann && ann.text) ? ann : null;
     renderAnnouncement();
   }, () => {});
+
+// --- Mode maintenance d'urgence (activé depuis l'admin : config/maintenance) ---
+// Si le nœud existe, le jeu est recouvert par un écran de maintenance cyberpunk
+// (impossible de jouer). Dès que le nœud est supprimé, le jeu revient normalement.
+let maintenanceRainOn = false;
+function setMaintenance(on, msg){
+  const el = document.getElementById('maintenanceScreen');
+  if(!el) return;
+  const canvas = document.getElementById('mtRain');
+  if(on){
+    document.getElementById('mtMsg').textContent = msg || 'Le site revient prochainement';
+    el.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    if(!maintenanceRainOn){
+      maintenanceRainOn = true;
+      const ctx = canvas.getContext('2d');
+      const drops = [];
+      const init = () => {
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        drops.length = 0;
+        for(let i = 0; i < 120; i++){
+          drops.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            len: Math.random() * 20 + 10, sp: Math.random() * 10 + 10,
+            op: Math.random() * 0.5 + 0.2, col: Math.random() > 0.5 ? '#38bdf8' : '#34d399' });
+        }
+      };
+      init();
+      window.addEventListener('resize', init);
+      const draw = () => {
+        if(!maintenanceRainOn) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drops.forEach(d => {
+          ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x, d.y + d.len);
+          ctx.strokeStyle = d.col; ctx.globalAlpha = d.op; ctx.lineWidth = 1.2; ctx.stroke();
+          d.y += d.sp;
+          if(d.y > canvas.height){ d.y = -d.len; d.x = Math.random() * canvas.width; }
+        });
+        requestAnimationFrame(draw);
+      };
+      draw();
+      // Barre de progression et messages factices, pour l'ambiance
+      const logs = [
+        '> Initialisation des protocoles de maintenance...',
+        '> Analyse des données de parties...',
+        '> Vérification des compteurs d\'XP...',
+        '> Nettoyage de la matrice de données...',
+        '> Redémarrage imminent du serveur principal...'
+      ];
+      let li = 0, prog = 42;
+      const bar = document.getElementById('mtBar'), pct = document.getElementById('mtPct'), log = document.getElementById('mtLog');
+      setInterval(() => {
+        if(document.getElementById('maintenanceScreen').classList.contains('hidden')) return;
+        li = (li + 1) % logs.length;
+        log.textContent = logs[li];
+        if(prog < 97){ prog += Math.floor(Math.random() * 2); bar.style.width = prog + '%'; pct.textContent = prog + '%'; }
+      }, 3500);
+    }
+  } else {
+    el.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+}
+onValue(ref(db, 'config/maintenance'), (snap) => {
+  const m = snap.val();
+  setMaintenance(!!m, m && m.message);
+}, () => {});
 }
 function renderAnnouncement(){
   const el = document.getElementById('announcementBanner');
@@ -5870,5 +5939,33 @@ setInterval(updateDailyTileGoldenState, 30000);
     });
   }
 </script>
+<!-- Écran de maintenance d'urgence (activé à distance : config/maintenance) -->
+<div id="maintenanceScreen" class="hidden" style="position:fixed;inset:0;z-index:99999;background:#030712 url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1600&auto=format&fit=crop') center/cover;overflow:auto;">
+  <div style="position:absolute;inset:0;background:linear-gradient(to top,#020617 0%,rgba(2,6,23,.85) 40%,rgba(2,6,23,.6) 100%);"></div>
+  <canvas id="mtRain" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:2;"></canvas>
+  <div style="position:relative;z-index:3;min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center;">
+    <div style="border:3px solid #10b981;box-shadow:0 0 15px #10b981,inset 0 0 15px rgba(16,185,129,.5);background:rgba(2,6,23,.82);padding:22px 30px;border-radius:14px;">
+      <div style="font-family:'Orbitron',sans-serif;font-weight:900;font-size:clamp(30px,7vw,64px);letter-spacing:.08em;color:#34d399;text-shadow:0 0 5px #059669,0 0 10px #10b981,0 0 20px #10b981,0 0 40px #059669;">BRAINMIND</div>
+    </div>
+    <div style="border:3px solid #06b6d4;box-shadow:0 0 15px #06b6d4,inset 0 0 15px rgba(6,182,212,.5);background:rgba(2,6,23,.85);padding:18px 26px;border-radius:14px;max-width:560px;width:100%;">
+      <div style="font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(18px,4vw,32px);letter-spacing:.06em;text-transform:uppercase;color:#38bdf8;text-shadow:0 0 5px #0284c7,0 0 10px #06b6d4,0 0 20px #06b6d4;">En cours de maintenance</div>
+      <div style="height:2px;width:75%;margin:12px auto;background:linear-gradient(90deg,transparent,#06b6d4,transparent);"></div>
+      <div style="display:inline-block;border:2px solid #f43f5e;box-shadow:0 0 10px #f43f5e;background:rgba(76,5,25,.4);padding:10px 18px;border-radius:10px;">
+        <div id="mtMsg" style="font-family:'Orbitron',sans-serif;font-weight:700;font-size:clamp(12px,2.6vw,17px);letter-spacing:.12em;text-transform:uppercase;color:#fb7185;text-shadow:0 0 5px #e11d48,0 0 10px #f43f5e,0 0 20px #f43f5e;">Le site revient prochainement</div>
+      </div>
+    </div>
+    <div style="background:rgba(15,23,42,.9);border:1px solid rgba(51,65,85,.8);border-radius:10px;padding:14px 18px;font-family:monospace;text-align:left;max-width:430px;width:100%;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:8px;">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 6px #34d399;"></span> Mise à jour du système...</span>
+        <span id="mtPct" style="color:#34d399;font-weight:700;">42%</span>
+      </div>
+      <div style="width:100%;background:#1e293b;border-radius:99px;height:12px;padding:2px;border:1px solid #334155;">
+        <div id="mtBar" style="width:42%;height:100%;border-radius:99px;background:linear-gradient(90deg,#10b981,#06b6d4,#f43f5e);box-shadow:0 0 10px rgba(16,185,129,.8);transition:width .5s;"></div>
+      </div>
+      <div id="mtLog" style="font-size:11px;color:#94a3b8;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">&gt; Recalibrage du noyau Mastermind en cours...</div>
+    </div>
+    <div style="font-size:12px;color:#64748b;font-family:monospace;">&copy; 2026 BRAINMIND · Tous droits réservés</div>
+  </div>
+</div>
 </body>
 </html>

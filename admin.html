@@ -85,6 +85,7 @@
       <button id="refreshBtn">↻ Actualiser</button>
       <button id="eventBtn">⚡ Événement XP</button>
       <button id="annBtn">📣 Message aux joueurs</button>
+      <button id="maintBtn" style="border-color:#e0654f;color:#ff9a94;">🚨 Urgence</button>
       <button id="reserveBtn">🛡️ Réserver un pseudo</button>
     </div>
     <div class="tablewrap">
@@ -519,6 +520,45 @@ async function openAnnPanel(){
 }
 $('eventBtn').onclick = openEventPanel;
 $('annBtn').onclick = openAnnPanel;
+$('maintBtn').onclick = openMaintPanel;
+
+// ---------------- Mode maintenance d'urgence (config/maintenance) ----------------
+// Recouvre le jeu d'un écran cyberpunk « En cours de maintenance » pour TOUS les
+// joueurs, y compris ceux qui ont déjà le jeu ouvert (écoute en direct).
+async function openMaintPanel(){
+  let cur = null;
+  try { cur = (await get(ref(db, 'config/maintenance'))).val(); } catch(e) {}
+  const active = !!cur;
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0;">🚨 Mode urgence</h2>
+      <button id="mClose">✕</button>
+    </div>
+    ${active ? `<p style="color:#e0654f;font-weight:700;margin:10px 0 4px;">🔴 MAINTENANCE ACTIVE depuis le ${new Date(cur.at || Date.now()).toLocaleString('fr-FR')}</p>` : `<p class="muted" style="margin:10px 0 4px;">🟢 Jeu en ligne normalement.</p>`}
+    <p class="muted" style="font-size:12px;">Active l'écran de maintenance cyberpunk pour tous les joueurs (même ceux qui ont déjà le jeu ouvert). Utile en cas de faille d'XP ou de bug grave : plus personne ne peut jouer tant que le mode est actif.</p>
+    <label style="display:block;font-size:12px;margin:10px 0 4px;">Message affiché aux joueurs</label>
+    <input id="mtMsgIn" style="width:100%;" maxlength="80" placeholder="Le site revient prochainement" value="${cur && cur.message ? String(cur.message).replace(/"/g, '&quot;') : ''}">
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;">
+      ${active
+        ? `<button id="mtStop" class="primary" style="flex:1;">✅ Rétablir le jeu</button>`
+        : `<button id="mtStart" class="primary" style="flex:1;background:#e0654f;">🚨 Couper le jeu (maintenance)</button>`}
+    </div>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  if($('mtStart')) $('mtStart').onclick = async () => {
+    const message = $('mtMsgIn').value.trim();
+    if(!confirm('COUPER le jeu pour tous les joueurs ? Ils verront l\'écran de maintenance immédiatement.')) return;
+    try {
+      await set(ref(db, 'config/maintenance'), { at: Date.now(), message: message || null });
+      toast('Maintenance activée : le jeu est coupé partout.'); closeModal(); await loadAll();
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+  if($('mtStop')) $('mtStop').onclick = async () => {
+    if(!confirm('Rétablir le jeu pour tous les joueurs ?')) return;
+    try { await remove(ref(db, 'config/maintenance')); toast('Jeu rétabli !'); closeModal(); await loadAll(); }
+    catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+}
 
 $('reserveBtn').onclick = async () => {
   const input = prompt('Pseudo à réserver (par ex. un nom officiel) :');
