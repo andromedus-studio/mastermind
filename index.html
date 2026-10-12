@@ -444,7 +444,111 @@
     filter: blur(1.5px) brightness(0.68) saturate(1.2);
   }
 
-  /* --- Fond très peu flouté sur tous les écrans, pour que le décor (villes) reste lisible --- */
+  /* --- Mode Monde infini : thème noir et blanc --- */
+  body.infinite-mode .bg-photo {
+    background-image: url('images/infinite-city.png');
+    background-color: #050505;
+    filter: blur(1px) brightness(0.9);
+  }
+  body.infinite-mode .bg-overlay {
+    background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.65));
+  }
+  body.infinite-mode {
+    --panel-bg: #0d0d0d;
+    --panel-bg-light: #161616;
+    --ink: #f2f2f2;
+    --ink-dim: #a8a8a8;
+    --slot-empty: #333;
+  }
+  /* Fenêtre de partie en NOIR : ambiance dystopique, les couleurs éclatent dessus */
+  body.infinite-mode .card {
+    background: rgba(12, 12, 12, 0.93);
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 0 26px rgba(0,0,0,0.7);
+    color: #f2f2f2;
+  }
+  body.infinite-mode .card .status { color: #e8e8e8; }
+  body.infinite-mode .card .muted { color: #999; }
+  body.infinite-mode .card .btn {
+    background: #f2f2f2; color: #111; border-color: #f2f2f2;
+  }
+  body.infinite-mode .card .btn.secondary {
+    background: transparent; color: #f2f2f2; border-color: rgba(255,255,255,0.35);
+  }
+  body.infinite-mode .history .row { border-bottom-color: rgba(255,255,255,0.10); }
+  body.infinite-mode .history .num { color: #bbb; }
+  body.infinite-mode .slot {
+    border: 3px solid rgba(255,255,255,0.55);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  }
+  /* Les couleurs restent VIVANTES : contour blanc marqué, le pion BLANC en
+     particulier reste visible (fond blanc + liseré, sur carte noire). */
+  body.infinite-mode .slot.filled {
+    border: 3px solid #f5f5f5;
+    box-shadow: 0 0 0 1px #000, 0 2px 8px rgba(0,0,0,0.55), inset 0 3px 5px rgba(255,255,255,0.35), inset 0 -4px 6px rgba(0,0,0,0.25);
+  }
+  body.infinite-mode .peg,
+  body.infinite-mode .swatch,
+  body.infinite-mode .fpeg { filter: none !important; }
+  body.infinite-mode .peg { box-shadow: 0 0 0 2px #f5f5f5, 0 0 0 3px #000, 0 2px 5px rgba(0,0,0,0.45); }
+  body.infinite-mode .swatch { box-shadow: 0 0 0 2px #f5f5f5, 0 0 0 3px #000, 0 2px 5px rgba(0,0,0,0.45); }
+  body.infinite-mode .slot:not(.filled) { background: #2e2e2e; }
+  /* Bannière du mode Monde infini : gris clair sur fond noir */
+  body.infinite-mode .serie-mind-banner {
+    color: #f2f2f2;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.30);
+  }
+  body.infinite-mode .inf-top-btn {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.40);
+    color: #f2f2f2;
+  }
+  body.infinite-mode .inf-top-btn:active { background: rgba(255,255,255,0.28); }
+
+  /* Badge Top du Monde infini : visible et cliquable sur mobile */
+  .inf-top-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 8px 14px;
+    min-height: 40px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.35);
+    color: #f2f2f2;
+    font-weight: 700;
+    font-size: 0.85em;
+    cursor: pointer;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .inf-top-btn:active { background: rgba(255,255,255,0.28); }
+
+  /* Fenêtre Top séries du Monde infini : noir et blanc pour coller au thème */
+  .infinite-board .duel-card {
+    background: rgba(10, 10, 10, 0.94);
+    border: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 0 28px rgba(255,255,255,0.10);
+  }
+  .infinite-board .duel-title { color: #f2f2f2; letter-spacing: .04em; }
+  .infinite-board .muted { color: #9a9a9a; }
+  .infinite-board .history .row {
+    border-bottom: 1px solid rgba(255,255,255,0.10);
+    color: #e8e8e8;
+  }
+  .infinite-board .history .row .num { color: #fff; }
+  .infinite-board .btn.secondary {
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.30);
+    color: #f2f2f2;
+  }
+
+  /* Le plateau de jeu garde ses couleurs vives : seul le décor autour passe en N&B */
+
   body .bg-photo { filter: blur(1px) brightness(0.8); }
   body:is([class*="theme-"]) .bg-photo { filter: blur(1px) brightness(0.8); }
   body.theme-amethyste .bg-overlay {
@@ -1036,6 +1140,61 @@
     background-image: linear-gradient(90deg, #ff7a7a, #ffc766, #8cf27a, #6cc6ff, #c08cff);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+  /* Prestige : cadre doré lumineux + grande étoile */
+  .pseudo-frame-prestige {
+    border-color: #ffd700; color: #ffe066; box-shadow: 0 0 8px rgba(255,215,0,0.6);
+  }
+  .prestige-star {
+    color: #ffd700; font-weight: 900;
+    margin-left: 8px; /* décalée à droite du niveau */
+    text-shadow: 0 0 4px #fff8d0, 0 0 8px #ffd700, 0 0 14px rgba(255,215,0,0.8);
+  }
+  .prestige-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px; border-radius: 50%;
+    margin-left: 12px; /* bien séparé du niveau, à droite */
+    pointer-events: auto; /* la couche texte de la bannière est non-cliquable : le bouton, lui, doit l'être */
+    background: radial-gradient(circle at 35% 30%, #fff3c4, #ffd700 60%, #b8860b);
+    border: 2px solid #fff;
+    box-shadow: 0 0 10px rgba(255,215,0,0.9), 0 0 22px rgba(255,215,0,0.5);
+    font-size: 22px; cursor: pointer; vertical-align: middle;
+    -webkit-tap-highlight-color: transparent;
+    animation: prestigePulse 2.2s ease-in-out infinite;
+  }
+  .prestige-btn:active { transform: scale(0.92); }
+  @keyframes prestigePulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(255,215,0,0.8), 0 0 18px rgba(255,215,0,0.4); }
+    50% { box-shadow: 0 0 14px rgba(255,215,0,1), 0 0 30px rgba(255,215,0,0.7); }
+  }
+
+  /* Bannière Prestige : lueur dorée pulsante + étincelles scintillantes */
+  .player-banner-tier-prestige .player-banner-frame {
+    box-shadow: 0 0 16px 3px rgba(255,215,0,0.35);
+    animation: prestigeFrameGlow 2.8s ease-in-out infinite;
+  }
+  @keyframes prestigeFrameGlow {
+    0%, 100% { box-shadow: 0 0 12px 2px rgba(255,215,0,0.28); }
+    50% { box-shadow: 0 0 22px 5px rgba(255,215,0,0.55); }
+  }
+  .player-banner-tier-prestige::after {
+    content: '';
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      radial-gradient(circle at 18% 28%, rgba(255,243,196,0.95) 0 1.3px, transparent 2.8px),
+      radial-gradient(circle at 72% 58%, rgba(255,215,0,0.9) 0 1.2px, transparent 2.6px),
+      radial-gradient(circle at 48% 82%, rgba(255,255,255,0.9) 0 1px, transparent 2.4px),
+      radial-gradient(circle at 60% 12%, rgba(255,230,150,0.85) 0 1.1px, transparent 2.4px);
+    background-size: 200px 200px, 260px 260px, 320px 320px, 240px 240px;
+    mix-blend-mode: screen;
+    animation: prestigeTwinkle 3.4s ease-in-out infinite;
+  }
+  @keyframes prestigeTwinkle {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.85; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .player-banner-tier-prestige::after, .player-banner-tier-prestige .player-banner-frame, .prestige-btn { animation: none; }
   }
 
   /* Bannières d'ornement complètes (liste de joueurs en ligne, classements) */
@@ -1711,6 +1870,11 @@
         <span class="big">🎰 Série-Mind</span>
         <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
       </button>
+      <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
+        <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
+        <span class="big">♾️ Monde infini</span>
+        <span class="small">Enchaîne les victoires : 9 essais par partie, une nouvelle grille tant que tu gagnes. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
+      </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
         <span class="big">⚔️ Duel en ligne (bêta)</span>
@@ -1728,6 +1892,7 @@
     <div id="game" class="hidden">
       <div class="history" id="history"></div>
       <div class="secret-reveal hidden" id="secretReveal"></div>
+      <div class="serie-mind-banner hidden" id="infiniteBanner"></div>
       <div class="serie-mind-banner hidden" id="serieMindBanner"></div>
       <img class="duel-result-icon hidden" id="ordiResultIcon" alt="" src="" style="width:110px;">
       <div class="status" id="status"></div>
@@ -1932,6 +2097,10 @@ window.soloBoardActive = () =>
   mode === 'userGuesses' && !solved && !document.getElementById('game').classList.contains('hidden');
 // --- Mode Série-Mind (risque le tout pour le tout) ---
 let serieMindActive = false;
+// --- Mode Monde infini : enchaîne les victoires, 9 essais par partie, série cumulée ---
+let infiniteActive = false;
+let infiniteStreak = 0;
+let infiniteSavedMoveLimit = null;
 let serieMindRound = 1;      // manche courante (1 à 9)
 let serieMindReserve = 0;    // banque accumulée, pas encore acquise tant que non récupérée
 let serieMindSavedMoveLimit = null; // limite d'essais du mode normal, restaurée en quittant Série-Mind
@@ -2058,6 +2227,30 @@ function startSerieMind(){
   moveLimit = SERIE_MIND_START_ATTEMPTS;
   startGame('userGuesses');
   renderSerieMindBanner();
+}
+
+// --- Mode Monde infini (end-game) : parties enchaînées à 9 essais, la série
+// continue tant que le joueur gagne. Meilleure série du mois classée (voir tuile
+// et panneau admin). ---
+function startInfiniteMode(){
+  if(NB_COULEURS !== 8){ setColorCount(8); }
+  trainingMode = false;
+  analysisMode = false;
+  infiniteActive = true;
+  infiniteStreak = 0;
+  infiniteSavedMoveLimit = moveLimit;
+  moveLimit = 9;
+  document.body.classList.add('infinite-mode'); // thème noir et blanc du mode
+  startGame('userGuesses');
+  renderInfiniteBanner();
+}
+
+function renderInfiniteBanner(){
+  const el = document.getElementById('infiniteBanner');
+  if(!el) return;
+  if(!infiniteActive){ el.classList.add('hidden'); el.innerHTML = ''; return; }
+  el.classList.remove('hidden');
+  el.innerHTML = `♾️ Monde infini — Série : <b>${infiniteStreak}</b> victoire${infiniteStreak>1?'s':''} d'affilée · 9 essais par partie`;
 }
 
 function renderSerieMindBanner(){
@@ -2256,7 +2449,19 @@ function openRanksInfo(){
       ${extra}
     </div>`;
   }).join('');
-  document.getElementById('ranksInfoList').innerHTML = `<div class="rank-info-intro">${intro}</div>${blocks}`;
+  document.getElementById('ranksInfoList').innerHTML = `<div class="rank-info-intro">${intro}</div>${blocks}
+    <div class="rank-block">
+      <div class="rank-block-title">⭐ Mode Prestige <span class="rank-levels">Niveau 50</span></div>
+      <div class="rank-block-lines">
+        Au niveau 50, une icône ⭐ apparaît à côté de ta bannière : clique-la pour activer le <b>Mode Prestige</b>.<br>
+        🔁 Tu repars au niveau 1 et recommences la montée des rangs ;<br>
+        💎 Ton XP totale est conservée (bannière, classements, stats) ;<br>
+        ⭐ Une grande étoile s'affiche à côté de ton nom et de ton niveau ;<br>
+        🎁 <b>+10% d'XP à chaque gain</b> par étoile de prestige (cumulable : 2 étoiles = +20%) ;<br>
+        🖼️ Bannière Prestige animée exclusive, à la place de celle du rang ;<br>
+        ♾️ Le prestige se répète : chaque nouveau niveau 50 ajoute une étoile.
+      </div>
+    </div>`;
   document.getElementById('ranksInfoScreen').classList.remove('hidden');
   // La liste défile : on amène le rang du joueur à l'écran
   const cur = document.querySelector('#ranksInfoList .rank-block.current');
@@ -2394,6 +2599,15 @@ function resetToMenu(){
     // Le joueur quitte en cours de manche : la limite d'essais du mode normal est restaurée.
     moveLimit = serieMindSavedMoveLimit;
   }
+  if(infiniteActive){
+    // Quitter en cours de série met fin à la série (la meilleure perf du mois reste enregistrée).
+    moveLimit = infiniteSavedMoveLimit;
+    document.body.classList.remove('infinite-mode');
+  }
+  infiniteActive = false;
+  infiniteStreak = 0;
+  document.body.classList.remove('infinite-mode'); // sécurité : jamais de thème N&B collant au menu
+  renderInfiniteBanner();
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
@@ -2530,6 +2744,20 @@ function submitUserGuess(){
       serieMindShowChoice(history.length);
       return;
     }
+    if(infiniteActive){
+      // Victoire en Monde infini : la série continue, partie suivante automatique.
+      infiniteStreak++;
+      const wonXpInf = window.xpForAttempts(history.length) + rankWinBonus();
+      const awardedWonXp = window.addXp(wonXpInf);
+      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'gagné', attempts: history.length, xp: awardedWonXp});
+      if(window.infiniteReportStreak) window.infiniteReportStreak(infiniteStreak);
+      sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: false});
+      setStatus(`Trouvé en ${history.length} coup${history.length>1?'s':''} ! Série en cours : ${infiniteStreak} (+${awardedWonXp} XP). Partie suivante...`, 'win');
+      renderInfiniteBanner();
+      launchConfetti();
+      setTimeout(() => { if(infiniteActive) startGame('userGuesses'); }, 1500);
+      return;
+    }
     const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length) + moveLimitBonus() + rankWinBonus();
     const awardedWonXp = (!trainingMode && wonXp) ? window.addXp(wonXp) : 0;
     setStatus(`🎉 Trouvé en ${history.length} coup${history.length>1?'s':''} !${awardedWonXp ? ` (+${awardedWonXp} XP)` : ''}`, 'win');
@@ -2549,6 +2777,22 @@ function submitUserGuess(){
       return;
     }
     const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
+    if(infiniteActive){
+      // Fin de la série : la meilleure performance du mois est déjà enregistrée à chaque victoire.
+      showSecretReveal(secretCode);
+      setStatus(`Série terminée : ${infiniteStreak} victoire${infiniteStreak>1?'s':''} d'affilée ! Le code était : ${secretLisible}.`, '');
+      document.getElementById('userInputArea').classList.add('hidden');
+      document.getElementById('replayBtn').classList.remove('hidden');
+      sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
+      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu', attempts: history.length, xp: 0});
+      infiniteActive = false;
+      infiniteStreak = 0;
+      moveLimit = infiniteSavedMoveLimit;
+      document.body.classList.remove('infinite-mode'); // retour au thème normal
+      renderInfiniteBanner();
+      renderAttemptsPicker();
+      return;
+    }
     const lostXp = 0; // une défaite ne rapporte plus d'XP, quel que soit le nombre d'essais
     showSecretReveal(secretCode);
     setStatus(`😔 Perdu ! Le code secret était : ${secretLisible}.${lostXp ? ` (+${lostXp} XP)` : ''}`, '');
@@ -3242,7 +3486,7 @@ async function renderSettings(){
     <div class="rank-block settings-block">
       <div class="rank-block-title">👤 ${escapeHtml(myPseudo)}</div>
       <div><span class="settings-status">${status}</span></div>
-      <div style="margin-top:4px;"><span class="settings-status">⭐ XP total : ${(playerXpCache[myPseudo] || 0).toLocaleString('fr-FR')} · Niveau ${levelFromXp(playerXpCache[myPseudo] || 0).level}</span></div>
+      <div style="margin-top:4px;"><span class="settings-status">⭐ XP total : ${(playerXpCache[myPseudo] || 0).toLocaleString('fr-FR')} · Niveau ${plvl(myPseudo).level}</span></div>
       ${linked ? '' : `<p class="settings-note">Relie ton compte à Google pour retrouver ta progression si tu changes de téléphone.</p>
       <button class="btn" onclick="settingsLinkGoogle()">Sauvegarder avec Google</button>`}
     </div>
@@ -3514,6 +3758,20 @@ function levelFromXp(totalXp){
   return { level, xpIntoLevel: remaining, xpForNext: xpForLevel(level) };
 }
 
+// --- Mode Prestige ---
+// players/<pseudo>/stats/prestige = { count: nombre d'étoiles, baseXp: XP totale
+// au moment du prestige }. Le niveau se calcule sur l'XP gagnée DEPUIS le prestige
+// (xp - baseXp) : le joueur repart au niveau 1, mais son XP totale (affichée dans
+// la bannière et les classements) est conservée.
+let playerPrestigeCache = {};
+function prestigeCount(pseudo){ const p = playerPrestigeCache[pseudo]; return (p && p.count) || 0; }
+function effXp(pseudo, xp){
+  const p = playerPrestigeCache[pseudo];
+  const base = (p && Number(p.baseXp)) || 0;
+  return Math.max(0, (xp || 0) - base);
+}
+function plvl(pseudo){ return levelFromXp(effXp(pseudo, playerXpCache[pseudo] || 0)); }
+
 // Bannières d'ornement par palier : débutant (<5), bronze (5-9), argent (10-14), or (15-19), émeraude (20-24), saphir (25-29), rubis (30-34), rubellite (35-39), améthyste (40-44), arc-en-ciel (45+).
 // Deux formats d'image par palier : PNG (nouvelles versions, priorité) et WEBP (anciennes, repli).
 // Pour les paliers animés, la vidéo WebM (TIER_BANNER_VIDEOS) passe avant tout, et le PNG du
@@ -3568,18 +3826,23 @@ function bannerVideoFallback(sourceEl){
 
 // Bannières animées : WebM transparent (fond réellement transparent, pas juste noir).
 const TIER_BANNER_VIDEOS = {
+  debutant: 'images/debutant_banniere_transparente.webm',
+  bronze: 'images/bronze_banniere_transparente.webm',
+  silver: 'images/argent_banniere_transparente.webm',
+  gold: 'images/or_banniere_transparente.webm',
   emerald: 'images/emeraude_banniere_transparente.webm',
   saphir: 'images/saphir_banniere_transparente.webm',
   rubis: 'images/rubis_banniere_transparente.webm',
   rubellite: 'images/rubellite_banniere_transparente.webm',
-  amethyste: 'images/amethyste_banniere_transparente.webm'
+  amethyste: 'images/amethyste_banniere_transparente.webm',
+  arcenciel: 'images/arcenciel_banniere_transparente.webm'
 };
 
 // Bannières animées (WebM) — interrupteur :
 // - false : toutes les bannières affichent le PNG (pendant la préparation des vidéos).
 // - true  : les rangs émeraude à améthyste utilisent leur vidéo animée
 //           (repli automatique sur le PNG si la vidéo est absente).
-const BANNERS_ANIMEES = false;
+const BANNERS_ANIMEES = true; // Prestige : bannière de rang en WebM. Repli PNG automatique si la vidéo manque.
 
 function pseudoTier(level){
   if(level >= RANK_LEVELS.arcenciel) return 'arcenciel';
@@ -3598,11 +3861,17 @@ function pseudoTier(level){
 // extra.rank : numéro de classement à afficher en badge (optionnel)
 // extra.subHTML : contenu additionnel (niveau, statut, bouton...) affiché sous le pseudo
 // extra.isMe : true pour surligner sa propre carte
+// Seuls les joueurs PRESTIGE affichent la bannière animée (WebM).
+// Tous les autres rangs gardent le PNG, comme avant.
 function playerBannerCardHTML(pseudo, level, extra){
   extra = extra || {};
-  const tier = pseudoTier(level);
+  const pr = prestigeCount(pseudo);
+  const tier = pseudoTier(level); // même rang pour tous ; seuls les Prestige ont la version animée
   const safe = escapeHtml(pseudo);
-  const bannerMedia = (BANNERS_ANIMEES && TIER_BANNER_VIDEOS[tier])
+  const subHTML = (extra.subHTML || '') + (pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : '');
+  // Prestige : la bannière de son rang en WebM animé. Les autres : le PNG, comme avant.
+  const useVideo = (pr > 0 && BANNERS_ANIMEES && TIER_BANNER_VIDEOS[tier]);
+  const bannerMedia = useVideo
     ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" data-tier="${tier}" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm" onerror="bannerVideoFallback(this)"></video>`
     : `<img class="player-banner-img" data-tier="${tier}" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="bannerImgFallback(this)">`;
   return `<div class="player-banner-card player-banner-tier-${tier}${extra.isMe ? ' player-banner-me' : ''}">
@@ -3611,15 +3880,15 @@ function playerBannerCardHTML(pseudo, level, extra){
       ${extra.rank ? `<span class="player-banner-rank">${extra.rank}</span>` : ''}
       <div class="player-banner-overlay">
         <div class="player-banner-name">${safe}</div>
-        <div class="player-banner-sub">${extra.subHTML || ''}</div>
+        <div class="player-banner-sub">${subHTML}</div>
       </div>
     </div>
     ${extra.belowHTML || ''}
   </div>`;
 }
 
-window.getMyLevel = () => myPseudo ? levelFromXp(playerXpCache[myPseudo] || 0).level : 1;
-window.getMyTier = () => myPseudo ? pseudoTier(levelFromXp(playerXpCache[myPseudo] || 0).level) : 'debutant';
+window.getMyLevel = () => myPseudo ? plvl(myPseudo).level : 1;
+window.getMyTier = () => myPseudo ? pseudoTier(plvl(myPseudo).level) : 'debutant';
 
 // Bannières (réduites) des deux joueurs dans l'écran de duel.
 let duelBannerKey = '';
@@ -3627,8 +3896,8 @@ function renderDuelBanners(){
   const myEl = document.getElementById('duelMyBanner');
   const oppEl = document.getElementById('duelOppBanner');
   if(!myEl || !oppEl || !myPseudo) return;
-  const myLevel = levelFromXp(playerXpCache[myPseudo] || 0).level;
-  const oppLevel = opponentPseudo ? levelFromXp(playerXpCache[opponentPseudo] || 0).level : 1;
+  const myLevel = plvl(myPseudo).level;
+  const oppLevel = opponentPseudo ? plvl(opponentPseudo).level : 1;
   const key = `${myPseudo}|${myLevel}|${opponentPseudo}|${oppLevel}`;
   if(key === duelBannerKey) return; // évite de recharger les images à chaque coup joué
   duelBannerKey = key;
@@ -3637,7 +3906,7 @@ function renderDuelBanners(){
 }
 
 function decoratedPseudoHTML(pseudo){
-  const level = levelFromXp(playerXpCache[pseudo] || 0).level;
+  const level = plvl(pseudo).level;
   const safe = escapeHtml(pseudo);
   const tier = pseudoTier(level);
   if(!tier) return safe;
@@ -3790,6 +4059,51 @@ function setMaintenance(on, msg){
     document.body.style.overflow = '';
   }
 }
+// --- Mode Monde infini : classement mensuel des plus longues séries ---
+// Chaque victoire met à jour players/<pseudo>/stats/infiniteBest (si meilleure)
+// et infiniteMonth (clé YYYY-MM). Le classement du mois est reconstruit depuis
+// les stats des joueurs : aucun nouveau nœud, aucune règle Firebase à ajouter.
+window.getParisMonthKey = () => getParisDateKey().slice(0, 7);
+window.infiniteReportStreak = (streak) => {
+  if(!myPseudo || !streak) return;
+  const mk = window.getParisMonthKey();
+  runTransaction(ref(db, `players/${myPseudo}/stats`), (cur) => {
+    const st = cur || {};
+    if(st.infiniteMonth !== mk || streak > (st.infiniteBest || 0)){
+      st.infiniteBest = streak;
+      st.infiniteMonth = mk;
+    }
+    return st;
+  }).catch(() => {});
+};
+window.openInfiniteBoard = async () => {
+  const mk = window.getParisMonthKey();
+  let playersData = {};
+  try { playersData = (await get(ref(db, 'players'))).val() || {}; } catch(e) {}
+  const rows = Object.entries(playersData)
+    .map(([p, d]) => ({ p, best: d && d.stats && d.stats.infiniteMonth === mk ? (d.stats.infiniteBest || 0) : 0 }))
+    .filter(r => r.best > 0)
+    .sort((a, b) => b.best - a.best)
+    .slice(0, 20);
+  const mois = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  document.getElementById('infiniteBoardMonth').textContent = `Classement de ${mois} — remise à zéro chaque mois${infiniteRewardXp ? ` · 🏆 Récompense du vainqueur : ${infiniteRewardXp} XP` : ''}`;
+  const el = document.getElementById('infiniteBoardList');
+  el.innerHTML = rows.length
+    ? rows.map((r, i) => `<div class="row"><span class="num">${i+1}</span><b>${r.p}</b><span style="margin-left:auto;">${r.best} victoire${r.best>1?'s':''} d'affilée</span></div>`).join('')
+    : '<div class="muted" style="text-align:center;">Aucune série ce mois-ci. Sois le premier !</div>';
+  document.getElementById('infiniteBoardScreen').classList.remove('hidden');
+};
+window.closeInfiniteBoard = () => document.getElementById('infiniteBoardScreen').classList.add('hidden');
+
+// Récompense du mois (montant défini dans l'admin : config/infiniteReward.amount)
+let infiniteRewardXp = 0;
+onValue(ref(db, 'config/infiniteReward'), (snap) => {
+  const r = snap.val();
+  infiniteRewardXp = (r && Number(r.amount)) || 0;
+  const tileEl = document.getElementById('infiniteTileXp');
+  if(tileEl) tileEl.textContent = infiniteRewardXp ? `🏆 ${infiniteRewardXp} XP au vainqueur` : '🏆 Top';
+}, () => {});
+
 onValue(ref(db, 'config/maintenance'), (snap) => {
   const m = snap.val();
   setMaintenance(!!m, m && m.message);
@@ -3819,7 +4133,8 @@ function addXp(amount, opts = {}){
   if(!myPseudo || !amount) return 0;
   const baseAmount = Number(amount) || 0;
   const multiplier = opts.ignoreEvent ? 1 : getActiveXpMultiplier();
-  const awardedAmount = Math.round(baseAmount * multiplier);
+  const prestigeBonus = 1 + 0.1 * prestigeCount(myPseudo); // +10% d'XP par étoile de prestige
+  const awardedAmount = Math.round(baseAmount * multiplier * prestigeBonus);
   const xpRef = ref(db, `players/${myPseudo}/xp`);
   runTransaction(xpRef, (current) => (current || 0) + awardedAmount);
   return awardedAmount;
@@ -4173,7 +4488,7 @@ function openLeaderboard(){
   if(!el) return;
   document.getElementById('leaderboardScreen').classList.remove('hidden');
   const top = Object.entries(playerXpCache)
-    .map(([pseudo, xp]) => ({pseudo, xp, info: levelFromXp(xp)}))
+    .map(([pseudo, xp]) => ({pseudo, xp, info: plvl(pseudo)}))
     .sort((a,b) => b.xp - a.xp)
     .slice(0, 100);
   if(top.length === 0){
@@ -4200,8 +4515,10 @@ function setupPlayersXpListener(){
   onValue(ref(db, 'players'), (snap) => {
     const data = snap.val() || {};
     playerXpCache = {};
+    playerPrestigeCache = {};
     Object.entries(data).forEach(([pseudo, p]) => {
       if(p && typeof p.xp === 'number') playerXpCache[pseudo] = p.xp;
+      if(p && p.stats && p.stats.prestige) playerPrestigeCache[pseudo] = p.stats.prestige;
     });
     renderOnlinePlayers(lastPresenceData);
     updateMyLevelBadge();
@@ -4298,13 +4615,14 @@ function applyRankTheme(tier){
 function updateMyLevelBadge(){
   const badge = document.getElementById('myLevelBadge');
   if(!badge || !myPseudo) return;
-  const info = levelFromXp(playerXpCache[myPseudo] || 0);
+  const info = plvl(myPseudo);
   const tier = pseudoTier(info.level);
+  const pr = prestigeCount(myPseudo);
   document.body.dataset.tier = tier; // accent de rang (--accent) dans toute l'interface
   applyRankTheme(tier); // thème graphique (Neo-Gold / Neo-Emerald) donné directement au rang requis
   badge.innerHTML = tier
-    ? `<span class="pseudo-frame pseudo-frame-${tier}">Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP</span>`
-    : `Nv ${info.level} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
+    ? `<span class="pseudo-frame pseudo-frame-${tier}">Nv ${info.level}${pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : ''} · ${info.xpIntoLevel}/${info.xpForNext} XP</span>`
+    : `Nv ${info.level}${pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : ''} · ${info.xpIntoLevel}/${info.xpForNext} XP`;
   badge.title = `${info.xpIntoLevel} / ${info.xpForNext} XP vers le niveau ${info.level + 1}`;
   renderMyBanner();
 }
@@ -4315,19 +4633,65 @@ function renderMyBanner(){
   const wrap = document.getElementById('myBannerWrap');
   if(!wrap) return;
   if(!myPseudo){ wrap.innerHTML = ''; myBannerKey = ''; return; }
-  const info = levelFromXp(playerXpCache[myPseudo] || 0);
-  const subHTML = `Nv ${info.level}`;
-  const key = `${myPseudo}|${info.level}`;
+  const info = plvl(myPseudo);
+  const pr = prestigeCount(myPseudo);
+  const canPrestige = info.level >= 50;
+  const subHTML = `Nv ${info.level}${pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : ''}${canPrestige ? ` <button class="prestige-btn" onclick="window.openPrestigeModal()" title="Mode Prestige : en savoir plus">⭐</button>` : ''}`;
+  const key = `${myPseudo}|${info.level}|${pr}|${canPrestige}`;
   if(key === myBannerKey){
-    // Même joueur/même rang : on met juste le texte à jour, sans recharger la vidéo/l'image
+    // Même joueur/même état : on met juste le texte à jour, sans recharger la vidéo/l'image
     // (évite le clignotement à chaque tick XP d'un joueur en ligne, quel qu'il soit).
     const sub = wrap.querySelector('.player-banner-sub');
-    if(sub) sub.textContent = subHTML;
+    if(sub) sub.innerHTML = subHTML;
     return;
   }
   myBannerKey = key;
   wrap.innerHTML = playerBannerCardHTML(myPseudo, info.level, { isMe: true, subHTML });
 }
+
+// --- Modale du mode Prestige (icône ⭐ visible à côté de la bannière au niveau 50) ---
+function openPrestigeModal(){
+  const el = document.getElementById('prestigeScreen');
+  if(!el || !myPseudo) return;
+  const pr = prestigeCount(myPseudo);
+  const info = plvl(myPseudo);
+  const totalXp = (playerXpCache[myPseudo] || 0).toLocaleString('fr-FR');
+  document.getElementById('prestigeBody').innerHTML = `
+    <div class="rank-block settings-block">
+      <div class="rank-block-title">⭐ Mode Prestige${pr > 0 ? ` — tu as déjà ${pr} étoile${pr>1?'s':''}` : ''}</div>
+      <div class="rank-block-lines">
+        Tu as atteint le <b>niveau ${info.level}</b> (XP totale : <b>${totalXp}</b>).<br><br>
+        <b>Ce que fait le Prestige :</b><br>
+        🔁 Tu <b>repartes au niveau 1</b> et recommences la montée des rangs ;<br>
+        💎 Ton <b>XP totale est conservée</b> — elle reste affichée dans ta bannière, les classements et tes stats ;<br>
+        ⭐ Une <b>étoile Prestige</b> s'affiche à côté de ton nom et de ton niveau, partout dans le jeu ;<br>
+        🎁 <b>+10% d'XP à chaque gain</b> (parties, quêtes, événements) par étoile — cumulable : 3 étoiles = +30% ;<br>
+        🖼️ Tu reçois la <b>bannière Prestige animée</b>, exclusive, qui remplace celle de ton rang ;<br>
+        🏆 Le prestige peut être répété : chaque nouveau passage au niveau 50 ajoute une étoile.<br><br>
+        <b>Ce que tu perds :</b><br>
+        ⬇️ Ton niveau et ton rang redescendent (les bonus de rang recalculent avec) — c'est le prix du prestige, compensé par le bonus d'XP permanent.
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button class="btn secondary" style="flex:1;" onclick="window.closePrestigeModal()">❌ Refuser — je garde mon niveau</button>
+        <button class="btn" style="flex:1;" onclick="window.acceptPrestige()">⭐ Valider le mode Prestige</button>
+      </div>
+    </div>`;
+  el.classList.remove('hidden');
+}
+function closePrestigeModal(){
+  document.getElementById('prestigeScreen').classList.add('hidden');
+}
+function acceptPrestige(){
+  if(!myPseudo) return;
+  if(!confirm(`⚠️ Confirmer le Prestige ?\n\nTu repartiras au niveau 1 (ton XP totale de ${(playerXpCache[myPseudo]||0).toLocaleString('fr-FR')} est conservée).\nTu gagnes une étoile ★ et +10% d'XP permanent.\n\nC'est définitif — continuer ?`)) return;
+  const pr = prestigeCount(myPseudo);
+  update(ref(db, `players/${myPseudo}/stats/prestige`), { count: pr + 1, baseXp: playerXpCache[myPseudo] || 0, at: Date.now() })
+    .then(() => { setStatus(`⭐ Prestige ${pr + 1} activé ! Tu repars au niveau 1 avec +${(pr+1)*10}% d'XP sur chaque gain.`, 'win'); closePrestigeModal(); updateMyLevelBadge(); })
+    .catch(e => setStatus('Impossible : ' + (e.code || e.message), ''));
+}
+window.openPrestigeModal = openPrestigeModal;
+window.closePrestigeModal = closePrestigeModal;
+window.acceptPrestige = acceptPrestige;
 
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -4412,7 +4776,7 @@ function renderOnlinePlayers(data){
     const isFriend = !!myFriends[pseudo];
     const safePseudo = escapeHtml(pseudo);
     const safeJs = safePseudo.replace(/'/g, "\\'");
-    const info = levelFromXp(playerXpCache[pseudo] || 0);
+    const info = plvl(pseudo);
     const statusLabel = !onlineNow ? '😴 hors ligne'
       : presence.status === 'in_duel' ? '⚔️ en duel'
       : presence.status === 'searching' ? '🔍 en recherche'
@@ -5939,6 +6303,25 @@ setInterval(updateDailyTileGoldenState, 30000);
     });
   }
 </script>
+<!-- Classement du mois — Monde infini (fenêtre noir et blanc, thème du mode) -->
+<div id="infiniteBoardScreen" class="hidden duel-overlay infinite-board" onclick="if(event.target === this) window.closeInfiniteBoard()">
+  <div class="card duel-card">
+    <div class="duel-title">♾️ Monde infini — Top séries</div>
+    <div class="muted" id="infiniteBoardMonth" style="font-size:.85em;margin-bottom:8px;"></div>
+    <div class="history" id="infiniteBoardList"></div>
+    <button class="btn secondary" onclick="window.closeInfiniteBoard()">Fermer</button>
+  </div>
+</div>
+
+<!-- Modale du mode Prestige (icône ⭐ à côté de la bannière au niveau 50) -->
+<div id="prestigeScreen" class="hidden duel-overlay" onclick="if(event.target === this) window.closePrestigeModal()">
+  <div class="card duel-card">
+    <div class="duel-title">⭐ Mode Prestige</div>
+    <div class="rank-info-scroll" id="prestigeBody"></div>
+    <button class="btn secondary" onclick="window.closePrestigeModal()">Fermer</button>
+  </div>
+</div>
+
 <!-- Écran de maintenance d'urgence (activé à distance : config/maintenance) -->
 <div id="maintenanceScreen" class="hidden" style="position:fixed;inset:0;z-index:99999;background:#030712 url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1600&auto=format&fit=crop') center/cover;overflow:auto;">
   <div style="position:absolute;inset:0;background:linear-gradient(to top,#020617 0%,rgba(2,6,23,.85) 40%,rgba(2,6,23,.6) 100%);"></div>

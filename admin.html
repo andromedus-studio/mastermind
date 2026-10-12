@@ -86,6 +86,7 @@
       <button id="eventBtn">⚡ Événement XP</button>
       <button id="annBtn">📣 Message aux joueurs</button>
       <button id="maintBtn" style="border-color:#e0654f;color:#ff9a94;">🚨 Urgence</button>
+      <button id="infBtn">♾️ Monde infini</button>
       <button id="reserveBtn">🛡️ Réserver un pseudo</button>
     </div>
     <div class="tablewrap">
@@ -116,7 +117,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { getDatabase, ref, get, set, update, remove } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+import { getDatabase, ref, get, set, update, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -221,6 +222,7 @@ async function loadAll(){
     DATA.priv = pv.val() || {};
     DATA.config = cfg.val() || {};
     render();
+    checkInfiniteMonthRoll(); // récompense du mois écoulé versée automatiquement si besoin
   } catch(e){
     toast('Lecture impossible : ' + (e.code || e.message), true);
   }
@@ -329,6 +331,8 @@ function openDetail(pseudo){
       <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
       <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '✅ généré' : '—'}</div>
       <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
+      <div>Prestige</div><div>${r.stats && r.stats.prestige ? `⭐ ${r.stats.prestige.count || 1} étoile(s) · repartie à partir de ${(r.stats.prestige.baseXp || 0).toLocaleString('fr-FR')} XP (le ${fmtDate(r.stats.prestige.at || 0)})` : '— (aucun)'}</div>
+      <div>Meilleure série (Monde infini)</div><div>${r.stats && r.stats.infiniteBest ? `♾️ ${r.stats.infiniteBest} victoires d'affilée (${(r.stats.infiniteMonth || '').replace('-', '/')})` : '—'}</div>
       <div>Sorties d'onglet</div><div>${r.tabLeft ? `🚪 ${r.tabLeft}${Object.keys(r.tabLeftModes).length ? ' — ' + Object.entries(r.tabLeftModes).map(([m, n]) => `${MODE_LABELS[m] || m} : ${n}`).join(' · ') : ''} · dernière le ${fmtDate(r.tabLeftAt)}` : '— (aucune détectée)'}</div>
       <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
     </div>
@@ -521,6 +525,7 @@ async function openAnnPanel(){
 $('eventBtn').onclick = openEventPanel;
 $('annBtn').onclick = openAnnPanel;
 $('maintBtn').onclick = openMaintPanel;
+$('infBtn').onclick = openInfPanel;
 
 // ---------------- Mode maintenance d'urgence (config/maintenance) ----------------
 // Recouvre le jeu d'un écran cyberpunk « En cours de maintenance » pour TOUS les
@@ -557,6 +562,104 @@ async function openMaintPanel(){
     if(!confirm('Rétablir le jeu pour tous les joueurs ?')) return;
     try { await remove(ref(db, 'config/maintenance')); toast('Jeu rétabli !'); closeModal(); await loadAll(); }
     catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+}
+
+// ---------------- Monde infini : classement mensuel des séries ----------------
+// Les séries sont stockées dans players/<pseudo>/stats (infiniteBest + infiniteMonth,
+// clé YYYY-MM). Le classement se reconstruit ici ; à la fin du mois, tu peux
+// attribuer l'XP de la récompense au vainqueur d'un clic.
+// ---------------- Monde infini : récompense automatique de fin de mois ----------------
+// config/infiniteReward = { amount, month } : month = dernier mois CLÔTURÉ (YYYY-MM).
+// À l'ouverture de l'admin : si le mois en cours a changé depuis la dernière clôture,
+// le vainqueur du mois écoulé reçoit automatiquement `amount` XP (aucun clic nécessaire).
+async function checkInfiniteMonthRoll(){
+  try {
+    const now = new Date();
+    const curMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(now).slice(0, 7);
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 7);
+    let cfg = null;
+    try { cfg = (await get(ref(db, 'config/infiniteReward'))).val(); } catch(e) {}
+    const amount = (cfg && Number(cfg.amount)) || 500;
+    const lastAwarded = (cfg && cfg.month) || curMonth; // par défaut : rien à clôturer ce mois-ci
+    if(prevMonth <= lastAwarded) return; // déjà clôturé (ou premier lancement)
+    // Vainqueur du mois écoulé
+    const playersData = (await get(ref(db, 'players'))).val() || {};
+    const rows = Object.entries(playersData)
+      .map(([p, d]) => ({ p, best: d && d.stats && d.stats.infiniteMonth === prevMonth ? (d.stats.infiniteBest || 0) : 0 }))
+      .filter(r => r.best > 0)
+      .sort((a, b) => b.best - a.best);
+    await set(ref(db, 'config/infiniteReward'), { amount, month: prevMonth });
+    if(!rows.length){ toast(`♾️ Mois ${prevMonth} clôturé : aucune série enregistrée, pas de vainqueur.`); return; }
+    const winner = rows[0];
+    await runTransaction(ref(db, 'players/' + winner.p + '/xp'), (cur) => (cur || 0) + amount);
+    await set(ref(db, 'config/infiniteRewardWinners/' + prevMonth), { pseudo: winner.p, best: winner.best, xp: amount, at: Date.now() });
+    toast(`🏆 Fin de mois automatique : ${winner.p} gagne ${amount} XP (série de ${winner.best}) !`);
+  } catch(e) { /* silencieux : n bloque pas le chargement de l'admin */ }
+}
+
+async function openInfPanel(){
+  const curMonth = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7);
+  const monthKey = (localStorage.getItem('bm_inf_month') || curMonth);
+  let infAmount = 500;
+  try { const rc = (await get(ref(db, 'config/infiniteReward'))).val(); if(rc && Number(rc.amount)) infAmount = Number(rc.amount); } catch(e) {}
+  const rows = Object.entries(DATA.players || {})
+    .map(([p, d]) => {
+      const st = (d && d.stats) || {};
+      return { p, best: st.infiniteMonth === monthKey ? (st.infiniteBest || 0) : 0 };
+    })
+    .filter(r => r.best > 0)
+    .sort((a, b) => b.best - a.best)
+    .slice(0, 10);
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0;">♾️ Monde infini — séries du mois</h2>
+      <button id="mClose">✕</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin:8px 0;">Meilleures séries d'affilée. Le compteur se remet à zéro à chaque changement de mois (automatique). À la fin d'un mois, attribue la récompense au vainqueur puis passe au mois suivant.</p>
+    <label style="font-size:12px;">Mois (YYYY-MM)</label>
+    <input id="infMonth" style="width:100%;" value="${monthKey}">
+    <button id="infReload" class="secondary" style="margin-top:8px;">Actualiser</button>
+    <div style="margin-top:12px;font-size:13px;">
+      ${rows.length ? rows.map((r, i) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span>${i+1}. <b>${esc(r.p)}</b></span><span>${r.best} victoire${r.best>1?'s':''}</span></div>`).join('') : '<span class="muted">Aucune série pour ce mois.</span>'}
+    </div>
+    ${rows.length ? `<button id="infAward" class="primary" style="margin-top:14px;width:100%;">🏆 Donner l'XP au vainqueur (${esc(rows[0].p)})</button>` : ''}
+    <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px;">
+      <label style="font-size:12px;">Récompense mensuelle automatique (XP)</label>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <input id="infAmount" style="flex:1;" type="number" min="0" step="50" value="${infAmount}">
+        <button id="infAmountSave" class="secondary">Enregistrer</button>
+      </div>
+      <p class="muted" style="font-size:11px;margin:6px 0 0;">Versée automatiquement au vainqueur à chaque fin de mois (dès que tu ouvres l'admin après le 1er). Le montant est affiché aux joueurs sur la tuile du mode.</p>
+    </div>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  $('infReload').onclick = () => {
+    const v = $('infMonth').value.trim();
+    if(/^\d{4}-\d{2}$/.test(v)) localStorage.setItem('bm_inf_month', v);
+    openInfPanel();
+  };
+  if($('infAward')) $('infAward').onclick = async () => {
+    const winner = rows[0];
+    const amount = prompt(`Combien d'XP pour ${winner.p} (série de ${winner.best}) ?`, '500');
+    if(amount === null) return;
+    const n = Number(amount);
+    if(!n || n <= 0) return;
+    if(!confirm(`Ajouter ${n} XP à ${winner.p} ?`)) return;
+    try {
+      await runTransaction(ref(db, 'players/' + winner.p + '/xp'), (cur) => (cur || 0) + n);
+      toast(`${n} XP attribués à ${winner.p} !`);
+      closeModal(); await loadAll();
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+  if($('infAmountSave')) $('infAmountSave').onclick = async () => {
+    const n = Math.max(0, Number($('infAmount').value) || 0);
+    try {
+      let cur = null;
+      try { cur = (await get(ref(db, 'config/infiniteReward'))).val(); } catch(e) {}
+      await set(ref(db, 'config/infiniteReward'), { amount: n, month: (cur && cur.month) || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7) });
+      toast('Récompense mensuelle : ' + n + ' XP (versée automatiquement en fin de mois).');
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
   };
 }
 
