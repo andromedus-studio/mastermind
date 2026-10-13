@@ -331,7 +331,7 @@ function openDetail(pseudo){
       <div>Dernière activité</div><div>${fmtDate(r.seen)}</div>
       <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '✅ généré' : '—'}</div>
       <div>Parties</div><div>${r.games} (V ${r.wins} · D ${r.losses} · abandons ${st.abandons || 0})</div>
-      <div>Prestige</div><div>${r.stats && r.stats.prestige ? `⭐ ${r.stats.prestige.count || 1} étoile(s) · repartie à partir de ${(r.stats.prestige.baseXp || 0).toLocaleString('fr-FR')} XP (le ${fmtDate(r.stats.prestige.at || 0)})` : '— (aucun)'}</div>
+      <div>Prestige</div><div>${r.stats && r.stats.prestige ? `⭐ ${r.stats.prestige.count || 1} étoile(s) · repartie à partir de ${(r.stats.prestige.baseXp || 0).toLocaleString('fr-FR')} XP (le ${fmtDate(r.stats.prestige.at || 0)})${r.xp < (r.stats.prestige.baseXp || 0) ? ` ⚠️ XP actuelle (${r.xp}) SOUS la base : progression bloquée à 0 — utilise « Recaler le prestige »` : ''}` : '— (aucun)'}</div>
       <div>Meilleure série (Monde infini)</div><div>${r.stats && r.stats.infiniteBest ? `♾️ ${r.stats.infiniteBest} victoires d'affilée (${(r.stats.infiniteMonth || '').replace('-', '/')})` : '—'}</div>
       <div>Sorties d'onglet</div><div>${r.tabLeft ? `🚪 ${r.tabLeft}${Object.keys(r.tabLeftModes).length ? ' — ' + Object.entries(r.tabLeftModes).map(([m, n]) => `${MODE_LABELS[m] || m} : ${n}`).join(' · ') : ''} · dernière le ${fmtDate(r.tabLeftAt)}` : '— (aucune détectée)'}</div>
       <div>XP gagnée (stats)</div><div>${st.xpGained || 0}${st.since ? ' · depuis le ' + fmtDate(st.since) : ''}</div>
@@ -339,6 +339,7 @@ function openDetail(pseudo){
     <div class="actions">
       <button id="aRename">✏️ Renommer</button>
       <button id="aXp">🎚️ Modifier l'XP</button>
+      ${r.stats && r.stats.prestige ? '<button id="aPrestigeFix">⭐ Recaler le prestige</button><button id="aPrestigeDel" class="danger">❌ Retirer le prestige</button>' : ''}
       ${canReserve ? '<button id="aReserve">🛡️ Réserver le pseudo</button>' : ''}
       ${canRelease ? '<button id="aRelease">🔓 Libérer le pseudo</button>' : ''}
       <button id="aDelete" class="danger">🗑️ Supprimer</button>
@@ -351,6 +352,25 @@ function openDetail(pseudo){
   $('mClose').onclick = closeModal;
   $('aRename').onclick = () => renamePlayer(pseudo);
   $('aXp').onclick = () => setXp(pseudo);
+  if($('aPrestigeFix')) $('aPrestigeFix').onclick = async () => {
+    // Répare un prestige bloqué : la base repart de l'XP actuelle (l'étoile est gardée).
+    if(!confirm(`Recaler le prestige de ${pseudo} sur son XP actuelle (${(DATA.players[pseudo] || {}).xp || 0} XP) ?\nSa progression repartira de 0 à partir de cette valeur, l'étoile est conservée.`)) return;
+    try {
+      const cur = (DATA.players[pseudo] || {}).stats || {};
+      const pr = cur.prestige || {};
+      await set(ref(db, `players/${pseudo}/stats/prestige`), { count: pr.count || 1, baseXp: (DATA.players[pseudo] || {}).xp || 0, at: pr.at || Date.now() });
+      toast('Prestige recalé : la progression repart de l\'XP actuelle.');
+      closeModal(); await loadAll();
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+  if($('aPrestigeDel')) $('aPrestigeDel').onclick = async () => {
+    if(!confirm(`RETIRER le prestige de ${pseudo} ? Il perdra son étoile et son niveau sera recalculé sur son XP totale (il redevient niveau 50 s'il a assez d'XP).`)) return;
+    try {
+      await remove(ref(db, `players/${pseudo}/stats/prestige`));
+      toast('Prestige retiré.');
+      closeModal(); await loadAll();
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
   if($('aReserve')) $('aReserve').onclick = () => reservePseudo(pseudo);
   if($('aRelease')) $('aRelease').onclick = () => releasePseudo(pseudo);
   $('aDelete').onclick = () => deletePlayer(pseudo);
