@@ -448,11 +448,16 @@
   body.infinite-mode .bg-photo {
     background-image: url('images/infinite-city.png');
     background-color: #050505;
+    background-size: cover; /* remplit l'écran sans zoom démesuré sur mobile */
+    background-position: center center;
+    background-repeat: no-repeat;
     filter: blur(1px) brightness(0.9);
   }
   /* Second fond dès la fin de la 5e manche : ambiance encore plus profonde */
   body.infinite-mode.infinite-bg2 .bg-photo {
     background-image: url('images/infinite-city-2.png');
+    background-size: cover;
+    background-position: center center;
     filter: blur(1px) brightness(0.75);
   }
   body.infinite-mode .bg-overlay {
@@ -1897,7 +1902,7 @@
       <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
         <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
         <span class="big">♾️ Monde infini 🔒</span>
-        <span class="small">7 essais par partie et 1:30 de chrono ! Chaque victoire enchaîne une nouvelle grille : continue ou encaisse ta série. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
+        <span class="small">7 essais par partie et 2:00 de chrono ! Chaque victoire enchaîne une nouvelle grille : continue ou encaisse ta série. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
       </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
