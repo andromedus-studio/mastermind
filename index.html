@@ -704,6 +704,8 @@
     cursor: not-allowed;
     pointer-events: none;
   }
+  /* La tuile est verrouillée, mais le badge Top reste cliquable pour voir le classement */
+  .mode-btn.locked .inf-top-btn { pointer-events: auto; }
   .xp-plus-badge {
     position: absolute;
     top: 8px;
@@ -1870,10 +1872,10 @@
         <span class="big">🎰 Série-Mind</span>
         <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
       </button>
-      <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
+      <button class="mode-btn infinite-tile locked" id="infiniteTile" type="button" onclick="startInfiniteMode()" title="Bientôt disponible">
         <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
-        <span class="big">♾️ Monde infini</span>
-        <span class="small">Enchaîne les victoires : 9 essais par partie, une nouvelle grille tant que tu gagnes. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
+        <span class="big">♾️ Monde infini 🔒</span>
+        <span class="small">Mode en préparation — bientôt disponible !</span>
       </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
