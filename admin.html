@@ -636,13 +636,22 @@ async function openInfPanel(){
       <h2 style="margin:0;">♾️ Monde infini — séries du mois</h2>
       <button id="mClose">✕</button>
     </div>
-    <p class="muted" style="font-size:12px;margin:8px 0;">Meilleures séries d'affilée. Le compteur se remet à zéro à chaque changement de mois (automatique). À la fin d'un mois, attribue la récompense au vainqueur puis passe au mois suivant.</p>
+    <p class="muted" style="font-size:12px;margin:8px 0;">Meilleures séries d'affilée. Le compteur se remet à zéro à chaque changement de mois (automatique). À la fin d'un mois, le vainqueur reçoit automatiquement la récompense ci-dessous.</p>
+    <div style="border:1px solid rgba(255,215,0,.4);border-radius:8px;padding:8px 10px;margin:8px 0;background:rgba(255,215,0,.06);">
+      <span style="font-size:13px;">🎁 Récompense du vainqueur : <b style="color:#ffd700;">${infAmount} XP</b></span>
+      <span class="muted" style="font-size:11px;"> — c'est ce montant que les joueurs voient sur la tuile et dans le classement.</span>
+    </div>
     <label style="font-size:12px;">Mois (YYYY-MM)</label>
     <input id="infMonth" style="width:100%;" value="${monthKey}">
     <button id="infReload" class="secondary" style="margin-top:8px;">Actualiser</button>
     <div style="margin-top:12px;font-size:13px;">
-      ${rows.length ? rows.map((r, i) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);"><span>${i+1}. <b>${esc(r.p)}</b></span><span>${r.best} victoire${r.best>1?'s':''}</span></div>`).join('') : '<span class="muted">Aucune série pour ce mois.</span>'}
+      ${rows.length ? rows.map((r, i) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${i+1}. <b>${esc(r.p)}</b>${i===0?' 🎁':''}</span>
+        <input type="number" min="0" step="1" value="${r.best}" data-inf-pseudo="${esc(r.p)}" style="width:70px;text-align:right;" title="Nombre de victoires d'affilée">
+        <button class="secondary inf-save" data-p="${esc(r.p)}" data-month="${monthKey}" style="padding:4px 8px;">💾</button>
+      </div>`).join('') : '<span class="muted">Aucune série pour ce mois.</span>'}
     </div>
+    <p class="muted" style="font-size:11px;margin:6px 0 0;">✏️ Modifie le nombre de victoires puis 💾 pour enregistrer (0 = retirer du classement). Un score ne comptera que si infiniteMonth correspond au mois affiché.</p>
     ${rows.length ? `<button id="infAward" class="primary" style="margin-top:14px;width:100%;">🏆 Donner l'XP au vainqueur (${esc(rows[0].p)})</button>` : ''}
     <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.1);padding-top:10px;">
       <label style="font-size:12px;">Récompense mensuelle automatique (XP)</label>
@@ -679,8 +688,30 @@ async function openInfPanel(){
       try { cur = (await get(ref(db, 'config/infiniteReward'))).val(); } catch(e) {}
       await set(ref(db, 'config/infiniteReward'), { amount: n, month: (cur && cur.month) || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7) });
       toast('Récompense mensuelle : ' + n + ' XP (versée automatiquement en fin de mois).');
+      openInfPanel(); // rafraîchit l'encadré cadeau affiché en tête
     } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
   };
+  // Modifier le nombre de victoires d'un joueur (sauvegarde immédiate dans la base)
+  document.querySelectorAll('.inf-save').forEach(btn => {
+    btn.onclick = async () => {
+      const p = btn.dataset.p;
+      const input = document.querySelector(`input[data-inf-pseudo="${CSS.escape(p)}"]`);
+      if(!input) return;
+      const v = Math.max(0, Number(input.value) || 0);
+      if(!confirm(`Définir la série de ${p} à ${v} victoire(s) pour ${btn.dataset.month} ?`)) return;
+      try {
+        if(v > 0){
+          await update(ref(db, `players/${p}/stats`), { infiniteBest: v, infiniteMonth: btn.dataset.month });
+        } else {
+          await remove(ref(db, `players/${p}/stats/infiniteBest`));
+          await remove(ref(db, `players/${p}/stats/infiniteMonth`));
+        }
+        toast(`Série de ${p} mise à jour : ${v}.`);
+        await loadAll();
+        openInfPanel();
+      } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+    };
+  });
 }
 
 $('reserveBtn').onclick = async () => {

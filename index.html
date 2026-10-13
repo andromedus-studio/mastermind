@@ -450,6 +450,11 @@
     background-color: #050505;
     filter: blur(1px) brightness(0.9);
   }
+  /* Second fond dès la fin de la 5e manche : ambiance encore plus profonde */
+  body.infinite-mode.infinite-bg2 .bg-photo {
+    background-image: url('images/infinite-city-2.png');
+    filter: blur(1px) brightness(0.75);
+  }
   body.infinite-mode .bg-overlay {
     background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,.65));
   }
@@ -874,6 +879,23 @@
   }
   .serie-mind-choice { margin-bottom: 14px; }
   .serie-mind-choice .analysis-panel { text-align: center; }
+  /* Choix fin de partie — Monde infini : nombre de manches en GRAND */
+  .infinite-choice { margin-bottom: 14px; }
+  .infinite-choice-panel {
+    text-align: center;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 14px;
+    padding: 18px 14px;
+  }
+  .infinite-choice-label { font-size: 12px; letter-spacing: .3em; color: var(--ink-dim); font-weight: 700; }
+  .infinite-choice-round {
+    font-size: 64px; font-weight: 900; line-height: 1.05;
+    color: #ffd700;
+    text-shadow: 0 0 10px rgba(255,215,0,0.8), 0 0 26px rgba(255,215,0,0.5);
+    animation: winPulse 0.6s ease;
+  }
+  .infinite-choice-msg { font-size: 13px; color: var(--ink-dim); margin-top: 4px; }
   .attempts-left b { color: var(--gold); }
   .attempts-left.low b { color: var(--danger); }
 
@@ -1872,10 +1894,10 @@
         <span class="big">🎰 Série-Mind</span>
         <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
       </button>
-      <button class="mode-btn infinite-tile locked" id="infiniteTile" type="button" onclick="startInfiniteMode()" title="Bientôt disponible">
+      <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
         <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
         <span class="big">♾️ Monde infini 🔒</span>
-        <span class="small">Mode en préparation — bientôt disponible !</span>
+        <span class="small">7 essais par partie et 1:30 de chrono ! Chaque victoire enchaîne une nouvelle grille : continue ou encaisse ta série. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
       </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
@@ -1907,6 +1929,19 @@
           <div style="display:flex; gap:10px; justify-content:center; margin-top:10px; flex-wrap:wrap;">
             <button class="btn" onclick="serieMindCashOut()">💰 Récupérer le pactole</button>
             <button class="btn secondary" id="serieMindContinueBtn" onclick="serieMindContinueRound()">🎲 Quitte ou double</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Choix fin de partie (mode Monde infini) -->
+      <div class="infinite-choice hidden" id="infiniteChoice">
+        <div class="infinite-choice-panel">
+          <div class="infinite-choice-label">MANCHE</div>
+          <div class="infinite-choice-round" id="infiniteChoiceRound">1</div>
+          <div class="infinite-choice-msg" id="infiniteChoiceMsg"></div>
+          <div style="display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap;">
+            <button class="btn" onclick="infiniteContinue()">▶️ Continuer</button>
+            <button class="btn secondary" onclick="infiniteCashOut()">🏁 S'arrêter</button>
           </div>
         </div>
       </div>
@@ -2231,9 +2266,55 @@ function startSerieMind(){
   renderSerieMindBanner();
 }
 
-// --- Mode Monde infini (end-game) : parties enchaînées à 9 essais, la série
-// continue tant que le joueur gagne. Meilleure série du mois classée (voir tuile
-// et panneau admin). ---
+// --- Mode Monde infini (end-game) : parties enchaînées à 7 essais avec chrono
+// de 1:30 par partie. Après chaque victoire : continuer ou s'arrêter. À partir de
+// la 6e manche, un second fond d'écran (infinite-city-2.png) prend le relais. ---
+const INFINITE_TIME_MS = 120000; // 2 minutes par partie
+let infiniteClockInterval = null;
+function infiniteFormatClock(ms){
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+function startInfiniteClock(){
+  stopInfiniteClock();
+  const startAt = Date.now();
+  infiniteClockInterval = setInterval(() => {
+    if(!infiniteActive){ stopInfiniteClock(); return; }
+    const remaining = Math.max(0, INFINITE_TIME_MS - (Date.now() - startAt));
+    const el = document.getElementById('infiniteClock');
+    if(el){
+      el.textContent = infiniteFormatClock(remaining);
+      el.style.color = remaining < 30000 ? '#ff8a80' : '';
+    }
+    if(remaining <= 0) infiniteTimeout();
+  }, 500);
+}
+function stopInfiniteClock(){
+  if(infiniteClockInterval){ clearInterval(infiniteClockInterval); infiniteClockInterval = null; }
+}
+function infiniteTimeout(){
+  if(!infiniteActive || solved) return;
+  stopInfiniteClock();
+  const secretLisible = secretCode.map(ci => COLORS[ci].name).join(', ');
+  showSecretReveal(secretCode);
+  setStatus(`⏰ Temps écoulé ! Série terminée : ${infiniteStreak} victoire${infiniteStreak>1?'s':''} d'affilée. Le code était : ${secretLisible}.`, '');
+  document.getElementById('userInputArea').classList.add('hidden');
+  document.getElementById('replayBtn').classList.remove('hidden');
+  sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
+  recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu (temps)', attempts: history.length, xp: 0});
+  endInfiniteRun();
+}
+function endInfiniteRun(){
+  // Fin de série (défaite, temps écoulé ou arrêt volontaire) : nettoyage de la logique.
+  // Le thème noir et blanc RESTE affiché sur l'écran de fin (révélation du code,
+  // série terminée) ; il est retiré au retour au menu ou au lancement d'un autre mode.
+  infiniteActive = false;
+  infiniteStreak = 0;
+  moveLimit = infiniteSavedMoveLimit;
+  stopInfiniteClock();
+  renderInfiniteBanner();
+  renderAttemptsPicker();
+}
 function startInfiniteMode(){
   if(NB_COULEURS !== 8){ setColorCount(8); }
   trainingMode = false;
@@ -2241,10 +2322,25 @@ function startInfiniteMode(){
   infiniteActive = true;
   infiniteStreak = 0;
   infiniteSavedMoveLimit = moveLimit;
-  moveLimit = 9;
+  moveLimit = 7; // 7 essais par partie en Monde infini
   document.body.classList.add('infinite-mode'); // thème noir et blanc du mode
+  document.body.classList.remove('infinite-bg2');
   startGame('userGuesses');
+  startInfiniteClock();
   renderInfiniteBanner();
+}
+// Choix après chaque victoire : continuer ou encaisser sa série.
+function infiniteContinue(){
+  document.getElementById('infiniteChoice').classList.add('hidden');
+  startGame('userGuesses');
+  startInfiniteClock();
+  renderInfiniteBanner();
+}
+function infiniteCashOut(){
+  document.getElementById('infiniteChoice').classList.add('hidden');
+  setStatus(`🏁 Série encaissée : ${infiniteStreak} victoire${infiniteStreak>1?'s':''} d'affilée ! Ta meilleure série du mois reste enregistrée.`, 'win');
+  document.getElementById('replayBtn').classList.remove('hidden');
+  endInfiniteRun();
 }
 
 function renderInfiniteBanner(){
@@ -2252,7 +2348,7 @@ function renderInfiniteBanner(){
   if(!el) return;
   if(!infiniteActive){ el.classList.add('hidden'); el.innerHTML = ''; return; }
   el.classList.remove('hidden');
-  el.innerHTML = `♾️ Monde infini — Série : <b>${infiniteStreak}</b> victoire${infiniteStreak>1?'s':''} d'affilée · 9 essais par partie`;
+  el.innerHTML = `♾️ Monde infini — Série : <b>${infiniteStreak}</b> · ⏱ <span id="infiniteClock">2:00</span>`;
 }
 
 function renderSerieMindBanner(){
@@ -2589,6 +2685,8 @@ renderAttemptsPicker();
 updateXpBadgeOrdi();
 
 function replayVsOrdi(){
+  // Si on relance une partie depuis l'écran de fin du Monde infini, on retrouve le thème normal.
+  document.body.classList.remove('infinite-mode', 'infinite-bg2');
   startGame('userGuesses');
 }
 
@@ -2604,11 +2702,12 @@ function resetToMenu(){
   if(infiniteActive){
     // Quitter en cours de série met fin à la série (la meilleure perf du mois reste enregistrée).
     moveLimit = infiniteSavedMoveLimit;
-    document.body.classList.remove('infinite-mode');
+    stopInfiniteClock();
+    document.getElementById('infiniteChoice').classList.add('hidden');
   }
   infiniteActive = false;
   infiniteStreak = 0;
-  document.body.classList.remove('infinite-mode'); // sécurité : jamais de thème N&B collant au menu
+  document.body.classList.remove('infinite-mode', 'infinite-bg2'); // sécurité : jamais de thème N&B collant au menu
   renderInfiniteBanner();
   serieMindActive = false;
   serieMindRound = 1;
@@ -2747,17 +2846,24 @@ function submitUserGuess(){
       return;
     }
     if(infiniteActive){
-      // Victoire en Monde infini : la série continue, partie suivante automatique.
+      // Victoire en Monde infini : le chrono s'arrête, on propose de continuer ou d'encaisser.
       infiniteStreak++;
+      stopInfiniteClock();
       const wonXpInf = window.xpForAttempts(history.length) + rankWinBonus();
       const awardedWonXp = window.addXp(wonXpInf);
       recordGameHistory({type: 'ordi', sub: 'infinite', result: 'gagné', attempts: history.length, xp: awardedWonXp});
       if(window.infiniteReportStreak) window.infiniteReportStreak(infiniteStreak);
       sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: false});
-      setStatus(`Trouvé en ${history.length} coup${history.length>1?'s':''} ! Série en cours : ${infiniteStreak} (+${awardedWonXp} XP). Partie suivante...`, 'win');
+      if(infiniteStreak >= 5) document.body.classList.add('infinite-bg2'); // nouveau fond dès la fin de la 5e manche
+      setStatus(`Trouvé en ${history.length} coup${history.length>1?'s':''} ! (+${awardedWonXp} XP)`, 'win');
       renderInfiniteBanner();
       launchConfetti();
-      setTimeout(() => { if(infiniteActive) startGame('userGuesses'); }, 1500);
+      const choiceEl = document.getElementById('infiniteChoice');
+      document.getElementById('userInputArea').classList.add('hidden');
+      document.getElementById('infiniteChoiceRound').textContent = infiniteStreak;
+      document.getElementById('infiniteChoiceMsg').textContent =
+        `${infiniteStreak} victoire${infiniteStreak>1?'s':''} d'affilée · ${awardedWonXp} XP gagnés sur cette partie`;
+      choiceEl.classList.remove('hidden');
       return;
     }
     const wonXp = (trainingMode || NB_COULEURS !== 8) ? 0 : xpForAttempts(history.length) + moveLimitBonus() + rankWinBonus();
@@ -2787,12 +2893,7 @@ function submitUserGuess(){
       document.getElementById('replayBtn').classList.remove('hidden');
       sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
       recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu', attempts: history.length, xp: 0});
-      infiniteActive = false;
-      infiniteStreak = 0;
-      moveLimit = infiniteSavedMoveLimit;
-      document.body.classList.remove('infinite-mode'); // retour au thème normal
-      renderInfiniteBanner();
-      renderAttemptsPicker();
+      endInfiniteRun();
       return;
     }
     const lostXp = 0; // une défaite ne rapporte plus d'XP, quel que soit le nombre d'essais
@@ -4088,10 +4189,10 @@ window.openInfiniteBoard = async () => {
     .sort((a, b) => b.best - a.best)
     .slice(0, 20);
   const mois = new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  document.getElementById('infiniteBoardMonth').textContent = `Classement de ${mois} — remise à zéro chaque mois${infiniteRewardXp ? ` · 🏆 Récompense du vainqueur : ${infiniteRewardXp} XP` : ''}`;
+  document.getElementById('infiniteBoardMonth').textContent = `Classement de ${mois} — remise à zéro chaque mois · 🎁 Le vainqueur remporte ${infiniteRewardXp} XP !`;
   const el = document.getElementById('infiniteBoardList');
   el.innerHTML = rows.length
-    ? rows.map((r, i) => `<div class="row"><span class="num">${i+1}</span><b>${r.p}</b><span style="margin-left:auto;">${r.best} victoire${r.best>1?'s':''} d'affilée</span></div>`).join('')
+    ? rows.map((r, i) => `<div class="row"><span class="num">${i+1}</span><b>${r.p}</b>${i===0 && infiniteRewardXp ? '<span style="margin-left:6px;">🎁</span>' : ''}<span style="margin-left:auto;">${r.best} victoire${r.best>1?'s':''} d'affilée</span></div>`).join('')
     : '<div class="muted" style="text-align:center;">Aucune série ce mois-ci. Sois le premier !</div>';
   document.getElementById('infiniteBoardScreen').classList.remove('hidden');
 };
