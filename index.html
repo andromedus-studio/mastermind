@@ -918,6 +918,30 @@
     border-color: rgba(200,210,220,.65) !important;
     box-shadow: 0 0 18px rgba(200,210,220,.3);
   }
+  /* Palier 3 « Challenge » : cadre doré/rouge sur fond dédié */
+  body.adv-palier3 .bg-photo {
+    background-image: url('images/aventure-palier3.png');
+    background-size: cover; background-position: center center; background-repeat: no-repeat;
+  }
+  body.adv-palier3 .game-card, body.adv-palier3 .card {
+    border-color: rgba(255,80,60,.6) !important;
+    box-shadow: 0 0 22px rgba(255,120,60,.35);
+  }
+  body.adv-palier4 .bg-photo {
+    background-image: url('images/aventure-palier4.png');
+    background-size: cover; background-position: center center; background-repeat: no-repeat;
+  }
+  body.adv-palier4 .game-card, body.adv-palier4 .card {
+    border-color: rgba(140,120,255,.55) !important;
+    box-shadow: 0 0 22px rgba(120,100,255,.35);
+  }
+  /* 🌑 Palier 4 « L'Ombre » : pion masqué (couleur cachée à mémoriser) */
+  .peg.shadow-peg {
+    background: #14161f !important;
+    border: 1px dashed rgba(200,190,255,.45);
+    display: flex; align-items: center; justify-content: center;
+    color: #9a8fdf; font-weight: 800; font-size: 12px;
+  }
   .attempts-left b { color: var(--gold); }
   .attempts-left.low b { color: var(--danger); }
 
@@ -1983,6 +2007,29 @@
         </div>
       </div>
 
+      <!-- Écran d'introduction (étage 1 / entrée de palier) -->
+      <div class="infinite-choice hidden" id="advIntro">
+        <div class="infinite-choice-panel">
+          <div class="infinite-choice-label" id="advIntroKicker">MODE AVENTURE</div>
+          <div class="infinite-choice-round" id="advIntroTitle" style="font-size:22px;letter-spacing:.1em;">Les Limites</div>
+          <div class="infinite-choice-msg" id="advIntroMsg" style="text-align:left;white-space:normal;line-height:1.7;margin-top:10px;"></div>
+          <button class="btn" style="margin-top:16px;" onclick="closeAdvIntro()">▶️ C'est parti !</button>
+        </div>
+      </div>
+
+      <!-- ⚠️ Confirmation avant de changer de mode pendant une partie en cours -->
+      <div class="infinite-choice hidden" id="modeConfirm">
+        <div class="infinite-choice-panel">
+          <div class="infinite-choice-label">ATTENTION</div>
+          <div class="infinite-choice-round" style="font-size:20px;letter-spacing:.08em;">Changer de mode ?</div>
+          <div class="infinite-choice-msg" id="modeConfirmMsg" style="text-align:left;white-space:normal;line-height:1.7;margin-top:10px;"></div>
+          <div style="display:flex;gap:10px;margin-top:16px;">
+            <button class="btn" style="flex:1;" onclick="modeConfirmYes()">✅ Oui, quitter</button>
+            <button class="btn secondary" style="flex:1;" onclick="modeConfirmNo()">↩️ Non, continuer</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Boutique (mode Aventure, toutes les 5 manches) -->
       <div class="infinite-choice hidden" id="advShop">
         <div class="infinite-choice-panel">
@@ -2009,7 +2056,7 @@
       </div>
 
       <button class="btn secondary hidden" id="replayBtn" onclick="replayVsOrdi()">🔁 Rejouer contre l'ordi</button>
-      <button class="btn secondary" onclick="resetToMenu()">↩ Changer de mode</button>
+      <button class="btn secondary" onclick="askModeChange()">↩ Changer de mode</button>
       <button class="btn secondary hidden" id="devBtn" onclick="toggleDevPanel()" title="Mode développeur (tapez 'dev')">🛠️</button>
     </div>
 
@@ -2300,6 +2347,8 @@ function startGame(chosenMode){
     for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
     secretCode = pool.slice(0, 4);
   }
+  // Aventure : malus « chiffres » — nouveaux chiffres 0-99 à chaque étage.
+  if(advActive && advNumbersMode) advRollNumbers();
   currentGuess = [null,null,null,null];
   selectedSlot = 0;
   analysisCandidates = ALL_CODES.slice();
@@ -2435,29 +2484,88 @@ let advShopBought = {};          // achats déjà faits dans la boutique courant
 let advPendingXp = 0;            // XP gagnée à l'étage en cours, pas encore consolidée
 let advExitBoost = false;        // bonus +25% à la sortie (acheté aux étages 15/25/35/45)
 let advShopPendingPct = 0;       // % achetés en boutique, appliqués au prochain étage
+let advChallenge = null;         // palier 3 « Challenge » : défi de l'étage en cours
+let advChallengeStart = 0;       // timestamp de début de l'étage (pour la pendule du défi)
+let advChallengeTries = null;    // limite d'essais du défi (n'entame pas les essais totaux)
+let advAngelRing = false;        // 😇 anneau de l'ange : en cas de défaite, rejoue l'étage perdu (consommé à l'usage)
+let advStagePalierMs = 0;        // pendule totale au début de l'étage en cours (restaurée par l'anneau)
+let advShadow = null;            // 🌑 palier 4 « L'Ombre » : { count, fixed, fixedPos, revealAt } pour l'étage en cours
+let advShadowLinePos = [];       // positions masquées par ligne d'historique (stables entre les rendus)
+// 🌑 Options « L'Ombre » : choix proposé après chaque étage du palier 4 (étage VISÉ).
+const ADV_SHADOW_OPTS = {
+  17: { A: { pct: 20, masks: { count: 1, fixed: false } },
+        B: { pct: 30, masks: { count: 2, fixed: false } },
+        C: { pct: -25 } },
+  18: { A: { pct: 20, masks: { count: 1, fixed: false } },
+        B: { pct: 35, masks: { count: 2, fixed: false } },
+        C: { pct: -25 },
+        D: { pct: -15, masks: { count: 2, fixed: false, revealAt: 5 } } },
+  19: { A: { pct: 25, masks: { count: 2, fixed: false } },
+        B: { pct: 40, masks: { count: 2, fixed: true } },
+        C: { pct: -15, masks: { count: 1, fixed: false } },
+        D: { pct: -10, masks: { count: 2, fixed: false, revealAt: 7 } } },
+  20: { A: { pct: 30, masks: { count: 2, fixed: true } },
+        B: { pct: 45, masks: { count: 3, fixed: false } },
+        C: { pct: -15, masks: { count: 1, fixed: false } },
+        D: { pct: -10, masks: { count: 3, fixed: false, revealAt: 8 } } },
+};
+// 🌑 Masques actifs pour l'affichage ? (faux si l'option « révélation » a débloqué les masques)
+function advShadowActive(){
+  return advActive && advShadow && !(advShadow.revealAt !== null && history.length >= advShadow.revealAt);
+}
+// Positions masquées d'une ligne d'historique : stables (mémorisées une fois tirées).
+function advShadowPosFor(idx){
+  if(advShadow.fixed) return advShadow.fixedPos;
+  let p = advShadowLinePos[idx];
+  if(!p){
+    const all = [0, 1, 2, 3];
+    for(let i = all.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
+    p = all.slice(0, advShadow.count);
+    advShadowLinePos[idx] = p;
+  }
+  return p;
+}
+let advTimeFrozen = false;       // gel de la pendule totale pour l'étage en cours
+let advMalusUntil = 0;           // dernier étage couvert par le malus de palier en cours
+let advIntroNext = null;          // action après fermeture de l'intro (ex: 'choices')
+let advIntroShownRound = 0;       // étage dont l'intro a déjà été affichée
+let advIntroPrevHidden = {};      // état du plateau avant l'intro (restauré à la fermeture)
 const ADV_GO_BASE_PCT = 10;      // game over : 10% de la réserve
 const ADV_PALIER_MS = 20 * 60000;
 
-function advPalier(){ return Math.floor((advRound - 1) / 5) + 1; } // 1..2 sur les 10 étages
-function advTheme(){ return (advPalier() === 2) ? 'temps' : 'essais'; }
+function advPalier(){ return Math.floor((advRound - 1) / 5) + 1; } // 1..3+ sur les étages
+function advTheme(){ return advThemeFor(advRound); }
+function advThemeFor(r){ const th = ['essais', 'temps', 'challenge', 'ombre']; return th[Math.floor((r - 1) / 5) % th.length]; }
+// Paliers avec pendule (horloge/temps définitif) : Temps, Challenge et L'Ombre.
+function advClockTheme(t){ return t === 'temps' || t === 'challenge' || t === 'ombre'; }
 function advFormatClock(ms){
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 function startAdvClock(){
   stopAdvClock();
-  if(advTheme() !== 'temps') return;
+  if(advTheme() !== 'temps' && advTheme() !== 'challenge') return;
   const endAt = Date.now() + advPalierMs;
   advClockInterval = setInterval(() => {
     if(!advActive){ stopAdvClock(); return; }
-    advPalierMs = Math.max(0, endAt - Date.now());
+    // Gel : la pendule totale est figée pour l'étage (option D de l'étage 14).
+    if(!advTimeFrozen) advPalierMs = Math.max(0, endAt - Date.now());
     const el = document.getElementById('advClock');
     if(el){
       el.textContent = advFormatClock(advPalierMs);
       el.style.color = advPalierMs < 60000 ? '#ff8a80' : '';
     }
+    // Palier 3 : pendule du défi (rouge) qui défile en temps réel.
+    if(advChallenge && advChallenge.round === advRound && advChallenge.maxMs){
+      const cel = document.getElementById('advChallengeClock');
+      if(cel){
+        const left = Math.max(0, advChallenge.maxMs - (Date.now() - advChallengeStart));
+        cel.textContent = advFormatClock(left);
+        cel.style.color = (left < 30000 || left < advChallenge.maxMs * 0.25) ? '#ff5252' : '#ff8a80';
+      }
+    }
     if(advPalierMs <= 0) advDefeat('temps du palier écoulé');
-  }, 500);
+  }, 250);
 }
 function stopAdvClock(){
   if(advClockInterval){ clearInterval(advClockInterval); advClockInterval = null; }
@@ -2466,41 +2574,213 @@ function renderAdvBanner(){
   const el = document.getElementById('advBanner');
   if(!el) return;
   if(!advActive){ el.classList.add('hidden'); el.innerHTML = ''; return; }
-  const palName = advPalier() === 1 ? 'Les Limites' : 'Le Temps';
+  const palName = advPalier() === 1 ? 'Les Limites' : advPalier() === 2 ? 'Le Temps' : 'Challenge';
   el.classList.remove('hidden');
-  el.innerHTML = `🗺️ ${palName} — Étage <b>${advRound}</b> · 💰 <b>${advReserve} XP</b>` +
-    `${advPendingXp ? ` <span style="color:#8cffaa;">(+${advPendingXp} à valider)</span>` : ''}` +
-    `${advMaxTries ? ` · 🎯 ${advMaxTries} essais max` : ''}` +
-    `${advTheme() === 'temps' ? ` · ⏱ <span id="advClock">${advFormatClock(advPalierMs)}</span>` : ''}` +
-    `${advMalus ? ` · ⚠️ malus : ${advMalus.label}` : ''}`;
+  // Cadres séparés pour une lecture immédiate : réserve / essais / temps / défi / malus.
+  const chip = (cls, html) => `<span style="display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:3px 10px;margin:3px 4px 0 0;background:rgba(255,255,255,.06);font-size:12.5px;${cls ? 'border-color:' + cls + ';' : ''}">${html}</span>`;
+  const goPct = ADV_GO_BASE_PCT + 5 * advInsuranceCount;
+  const defeatAmt = Math.floor(advReserve * goPct / 100);
+  let html = `🗺️ ${palName} — Étage <b>${advRound}</b><br>`;
+  // 💰 Réserve + montant récupéré en cas de défaite (avec les assurances achetées)
+  html += chip('', `💰 <b>${advReserve} XP</b>${advPendingXp ? ` <span style="color:#8cffaa;">(+${advPendingXp} à valider)</span>` : ''} <span class="muted">(défaite : ${defeatAmt} XP · ${goPct}%)</span>`);
+  // 🎯 Essais : limite permanente + essais restants de la manche
+  if(advMaxTries){
+    const left = (moveLimit !== null && moveLimit !== undefined) ? Math.max(0, moveLimit - history.length) : null;
+    html += chip('', `🎯 ${left !== null ? `<b>${left}</b>/${moveLimit} restants` : `<b>${advMaxTries}</b> essais max`} <span class="muted">(total : ${advMaxTries})</span>`);
+  } else {
+    html += chip('', `🎯 illimité`);
+  }
+  // ⏱ Pendule totale (paliers Temps et Challenge)
+  if(advClockTheme(advTheme())){
+    html += chip(advPalierMs < 60000 ? 'rgba(255,138,128,.6)' : '', `⏱ <span id="advClock" style="font-weight:700;">${advFormatClock(advPalierMs)}</span>`);
+  }
+  // 🏆 Pendule du défi (rouge, palier Challenge)
+  if(advChallenge && advChallenge.round === advRound && advChallenge.maxMs){
+    html += chip('rgba(255,82,82,.7)', `🏆 défi &lt; ${advFormatClock(advChallenge.maxMs)} — <span id="advChallengeClock" style="font-weight:700;">${advFormatClock(advChallenge.maxMs)}</span>`);
+  }
+  // 🧊 Gel de la pendule
+  if(advTimeFrozen) html += chip('rgba(140,220,255,.5)', `🧊 pendule gelée`);
+  // ⚠️ Malus actif du palier
+  if(advMalus && advRound <= advMalusUntil) html += chip('rgba(255,138,128,.7)', `⚠️ ${advMalus.label}`);
+  // 🌑 Masques de l'étage (palier 4 « L'Ombre »)
+  if(advShadow && advPalier() === 4){
+    const revealed = advShadow.revealAt !== null && history.length >= advShadow.revealAt;
+    html += chip('rgba(150,130,255,.6)', revealed
+      ? `🌑 masques révélés (essai ${advShadow.revealAt} atteint)`
+      : `🌑 ${advShadow.count} couleur${advShadow.count > 1 ? 's' : ''} masquée${advShadow.count > 1 ? 's' : ''}${advShadow.fixed ? ' — position fixe' : ''}${advShadow.revealAt !== null ? ` — révélées au ${advShadow.revealAt}ᵉ essai` : ''}`);
+  }
+  // 🛡️ Assurances achetées
+  if(advInsuranceCount > 0) html += chip('', `🛡️ ${advInsuranceCount}× assurance (${goPct}% en cas de défaite)`);
+  el.innerHTML = html;
 }
 // Malus aléatoires (boutiques, annoncés avant le début du palier suivant)
-function advRollMalus(){
-  const pool = [
+function advRollMalus(startRound){
+  const fullPool = [
     { id: 'minus1min', label: '−1 min à chaque étage du prochain palier', desc: 'Chaque étage du palier enlève 1 minute à l\'horloge.' },
     { id: 'minus1try', label: '−1 essai (permanent)', desc: 'Ta limite d\'essais permanente baisse de 1.' },
     { id: 'doubles', label: 'Couleurs multiples possibles', desc: 'Le code secret peut contenir des doublons pendant le prochain palier.' },
     { id: 'noC', label: 'Pas d\'option C (aucun malus)', desc: 'L\'option −25% sans malus n\'est pas proposée pendant tout le prochain palier.' },
     { id: 'nogain', label: 'Un étage sans gain d\'XP', desc: 'Un étage du prochain palier ne rapportera pas d\'XP en réserve.' },
+    { id: 'numbers', label: 'Couleurs remplacées par des chiffres (0-99)', desc: 'Pendant tout le prochain palier, les couleurs sont remplacées par des chiffres aléatoires (0-99) qui changent à chaque étage.' },
   ];
+  // Pool selon la boutique : boutique 1 (startRound 6) PAS de malus « chiffres » ;
+  // boutiques 2 et 3 (startRound 11/16) PAS de malus « −1 min/étage » (palier Temps seulement).
+  let pool = fullPool;
+  if(startRound <= 6) pool = fullPool.filter(m => m.id !== 'numbers');
+  else pool = fullPool.filter(m => m.id !== 'minus1min');
   const m = pool[Math.floor(Math.random() * pool.length)];
-  if(m.id === 'nogain') advNoGainFloor = 6 + Math.floor(Math.random() * 5); // étage 6..10
+  // Fenêtre du malus : il couvre TOUT le palier qui vient (startRound .. startRound+4)
+  // et est automatiquement effacé à la fin de cette fenêtre (advClearMalusIfDone).
+  // Remplacement propre : on efface d'abord TOUT l'état de l'ancien malus.
+  advDistinct = true; advNoGainFloor = 0; advNumbersMode = false; advNumbersMap = null;
+  advMalusUntil = startRound + 4;
+  if(m.id === 'nogain') advNoGainFloor = startRound + Math.floor(Math.random() * 5); // un étage du palier
   if(m.id === 'doubles') advDistinct = false;
   if(m.id === 'minus1try' && advMaxTries !== null) advMaxTries = Math.max(5, advMaxTries - 1);
+  if(m.id === 'numbers') advNumbersMode = true; // couleurs -> chiffres 0-99 pour tout le palier
   advMalus = m;
+  renderAdvBanner();
   return m;
 }
-function advApplyPalierStart(){
-  // Annonce du palier : thème, bonus, malus éventuel + thème visuel du palier.
-  if(advPalier() === 2 && advRound === 6){
-    advPalierBaseMs = ADV_PALIER_MS;
-    advPalierMs = ADV_PALIER_MS; // le malus « −1 min/étage » s'applique à chaque étage via applyAdvChoice
-    document.body.classList.remove('adv-palier1');
-    document.body.classList.add('adv-palier2'); // cadre argenté — palier « Le Temps »
-    const warn = advMalus ? ` ⚠️ Malus du palier : ${advMalus.label} — ${advMalus.desc}` : '';
-    setStatus(`🕰️ Palier « Le Temps » : tu as <b>20 minutes</b> pour franchir les étages 6 à 10 !${warn}`, '');
+// Efface le malus de palier si sa fenêtre est passée (appelé à chaque changement d'étage).
+function advClearMalusIfDone(){
+  if(advMalus && advRound > advMalusUntil){
+    advMalus = null; advDistinct = true; advNoGainFloor = 0;
+    advNumbersMode = false; advNumbersMap = null; advMalusUntil = 0;
   }
 }
+// Palier « chiffres » : mapping couleur -> chiffre 0-99, retiré à chaque étage.
+let advNumbersMode = false;
+let advNumbersMap = null; // index couleur -> "NN"
+function advRollNumbers(){
+  const pool = [];
+  for(let i = 0; i < 100; i++) pool.push(String(i).padStart(2, '0'));
+  for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  advNumbersMap = COLORS.map((_, idx) => pool[idx]);
+}
+function advLabel(ci){ return (advNumbersMode && advNumbersMap) ? advNumbersMap[ci] : COLORS[ci].name; }
+function advApplyPalierStart(){
+  // Annonce du palier : fenêtre d'intro avec titre, thème, règles.
+  if(advPalier() === 1 && advRound === 1){
+    advIntroShownRound = 1;
+    showAdvIntro('LES LIMITES', `Bienvenue dans la <b>tour de l'Aventure</b> ! 🗺️<br><br>
+      <b>Le principe :</b> une suite d'étages à franchir. Chaque étage gagné te propose un choix : <b>plus d'XP en réserve</b> contre une contrainte, ou la tranquillité contre une partie de ta réserve. Tes choix construisent ta fortune… ou la fondent.<br><br>
+      <b>Bonus de palier :</b> le code secret contient toujours <b>4 couleurs différentes</b> — pas de doublons pour l'instant !<br><br>
+      <b>⚠️ Attention :</b> si tu perds <b>un seul</b> puzzle, tu perds <b>tout</b> — l'étage en cours et toute ta réserve. Tes XP ne sont <b>sauvegardées qu'en boutique</b> (tous les 5 étages) : là, tu peux <b>sortir et encaisser</b> ta réserve, ou continuer plus loin. Les étages 1 à 5 se jouent <b>sans limite de temps ni d'essais</b>.<br><br>
+      Bonne chance !`);
+    return;
+  }
+  if(advPalier() === 2 && advRound === 6){
+    advIntroShownRound = 6;
+    advPalierBaseMs = ADV_PALIER_MS;
+    advPalierMs = ADV_PALIER_MS;
+    document.body.classList.remove('adv-palier1');
+    document.body.classList.add('adv-palier2');
+    const warn = advMalus ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '';
+    showAdvIntro('LE TEMPS', `Nouveau palier : <b>Le Temps</b>. ⏱️<br><br>
+      Tu as <b>20 minutes</b> pour franchir les étages 6 à 10. L'horloge défile <b>pendant chaque manche</b> — elle est en pause pendant les choix et la boutique.<br><br>
+      <b>Bonus de palier :</b> toujours <b>4 couleurs différentes</b> dans le code.${warn}<br><br>
+      <b>Rappel :</b> temps écoulé = aventure terminée (consoles 10% + assurances). En boutique, tu pourras racheter du temps… pour l'instant.`);
+    return;
+  }
+  if(advPalier() === 3 && advRound === 11){
+    // L'intro du palier 3 est déjà affichée à la sortie de la boutique 2 :
+    // on ne la rejoue pas (elle enchaîne sur le choix du défi de l'étage 11).
+    if(advIntroShownRound === 11) return;
+    advIntroShownRound = 11;
+    document.body.classList.remove('adv-palier2');
+    document.body.classList.add('adv-palier3'); // cadre rouge/doré — palier « Challenge »
+    const warn = advMalus ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '';
+    showAdvIntro('CHALLENGE', `Nouveau palier : <b>Challenge</b>. 🏆<br><br>
+      Ta pendule totale devient <b>ton temps définitif</b> (${advFormatClock(advPalierMs)} restant) : elle continue de défiler, mais <b>tu ne pourras plus la recharger qu'en boutique</b>.<br><br>
+      Chaque étage te proposera un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : aventure terminée !</b>${warn}<br><br>
+      Les défis n'entament pas tes essais totaux : ose, vise le bonus, mais rate et tu perds tout.`);
+    return;
+  }
+  if(advPalier() === 4 && advRound === 16){
+    // Palier 4 « L'Ombre » : entrée après la boutique 3 (étage 16, sans masque).
+    advIntroShownRound = 16;
+    document.body.classList.remove('adv-palier3');
+    document.body.classList.add('adv-palier4'); // cadre violet — palier « L'Ombre »
+    const warn = advMalus && advRound <= advMalusUntil ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '<br><br>✅ Aucun malus actif.';
+    showAdvIntro('L\'OMBRE', `Nouveau palier : <b>L'Ombre</b>. 🌑<br><br>
+      <b>Ta situation en entrant dans le palier :</b><br>
+      • Réserve : <b>${advReserve} XP</b><br>
+      • Essais max : <b>${advMaxTries === null ? 'illimité' : advMaxTries}</b><br>
+      • Pendule totale : <b>${advFormatClock(advPalierMs)}</b> (toujours ton temps définitif)<br>
+      • Assurances : <b>${advInsuranceCount}</b>${advAngelRing ? ' · 😇 anneau de l\'ange actif' : ''}${warn}<br><br>
+      <b>Le principe du palier :</b> à chaque étage, tes lignes d'historique seront <b>partiellement masquées</b> — une ou plusieurs couleurs jouées disparaissent derrière un <b>?</b> sombre. Les indices (pins) restent vrais : c'est à toi de <b>mémoriser</b> ce que tu as joué pour raisonner.<br><br>
+      Plus tu acceptes de couleurs masquées, plus la réserve gonfle. Les options D permettent de <b>révéler</b> les masques à un essai donné, contre un malus.<br><br>
+      Bonne mémoire…`);
+    renderAdvBanner();
+    return;
+  }
+}
+function showAdvIntro(title, msg){
+  // On cache TOUT le plateau (historique, proposition, palette, légende) pendant l'intro.
+  const lg = document.getElementById('legend');
+  const ua = document.getElementById('userInputArea');
+  const hs = document.getElementById('history');
+  advIntroPrevHidden = {
+    legend: !lg || lg.classList.contains('hidden'),
+    input: !ua || ua.classList.contains('hidden'),
+    history: !hs || hs.classList.contains('hidden'),
+  };
+  if(lg) lg.classList.add('hidden');
+  if(ua) ua.classList.add('hidden');
+  if(hs) hs.classList.add('hidden');
+  // Le temps est en pause tant qu'une manche n'est pas lancée / l'intro ouverte.
+  stopAdvClock();
+  document.getElementById('advIntroTitle').textContent = title;
+  document.getElementById('advIntroMsg').innerHTML = msg;
+  document.getElementById('advIntro').classList.remove('hidden');
+}
+function closeAdvIntro(){
+  document.getElementById('advIntro').classList.add('hidden');
+  // Restauration du plateau (état d'avant l'intro).
+  const lg = document.getElementById('legend');
+  const ua = document.getElementById('userInputArea');
+  const hs = document.getElementById('history');
+  if(lg && !advIntroPrevHidden.legend) lg.classList.remove('hidden');
+  if(ua && !advIntroPrevHidden.input) ua.classList.remove('hidden');
+  if(hs && !advIntroPrevHidden.history) hs.classList.remove('hidden');
+  // Après l'intro de palier 3 : le choix du défi de l'étage 11 apparaît.
+  if(advIntroNext === 'stage'){
+    advIntroNext = null;
+    advLaunchNextRound();
+    return;
+  }
+  if(advIntroNext === 'choices'){
+    advIntroNext = null;
+    showAdvChoices();
+    return; // pas d'horloge pendant l'écran de choix
+  }
+  // 😇 Anneau de l'ange : après la fenêtre, l'étage perdu est rejoué.
+  if(advIntroNext === 'ringreplay'){
+    advIntroNext = null;
+    advRingReplay();
+    return;
+  }
+  // Une manche tourne déjà derrière l'intro ? L'horloge repart.
+  if(advActive && advClockTheme(advTheme()) && !solved){
+    startAdvClock();
+  }
+}
+window.closeAdvIntro = closeAdvIntro;
+// 😇 Rejoue l'étage perdu grâce à l'anneau de l'ange (nouveau puzzle, même défi,
+// pendule totale déjà restaurée au niveau de début d'étage).
+function advRingReplay(){
+  moveLimit = advMaxTries;
+  if(advChallenge && advChallenge.round === advRound){
+    advChallengeStart = Date.now();
+    if(advChallenge.maxAttempts !== undefined) moveLimit = advChallenge.maxAttempts;
+  }
+  startGame('userGuesses');
+  if(advClockTheme(advTheme())) startAdvClock();
+  renderAdvBanner();
+  setStatus(`😇 L'anneau de l'ange s'est brillé : l'étage ${advRound} est rejoué ! Réserve intacte (${advReserve} XP).`, '');
+}
+window.advRingReplay = advRingReplay;
 // --- Mode Aventure verrouillé (teasing) : accessible seulement via une commande
 // clavier spéciale. Taper "aventure" ouvre l'accès pour cette session (retaper le
 // masque). Pour l'admin/testeur : le mode reste jouable, les autres voient "🔒 Bientôt". ---
@@ -2535,10 +2815,13 @@ function startAdventure(){
   trainingMode = false;
   analysisMode = false;
   advActive = true; advRound = 1; advReserve = 0; advPendingXp = 0;
-  advShopPendingPct = 0; advExitBoost = false;
+  advShopPendingPct = 0; advExitBoost = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
-  advDistinct = true; advShopVisited = 0; advShopBought = {};
+  advDistinct = true; advShopVisited = 0;
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
+  advNumbersMode = false; advNumbersMap = null; advShopBought = {};
   advSavedMoveLimit = moveLimit;
   document.body.classList.remove('adv-palier2');
   document.body.classList.add('adv-palier1'); // cadre orangé — palier « Les Limites »
@@ -2546,14 +2829,18 @@ function startAdventure(){
   document.getElementById('advShop').classList.add('hidden');
   moveLimit = null;
   startGame('userGuesses');
+  advApplyPalierStart(); // intro « Les Limites » avant l'étage 1
   renderAdvBanner();
 }
 function endAdvRun(){
   advActive = false;
-  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false;
+  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
   advDistinct = true; advShopVisited = 0;
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
+  advNumbersMode = false; advNumbersMap = null;
   moveLimit = advSavedMoveLimit;
   stopAdvClock();
   renderAdvBanner();
@@ -2564,20 +2851,86 @@ function endAdvRun(){
 // (après l'étage 1 on entre à l'étage 2 avec 20/16 essais, etc.).
 const ADV_FLOOR_TRIES = { 1: 20, 2: 18, 3: 16, 4: 14 }; // option A
 const ADV_GREED_TRIES = { 1: 16, 2: 14, 3: 12, 4: 10 }; // option B
+// Palier 3 « Challenge » — table des défis, indexée sur l'ÉTAGE VISÉ.
+// pct : % de réserve (négatif = malus) · capMs : pendule du défi · tries : finir
+// avec N essais de moins (essais du défi, pas les totaux) · permTry : baisse
+// permanente après l'étage · timeMs : rend du temps sur la pendule totale ·
+// freeze : gèle la pendule totale pendant l'étage visé.
+const ADV_CHALLENGES = {
+  // Étage 11 : manche classique d'échauffement (pas de défi — warm-up du palier 3).
+  12: [
+    { l: 'A', pct: 20, capMs: 3.5 * 60000 },
+    { l: 'B', pct: 20, tries: 2 },
+    { l: 'C', pct: 10, capMs: 4.5 * 60000 },
+  ],
+  13: [
+    { l: 'A', pct: 25, capMs: 3 * 60000 },
+    { l: 'B', pct: 25, tries: 3 },
+    { l: 'C', pct: 10, capMs: 4 * 60000, tries: 1 },
+    { l: 'D', pct: -25, timeMs: 3 * 60000 },
+  ],
+  14: [
+    { l: 'A', pct: 30, capMs: 2.5 * 60000 },
+    { l: 'B', pct: 30, tries: 2, permTry: 1 },
+    { l: 'C', pct: 10, capMs: 3.5 * 60000, tries: 1 },
+    { l: 'D', pct: -25, freeze: true },
+  ],
+  // Étage 15 : pas de défi (dernière ligne droite vers la boutique 3).
+};
 function advChoiceSet(){
-  const theme = advTheme();
+  const theme = advThemeFor(advRound + 1); // thème de l'ÉTAGE VISÉ (ex: défis pour l'étage 11)
   const opts = [];
   if(theme === 'essais'){
     opts.push({ l: 'A', bonus: '+15% de réserve', malus: `${ADV_FLOOR_TRIES[advRound]} essais max` });
     opts.push({ l: 'B', bonus: '+30% de réserve', malus: `${ADV_GREED_TRIES[advRound]} essais max` });
-  } else {
+  } else if(theme === 'temps'){
     opts.push({ l: 'A', bonus: '+10% de réserve', malus: '−30 s sur l\'horloge du palier' });
     opts.push({ l: 'B', bonus: '+15% de réserve', malus: '−1 min sur l\'horloge du palier' });
     opts.push({ l: 'D', bonus: '+30 s sur l\'horloge du palier', malus: '−15% de réserve' });
+  } else if(theme === 'challenge'){
+    // Palier 3 « Challenge » : défis pour l'étage SUIVANTE (target = advRound + 1).
+    // Pendule du défi séparée de la pendule totale ; essais du défi séparés des essais totaux.
+    const target = advRound + 1;
+    const ch = ADV_CHALLENGES[target] || [];
+    ch.forEach(spec => {
+      let mal = '';
+      if(spec.capMs && spec.tries) mal = `finir en moins de ${advFormatClock(spec.capMs)} ET avec ${spec.tries} essai${spec.tries>1?'s':''} de moins`;
+      else if(spec.capMs) mal = `finir l'étage en moins de ${advFormatClock(spec.capMs)}`;
+      else if(spec.tries) mal = `finir avec ${spec.tries} essai${spec.tries>1?'s':''} de moins${spec.permTry ? ' ET −1 essai permanent' : ''}`;
+      else if(spec.timeMs) mal = '−25% de réserve';
+      else if(spec.freeze) mal = '−25% de réserve';
+      let bon = `+${spec.pct}% de réserve`;
+      if(spec.timeMs) bon = `+${Math.round(spec.timeMs/60000)} min sur la pendule totale`;
+      if(spec.freeze) bon = `geler la pendule totale pendant l'étage ${target}`;
+      opts.push({ l: spec.l, bonus: bon, malus: mal });
+    });
+  } else if(theme === 'ombre'){
+    // Palier 4 « L'Ombre » : masques de couleurs à mémoriser pour l'étage VISÉ.
+    const target = advRound + 1;
+    const so = ADV_SHADOW_OPTS[target] || {};
+    Object.keys(so).sort().forEach(l => {
+      const s = so[l];
+      const n = s.masks ? s.masks.count : 0;
+      const posTxt = s.masks && s.masks.fixed ? 'position fixe pour tout l\'étage' : 'position aléatoire à chaque ligne';
+      const revTxt = s.masks && s.masks.revealAt ? ` — masques révélés au ${s.masks.revealAt}ᵉ essai` : '';
+      let bonus, malus;
+      if(!s.masks){ bonus = 'aucune couleur masquée'; malus = `−${-s.pct}% de réserve`; }
+      else if(s.pct > 0){ bonus = `+${s.pct}% de réserve`; malus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} (${posTxt})${revTxt}`; }
+      else { bonus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} seulement`; malus = `−${-s.pct}% de réserve${revTxt}`; }
+      opts.push({ l, bonus, malus });
+    });
   }
-  if(!(advMalus && advMalus.id === 'noC')){
-    opts.push({ l: 'C', bonus: 'aucun malus', malus: '−25% de réserve' });
+  if(theme !== 'challenge' && theme !== 'ombre' && !(advMalus && advMalus.id === 'noC')){
+      // Avant la boutique 1 (étage 5 visé) : l'option C limite quand même les essais (16).
+      // Avant les autres boutiques (10/15/…) : −25% sans limite.
+      if(advRound + 1 === 5){
+        opts.push({ l: 'C', bonus: 'aucun autre malus', malus: '−25% de réserve et 16 essais max' });
+      } else {
+        opts.push({ l: 'C', bonus: 'aucun malus', malus: '−25% de réserve' });
+      }
   }
+  // Affichage dans l'ordre alphabétique : A, B, C, D.
+  opts.sort((a, b) => a.l.localeCompare(b.l));
   return opts;
 }
 function applyAdvChoice(letter){
@@ -2585,23 +2938,80 @@ function applyAdvChoice(letter){
   // Consolidation : l'XP de l'étage gagné rejoint la réserve AVANT d'appliquer le %.
   advReserve += advPendingXp;
   advPendingXp = 0;
-  const theme = advTheme();
+  const theme = advThemeFor(advRound + 1); // thème de l'ÉTAGE VISÉ (ex: défi si on entre au palier 3)
   if(theme === 'essais'){
     if(letter === 'A'){ advReserve = Math.floor(advReserve * 1.15); advMaxTries = ADV_FLOOR_TRIES[advRound]; }
     else if(letter === 'B'){ advReserve = Math.floor(advReserve * 1.30); advMaxTries = ADV_GREED_TRIES[advRound]; }
-    else { advReserve = Math.floor(advReserve * 0.75); }
+    else {
+      advReserve = Math.floor(advReserve * 0.75);
+      if(advRound === 4) advMaxTries = 16; // option C avant la boutique 1 : 16 essais max
+    }
+  } else if(theme === 'challenge'){
+    // Palier 3 « Challenge » : le choix installe un DÉFI pour l'étage qui vient (target).
+    // Pendule du défi séparée de la pendule totale ; essais du défi n'entament pas les essais totaux.
+    // Défi raté = défaite (règle « si on perd, on perd »).
+    const target = advRound + 1;
+    const spec = (ADV_CHALLENGES[target] || []).find(s => s.l === letter);
+    if(spec){
+      advChallenge = { round: target, letter };
+      if(spec.capMs) advChallenge.maxMs = spec.capMs;               // pendule rouge du défi
+      if(spec.tries) advChallenge.maxAttempts = (advMaxTries === null ? 40 : advMaxTries) - spec.tries; // finir avec N essais de moins
+      if(spec.permTry){
+        // −1 essai permanent « pour la suite » : appliqué immédiatement.
+        advMaxTries = Math.max(5, (advMaxTries === null ? 40 : advMaxTries) - spec.permTry);
+      }
+      if(spec.timeMs) advPalierMs += spec.timeMs;                 // 13-D : +3 min sur la pendule totale
+      if(spec.freeze) advTimeFrozen = true;                       // 14-D : gel de la pendule pour l'étage 15
+      if(spec.pct) advReserve = Math.floor(advReserve * (1 + spec.pct / 100));
+      if(spec.pct < 0) advReserve = Math.floor(advReserve * (1 + spec.pct / 100));
+    } else {
+      advChallenge = null; // étage sans défi
+    }
+  } else if(theme === 'ombre'){
+    // 🌑 Palier 4 : application du choix « L'Ombre » pour l'étage visé.
+    const target = advRound + 1;
+    const s = (ADV_SHADOW_OPTS[target] || {})[letter];
+    advShadow = null; advShadowLinePos = [];
+    if(s){
+      if(s.pct) advReserve = Math.floor(advReserve * (1 + s.pct / 100));
+      if(s.masks){
+        advShadow = { count: s.masks.count, fixed: !!s.masks.fixed, fixedPos: null, revealAt: s.masks.revealAt || null };
+        if(s.masks.fixed){
+          const all = [0, 1, 2, 3];
+          for(let i = all.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
+          advShadow.fixedPos = all.slice(0, s.masks.count);
+        }
+      }
+    }
   } else {
     if(letter === 'A'){ advReserve = Math.floor(advReserve * 1.10); advPalierMs -= 30000; }
     else if(letter === 'B'){ advReserve = Math.floor(advReserve * 1.15); advPalierMs -= 60000; }
     else if(letter === 'D'){ advPalierMs += 30000; advReserve = Math.floor(advReserve * 0.85); }
     else { advReserve = Math.floor(advReserve * 0.75); }
   }
-  if(advMalus && advMalus.id === 'minus1min') advPalierMs -= 60000; // malus : −1 min par étage du palier Temps
+  if(advMalus && advMalus.id === 'minus1min' && (advRound + 1) <= advMalusUntil && advThemeFor(advRound + 1) === 'temps') advPalierMs -= 60000; // malus : −1 min par étage, palier Temps seulement
   advRound++;
+  advClearMalusIfDone(); // malus de palier consommé si sa fenêtre est passée
   moveLimit = advMaxTries;
+  advStagePalierMs = advPalierMs; // 😇 snapshot pendule début d'étage (anneau de l'ange)
+  // Palier 3 : l'étage démarre — pendule du défi et limite d'essais du défi.
+  if(advChallenge && advChallenge.round === advRound){
+    advChallengeStart = Date.now();
+    if(advChallenge.maxAttempts !== undefined){
+      // Défi « essais de moins » : la limite de l'étage (SEULEMENT celle-ci)
+      // est abaissée — les essais totaux restent intacts.
+      moveLimit = advChallenge.maxAttempts;
+    }
+  } else {
+    advChallenge = null; // pas de défi pour cette étage
+  }
   advApplyPalierStart();
   startGame('userGuesses');
-  if(theme === 'temps') startAdvClock();
+  if(advClockTheme(theme)){
+    // L'horloge ne démarre pas si une intro est affichée (elle la lancera à sa fermeture).
+    const intro = document.getElementById('advIntro');
+    if(!intro || intro.classList.contains('hidden')) startAdvClock();
+  }
   renderAdvBanner();
 }
 function advRoundCompleted(){
@@ -2614,12 +3024,18 @@ function advRoundCompleted(){
     dp.classList.remove('hidden');
   }
   if(advRound > 0 && advRound % 5 === 0){ advShopBought = {}; showAdvShop(); return; }
+  // Étage sans choix (ex. étage 15 : pas de défi) : on lance l'étage directement.
+  if(advChoiceSet().length === 0){ advLaunchNextRound(); return; }
   showAdvChoices();
 }
 function showAdvChoices(){
+  stopAdvClock(); // le temps est en pause hors manche
   const opts = advChoiceSet();
-  document.getElementById('advChoiceRound').textContent = advRound;
-  document.getElementById('advChoiceMsg').textContent = `Réserve : ${advReserve} XP — choisis pour l'étage ${advRound + 1} :`;
+  document.getElementById('advChoiceRound').textContent = advRound + 1;
+  const isChallenge = advThemeFor(advRound + 1) === 'challenge'; // thème de l'étage VISÉ
+  document.getElementById('advChoiceMsg').textContent = isChallenge
+    ? `Réserve : ${advReserve} XP — choisis ton DÉFI pour l'étage ${advRound + 1} :`
+    : `Réserve : ${advReserve} XP — choisis pour l'étage ${advRound + 1} :`;
   document.getElementById('advChoiceBtns').innerHTML = opts.map(c =>
     `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
       <b style="color:#8cffaa;">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}
@@ -2629,6 +3045,17 @@ function showAdvChoices(){
 function advDefeat(reason){
   if(!advActive) return;
   stopAdvClock();
+  // 😇 Anneau de l'ange : la défaite est annulée — l'étage est rejoué à l'identique.
+  if(advAngelRing){
+    advAngelRing = false;
+    advPalierMs = advStagePalierMs; // pendule totale remise à son niveau de début d'étage
+    advIntroNext = 'ringreplay';
+    showAdvIntro('😇 L\'ANNEAU DE L\'ANGE', `L\'anneau de l\'ange brille et <b>efface ta défaite</b> !<br><br>
+      Tu vas <b>rejouer l\'étage ${advRound}</b> : nouveau puzzle, même défi, pendule totale remise à son niveau de début d\'étage (<b>${advFormatClock(advPalierMs)}</b>).<br><br>
+      <span class="muted">L\'anneau est consommé. Ta réserve (<b>${advReserve} XP</b>) et tes essais totaux sont intacts.</span>`);
+    renderAdvBanner();
+    return;
+  }
   const goPct = ADV_GO_BASE_PCT + 5 * advInsuranceCount;
   // La défaite arrive avant validation : l'XP prévisionnelle de l'étage en cours est perdue.
   advPendingXp = 0;
@@ -2650,20 +3077,25 @@ function advShopOffers(){
     { id: 'insurance', icon: '🛡️', label: '+5% de réserve en cas de défaite', desc: `Game over actuel : ${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% → ${ADV_GO_BASE_PCT + 5 * (advInsuranceCount + 1)}% (permanent, cumulable)`, costPct: 10 },
     { id: 'tries', icon: '➕', label: '+2 essais', desc: `Relève ta limite d'essais permanente${advMaxTries ? ` (actuellement ${advMaxTries})` : ''}`, costPct: 20 },
   ];
-  if(p === 2){
+  if(p >= 2){
     offers.push({ id: 'time50', icon: '⏱️', label: '+50% du temps restant', desc: `Rend la moitié de ton temps restant (${advFormatClock(advPalierMs)})`, costPct: 30 });
     offers.push({ id: 'time3', icon: '⏱️', label: '+3 minutes', desc: 'Ajoute 3 minutes à ton horloge de palier', costPct: 20 });
     offers.push({ id: 'tries1', icon: '➕', label: '+1 essai', desc: 'Permanent', costPct: 15 });
   }
+  // 😇 Anneau de l'ange (boutiques 3+) : en cas de défaite, rejoue l'étage perdu.
+  if(p >= 3){
+    offers.push({ id: 'angelring', icon: '😇', label: 'Anneau de l\'ange', desc: 'En cas de défaite : tu rejoues l\'étage perdu au lieu de tout perdre (pendule totale remise au début de l\'étage). Consommé à l\'usage, un seul à la fois.', costPct: 30 });
+  }
   // Bonus multiplicateur de sortie (boutiques des étages 15/25/35/45) : +25% sur
-  // la réserve encaissée au moment de sortir, pour 10% de la réserve.
+  // la réserve encaissée au moment de sortir, pour 25% de la réserve.
   if([15, 25, 35, 45].includes(advRound)){
-    offers.push({ id: 'exitboost', icon: '🚀', label: '+25% à la sortie', desc: 'Ta sortie encaisse 25% de réserve en plus. Ne s\'applique que si tu continues au moins un étage.', costPct: 10 });
+    offers.push({ id: 'exitboost', icon: '🚀', label: '+25% à la sortie', desc: 'Ta sortie encaisse 25% de réserve en plus. Ne s\'applique que si tu continues au moins un étage.', costPct: 25 });
   }
   offers.push({ id: 'gamble', icon: '🎲', label: '+20% de réserve…', desc: '…mais malus aléatoire au prochain palier (annoncé avant de commencer). Ne s\'applique qu\'au prochain étage : partir aussitôt ne le valide pas.', costPct: 0, risky: true });
   return offers;
 }
 function showAdvShop(){
+  stopAdvClock(); // le temps est en pause hors manche
   const offers = advShopOffers();
   document.getElementById('advShopRound').textContent = advRound;
   const mult = advShopMultiplier();
@@ -2671,7 +3103,7 @@ function showAdvShop(){
     `Boutique ${advShopVisited + 1} — Réserve : ${advReserve} XP${advTheme() === 'temps' ? ` · ⏱ ${advFormatClock(advPalierMs)} restant` : ''}`;
   document.getElementById('advShopItems').innerHTML = offers.map(o => {
     const cost = Math.floor(advReserve * o.costPct / 100);
-    const bought = advShopBought[o.id];
+    const bought = advShopBought[o.id] || (o.id === 'angelring' && advAngelRing); // 😇 anneau : un seul à la fois, case grisée si déjà possédé
     const disabled = (bought || (!o.risky && advReserve < cost)) ? 'opacity:.45;pointer-events:none;' : '';
     return `<button class="btn secondary" style="width:100%;text-align:left;${disabled}" onclick="advBuy('${o.id}')">
       <b style="color:#ffd700;">${o.icon} ${o.label}</b> ${o.risky ? (bought ? '— ✅ déjà acheté' : '') : `— <b>${cost} XP</b> (${o.costPct}%)${bought ? ' ✅ déjà acheté' : ''}`}<br><span style="font-size:11px;">${o.desc}</span>
@@ -2679,7 +3111,10 @@ function showAdvShop(){
   }).join('');
   document.getElementById('advShopContinue').textContent = `▶️ Continuer l'aventure`;
   const cashBtn = document.getElementById('advShopCashOut');
-  cashBtn.textContent = mult > 1 ? `🏦 Sortir et encaisser ×${mult} (${Math.floor(advReserve * mult)} XP)` : `🏦 Sortir et encaisser (${advReserve} XP)`;
+  // 🚀 Bonus de sortie acheté : le bouton « Sortir » affiche le +25% en clair.
+  cashBtn.innerHTML = advExitBoost
+    ? `🏦 Sortir et encaisser <b style="color:#ffd700;">+25%</b> (${Math.floor(advReserve * mult * 1.25)} XP)`
+    : `🏦 Sortir et encaisser (${Math.floor(advReserve * mult)} XP)`;
   document.getElementById('advShop').classList.remove('hidden');
 }
 function advShopMultiplier(){
@@ -2695,9 +3130,14 @@ function advBuy(id){
   advShopBought[id] = true;
   if(o.risky){
     // Le +20% est en ATTENTE : il ne rejoint la réserve qu'au prochain changement
-    // d'étage. Sortir immédiatement l'annule — le malus n'est tiré qu'en validant.
+    // d'étage. Sortir immédiatement l'annule. Le malus tiré est montré en clair.
     advShopPendingPct += 20;
-    setStatus(`🎲 +20% en attente (validé au prochain étage) ! Malus tiré : <b>${advMalus ? advMalus.label : '—'}</b>`, '');
+    const m = advRollMalus(advRound + 1); // malus pour TOUT le palier qui vient
+    showAdvIntro('🎲 MALUS TIRÉ', `Tu as pris le risque ! Voici le malus qui frappera ton <b>prochain palier</b> :<br><br>
+      <b style="color:#ff8a80;font-size:16px;">${m.label}</b><br><br>
+      ${m.desc}<br><br>
+      <span class="muted">Le +20% de réserve s'appliquera au moment où tu continues vers l'étage suivant. Si tu sors maintenant, le bonus et le malus sont annulés.</span>`);
+    setStatus(`🎲 +20% en attente ! Malus tiré : <b>${m.label}</b> — ${m.desc}`, '');
   } else {
     advReserve -= cost;
     if(id === 'insurance') advInsuranceCount++;
@@ -2706,6 +3146,7 @@ function advBuy(id){
     else if(id === 'time50') advPalierMs += Math.floor(advPalierMs * 0.5); // +50% du temps RESTANT
     else if(id === 'time3') advPalierMs += 3 * 60000;
     else if(id === 'exitboost') advExitBoost = true; // +25% à la sortie, consommé en sortant
+    else if(id === 'angelring') advAngelRing = true; // 😇 rejoue l'étage perdu en cas de défaite
   }
   showAdvShop();
 }
@@ -2714,20 +3155,51 @@ function advShopContinue(){
   // Les achats en attente (ex. +20% gamble) ne s'appliquent qu'en continuant.
   if(advShopPendingPct){
     advReserve = Math.floor(advReserve * (1 + advShopPendingPct / 100));
-    const m = advRollMalus();
+    // Le malus a déjà été tiré à l'achat (fenêtre de révélation) — on ne retire PAS.
     advShopPendingPct = 0;
-    setStatus(`🎲 Bonus de boutique appliqué ! Malus du prochain palier : <b>${m.label}</b> — ${m.desc}`, '');
+    if(advMalus) setStatus(`🎲 Bonus de boutique appliqué (+20%) ! Malus pour ce palier : <b>${advMalus.label}</b> — ${advMalus.desc}`, '');
   }
   advShopVisited++;
+  // Sortie de la boutique 2 (étage 10) : on ENTRE dans le palier 3 « Challenge ».
+  // L'intro du palier s'affiche d'abord, puis l'étage 11 démarre directement
+  // (manche classique d'échauffement — les défis commencent à l'étage 12).
+  if(advRound === 10){
+    document.body.classList.remove('adv-palier2');
+    document.body.classList.add('adv-palier3'); // cadre rouge/doré — palier « Challenge »
+    advIntroShownRound = 11;
+    advIntroNext = 'stage'; // à la fermeture de l'intro : l'étage 11 démarre direct
+    const warn = advMalus && advRound <= advMalusUntil ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '<br><br>✅ Aucun malus actif.';
+    showAdvIntro('CHALLENGE', `Nouveau palier : <b>Challenge</b>. 🏆<br><br>
+      <b>Ta situation en entrant dans le palier :</b><br>
+      • Réserve : <b>${advReserve} XP</b><br>
+      • Essais max : <b>${advMaxTries === null ? 'illimité' : advMaxTries}</b><br>
+      • Pendule totale : <b>${advFormatClock(advPalierMs)}</b><br>
+      • Assurances : <b>${advInsuranceCount}</b> (${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% récupérés en cas de défaite)<br>${warn}<br><br>
+      Ta pendule totale devient <b>ton temps définitif</b> : elle défile à chaque manche, mais <b>tu ne pourras la recharger qu'en boutique</b>.<br><br>
+      L'<b>étage 11</b> est une <b>manche classique</b> d'échauffement, avec tes essais et le temps qui défile. Ensuite, les étages 12 à 14 te proposeront chacun un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : aventure terminée !</b> L'étage 15 sera une dernière ligne droite sans défi, vers la boutique 3.<br><br>
+      Les défis n'entament pas tes essais totaux : ose, vise le bonus, mais rate et tu perds tout.`);
+    renderAdvBanner();
+    return;
+  }
+  advLaunchNextRound();
+}
+// Lance l'étage suivant sans écran de choix (entrée d'étage : 11, 15, 16…).
+function advLaunchNextRound(){
   advRound++;
-  // fin de palier : on efface le malus de palier (annoncé/consommé), l'assurance reste
-  if(advRound % 5 === 1 && advRound > 5){ advMalus = null; advDistinct = true; advNoGainFloor = 0; }
+  advClearMalusIfDone(); // malus de palier consommé si sa fenêtre est passée
   moveLimit = advMaxTries;
+  advStagePalierMs = advPalierMs; // 😇 snapshot pendule début d'étage (anneau de l'ange)
+  if(advMalus && advMalus.id === 'minus1min' && advRound <= advMalusUntil && advTheme() === 'temps') advPalierMs -= 60000;
   advApplyPalierStart();
   startGame('userGuesses');
-  if(advTheme() === 'temps') startAdvClock();
+  // L'horloge ne tourne que pendant une manche, et jamais pendant une intro.
+  if(advClockTheme(advTheme())){
+    const intro = document.getElementById('advIntro');
+    if(!intro || intro.classList.contains('hidden')) startAdvClock();
+  }
   renderAdvBanner();
 }
+window.advLaunchNextRound = advLaunchNextRound;
 function advShopCashOut(){
   document.getElementById('advShop').classList.add('hidden');
   // Sortie immédiate : les achats « en attente » (gamble) ne s'appliquent PAS,
@@ -3097,6 +3569,8 @@ function pegHTML(ci, sizeClass, extraClass=''){
 
 function renderAttemptsLeft(){
   const el = document.getElementById('attemptsLeft');
+  // Rafraîchit aussi la bannière Aventure (essais restants en direct).
+  if(advActive) renderAdvBanner();
   if(moveLimit === null){ el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
   const left = moveLimit - history.length;
@@ -3160,10 +3634,44 @@ updateXpBadgeOrdi();
 function replayVsOrdi(){
   // Si on relance une partie depuis un écran de fin (Monde infini / Aventure),
   // on retrouve le thème et les réglages normaux.
-  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2');
+  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4');
   startGame('userGuesses');
 }
 
+// ⚠️ Confirmation avant de changer de mode pendant une partie en cours.
+// Détecte tout mode actif ; le message est adapté à ce qu'on risque de perdre.
+function gameInProgress(){
+  const gameEl = document.getElementById('game');
+  const gameOpen = gameEl && !gameEl.classList.contains('hidden');
+  return {
+    active: !!(advActive || infiniteActive || serieMindActive || (gameOpen && !solved)),
+    gameOpen, unsolved: gameOpen && !solved
+  };
+}
+function askModeChange(){
+  const g = gameInProgress();
+  if(!g.active){ resetToMenu(); return; }
+  let msg = 'Une <b>partie est en cours</b> ! Si tu changes de mode maintenant, elle sera <b>perdue</b>.';
+  if(advActive){
+    msg += `<br><br>🗺️ <b>Mode Aventure</b> : tu es à l'étage <b>${advRound}</b> avec <b>${advReserve} XP</b> en réserve${advAngelRing ? ' et l\'anneau de l\'ange 😇' : ''}. Ta réserve <b>non encaissée sera perdue</b> — seul le game over (${ADV_GO_BASE_PCT + 5 * advInsuranceCount}%) te rendrait des XP.`;
+  } else if(infiniteActive){
+    msg += `<br><br>♾️ <b>Série infinie</b> : ta série en cours (<b>${infiniteStreak}</b> manche${infiniteStreak > 1 ? 's' : ''}) sera interrompue.`;
+  } else if(serieMindActive){
+    msg += '<br><br>🧠 <b>SérieMind</b> : ta série en cours sera interrompue.';
+  }
+  document.getElementById('modeConfirmMsg').innerHTML = msg;
+  document.getElementById('modeConfirm').classList.remove('hidden');
+}
+function modeConfirmYes(){
+  document.getElementById('modeConfirm').classList.add('hidden');
+  resetToMenu();
+}
+function modeConfirmNo(){
+  document.getElementById('modeConfirm').classList.add('hidden');
+}
+window.askModeChange = askModeChange;
+window.modeConfirmYes = modeConfirmYes;
+window.modeConfirmNo = modeConfirmNo;
 function resetToMenu(){
   document.getElementById('menu').classList.remove('hidden');
   document.getElementById('game').classList.add('hidden');
@@ -3187,14 +3695,17 @@ function resetToMenu(){
     stopAdvClock();
   }
   advActive = false;
-  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false;
+  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
   advDistinct = true; advShopVisited = 0;
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
+  advNumbersMode = false; advNumbersMap = null;
   document.getElementById('advChoice').classList.add('hidden');
   document.getElementById('advShop').classList.add('hidden');
   renderAdvBanner();
-  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2'); // sécurité : aucun thème collant au menu
+  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4'); // sécurité : aucun thème collant au menu
   renderInfiniteBanner();
   serieMindActive = false;
   serieMindRound = 1;
@@ -3231,10 +3742,14 @@ function setStatus(text, cls){
 function renderLegend(){
   const el = document.getElementById('legend');
   el.innerHTML = COLORS.slice(0, NB_COULEURS).map((c, idx) => {
-    const swatch = numberMode
+    // Mode aventure « chiffres » : le nom devient le chiffre tiré au sort.
+    const label = (advActive && advNumbersMode && advNumbersMap) ? advNumbersMap[idx] : c.name;
+    const swatch = (advActive && advNumbersMode && advNumbersMap)
+      ? `<i class="num-peg" style="width:16px;height:16px;font-size:10px;border-width:1px;display:inline-flex;">${label}</i>`
+      : numberMode
       ? `<i class="num-peg" style="width:12px;height:12px;font-size:8px;border-width:1px;display:inline-flex;">${idx+1}</i>`
       : `<i style="background:${c.css}"></i>`;
-    return `<span>${swatch}${c.name}${numberMode ? ' ('+(idx+1)+')' : ''}</span>`;
+    return `<span>${swatch}${label}${(!advNumbersMode && numberMode) ? ' ('+(idx+1)+')' : ''}</span>`;
   }).join('');
 }
 
@@ -3253,7 +3768,11 @@ function hideSecretReveal(){
 function renderHistory(){
   const el = document.getElementById('history');
   el.innerHTML = history.map((h, idx) => {
-    const pegs = h.guess.map(ci => pegHTML(ci, 'peg')).join('');
+    // 🌑 Palier 4 « L'Ombre » : masque des positions tirées pour cette ligne.
+    const hid = advShadowActive() ? advShadowPosFor(idx) : [];
+    const pegs = h.guess.map((ci, pi) => hid.includes(pi)
+      ? '<div class="peg shadow-peg">?</div>'
+      : pegHTML(ci, 'peg')).join('');
     const fpegs = [];
     for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
     for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
@@ -3335,6 +3854,23 @@ function submitUserGuess(){
     if(advActive){
       // Victoire en Aventure : l'XP va dans la réserve (sauf étage frappé par le malus « sans gain »).
       stopAdvClock();
+      // Palier 3 « Challenge » : évaluation du défi AVANT tout. Défi raté = défaite.
+      if(advChallenge && advChallenge.round === advRound){
+        const elapsedMs = Date.now() - advChallengeStart;
+        let failReason = null;
+        if(advChallenge.maxMs && elapsedMs > advChallenge.maxMs + 900){
+          failReason = `défi raté : ${advFormatClock(elapsedMs)} au lieu de moins de ${advFormatClock(advChallenge.maxMs)}`;
+        }
+        if(!failReason && advChallenge.maxAttempts !== undefined && history.length > advChallenge.maxAttempts){
+          failReason = `défi raté : ${history.length} essais au lieu de ${advChallenge.maxAttempts} max`;
+        }
+        if(!failReason && advChallenge.permTry && advMaxTries !== null){
+          // (déjà appliqué au moment du choix — rien à faire ici)
+        }
+        advChallenge = null;
+        if(failReason){ advDefeat(failReason); return; }
+      }
+      advChallenge = null;
       const noGain = (advNoGainFloor === advRound);
       // XP d'étage — anti-farm : palier 1 volontairement peu rentable (15 XP max),
       // la vraie récompense pousse vers les paliers profonds (le multiplicateur ×palier
