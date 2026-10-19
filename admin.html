@@ -87,6 +87,7 @@
       <button id="annBtn">&#128227; Message aux joueurs</button>
       <button id="reserveBtn">&#128737;&#65039; R&#233;server un pseudo</button>
       <button id="infiniteBtn">&#9854;&#65039; S&#233;rie infinie</button>
+      <button id="advTestBtn">&#129514; Test Aventure</button>
     </div>
     <div class="tablewrap">
       <table>
@@ -164,6 +165,26 @@ function validatePseudo(v){
   return '';
 }
 const MODE_LABELS = { vsordi: 'Joueur vs Ordi', cache: 'Je cache un code', seriemind: 'S\u00e9rie-Mind', duel: 'Duel', daily: 'D\u00e9fi du jour', puzzle: 'Puzzle du jour', ordi: 'Ordi', quest: 'Qu\u00eate' };
+
+// \ud83e\uddec\ufe0f Journal de test XP : libell\u00e9s et d\u00e9tails lisibles par type d'\u00e9v\u00e9nement.
+const TEST_KINDS = {
+  xp: '\u2728 XP gagn\u00e9e', advStart: '\ud83d\uddfa\ufe0f Aventure lanc\u00e9e', advReprise: '\u21a9\ufe0f Aventure reprise',
+  advEtage: '\ud83c\udfc6 \u00c9tage franchi', advChoice: '\ud83e\uddde Choix', advBuy: '\ud83d\uded2 Achat boutique',
+  advDefeat: '\u274c D\u00e9faite', advCashOut: '\ud83c\udfe0 Encaissement'
+};
+function testEntryText(e){
+  switch(e.kind){
+    case 'xp': return `+${e.awarded} XP (base ${e.base} \u00d7 event ${e.eventMult} \u00d7 prestige ${e.prestige}) \u2192 total ${e.total == null ? '?' : e.total}${e.mode ? ' \u00b7 ' + e.mode : ''}${e.label ? ' \u00b7 ' + e.label : ''}`;
+    case 'advStart': return 'nouvelle run \u00e0 l\u2019\u00e9tage 1 (r\u00e9serve 0)';
+    case 'advReprise': return `reprise \u00e0 l\u2019\u00e9tage ${e.etage} \u00b7 r\u00e9serve ${e.reserve} XP`;
+    case 'advEtage': return `\u00e9tage ${e.etage} franchi \u00b7 +${e.pending} XP en attente \u2192 r\u00e9serve ${e.reserve}`;
+    case 'advChoice': return `option ${e.lettre} pour l\u2019\u00e9tage ${e.cible} \u00b7 r\u00e9serve ${e.reserveAvant} (+${e.pending}) \u2192 ${e.reserveApres}${e.essaisMax >= 0 ? ' \u00b7 essais max ' + e.essaisMax : ''}${e.defi ? ' \u00b7 d\u00e9fi ' + e.defi : ''}`;
+    case 'advBuy': return `${e.achat} (co\u00fbt ${e.cout} XP) \u2192 r\u00e9serve ${e.reserveApres}${e.essaisMax >= 0 ? ' \u00b7 essais max ' + e.essaisMax : ''}`;
+    case 'advDefeat': return `\u00e9tage ${e.etage} (${e.raison}) \u00b7 ${e.goPct}% de ${e.consolation} XP \u2192 +${e.xpEncaisse} XP`;
+    case 'advCashOut': return `${e.type} \u00e0 l\u2019\u00e9tage ${e.etage} \u00b7 r\u00e9serve ${e.reserve} XP${e.boost ? ' \u00b7 \ud83d\ude80 +25%' : ''} \u2192 +${e.encaisse} XP`;
+    default: return JSON.stringify(e);
+  }
+}
 
 let DATA = { players: {}, owners: {}, accounts: {}, priv: {} };
 // Le hash du code de secours est dans accountsPrivate/<uid> (anciennes fiches : dans pseudoOwners)
@@ -275,6 +296,7 @@ function render(){
   }
   const ann = (DATA.config || {}).announcement;
   if(ann && ann.text) stats.push(['\ud83d\udce3', String(ann.title || ann.text).slice(0, 30)]);
+  if((DATA.config || {}).advTest) stats.push(['\ud83e\uddec\ufe0f Test Aventure', 'ACTIF \u00b7 journal XP en marche']);
   $('summary').innerHTML = stats.map(([l, v]) => `<div class="stat"><b>${v}</b><span class="muted">${esc(l)}</span></div>`).join('');
   $('rows').innerHTML = shown.map(r => {
     const [lab, cls] = STATUS_LABEL[r.status];
@@ -311,6 +333,10 @@ function openDetail(pseudo){
   const hist = Object.values((DATA.players[pseudo] || {}).history || {}).sort((a, b) => b.at - a.at).slice(0, 8);
   const histRows = hist.map(h => `<tr><td>${fmtDate(h.at)}</td><td>${esc(MODE_LABELS[h.sub] || MODE_LABELS[h.type] || h.type)}${h.opponent ? ' vs ' + esc(h.opponent) : ''}</td><td>${esc(h.result || '')}</td><td class="num">${h.xp || 0}</td></tr>`).join('')
     || `<tr><td colspan="4" class="muted">Aucune partie.</td></tr>`;
+  // \ud83e\uddec\ufe0f Journal de test XP : entr\u00e9es players/<pseudo>/testLog (mode test uniquement).
+  const tlog = Object.values((DATA.players[pseudo] || {}).testLog || {}).sort((a, b) => b.at - a.at).slice(0, 50);
+  const testRows = tlog.map(e => `<tr><td>${fmtDate(e.at)}</td><td>${esc(TEST_KINDS[e.kind] || e.kind)}</td><td style="font-size:11px;">${esc(testEntryText(e))}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">Aucune entr\u00e9e (mode test inactif ou rien \u00e0 signaler).</td></tr>';
   const [lab] = STATUS_LABEL[r.status];
   const canRelease = !!r.owner;
   const canReserve = !r.owner;
@@ -338,7 +364,11 @@ function openDetail(pseudo){
     <h3>Par mode</h3>
     <table class="mini"><thead><tr><th>Mode</th><th class="num">Parties</th><th class="num">V</th><th class="num">D</th><th class="num">Abandons</th></tr></thead><tbody>${modeRows}</tbody></table>
     <h3>Derni\u00e8res parties</h3>
-    <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>R\u00e9sultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>`;
+    <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>R\u00e9sultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>
+    <h3>\ud83e\uddec\ufe0f Journal de test XP (Aventure)</h3>
+    <p class="muted" style="font-size:11px;">Enregistr\u00e9 seulement quand le mode test est actif \u2014 chaque gain d'XP et chaque \u00e9v\u00e9nement de l'Aventure, dans le d\u00e9tail.</p>
+    <table class="mini"><thead><tr><th>Date</th><th>\u00c9v\u00e9nement</th><th>D\u00e9tail</th></tr></thead><tbody>${testRows}</tbody></table>
+    ${testRows ? '<div class="actions"><button id="aPurgeTest" class="danger">\ud83e\uddf9 Effacer le journal</button></div>' : ''}`;
   $('modalWrap').classList.remove('hidden');
   $('mClose').onclick = closeModal;
   $('aRename').onclick = () => renamePlayer(pseudo);
@@ -346,6 +376,11 @@ function openDetail(pseudo){
   if($('aReserve')) $('aReserve').onclick = () => reservePseudo(pseudo);
   if($('aRelease')) $('aRelease').onclick = () => releasePseudo(pseudo);
   $('aDelete').onclick = () => deletePlayer(pseudo);
+  if($('aPurgeTest')) $('aPurgeTest').onclick = async () => {
+    if(!confirm('Effacer tout le journal de test de ce joueur ?')) return;
+    try { await remove(ref(db, 'players/' + pseudo + '/testLog')); toast('Journal de test effacé.'); closeModal(); await loadAll(); }
+    catch(e){ toast('Suppression impossible : ' + (e.code || e.message), true); }
+  };
 }
 
 // ---------------- Actions ----------------
@@ -557,6 +592,45 @@ $('infiniteBtn').onclick = async () => {
     await loadAll();
   } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
 };
+
+// ---------------- \ud83e\uddec\ufe0f Mode test Aventure (config/advTest) ----------------
+// Active/d\u00e9sactive en direct : le Mode Aventure se d\u00e9verrouille chez tous les
+// joueurs (badge \u00ab Acc\u00e8s test \u00bb) et chaque gain d'XP est journalis\u00e9 en d\u00e9tail
+// dans players/<pseudo>/testLog \u2014 visible dans la fiche de chaque joueur.
+async function openAdvTestPanel(){
+  let cur = null;
+  try { cur = (await get(ref(db, 'config/advTest'))).val(); } catch(e) {}
+  const active = !!cur;
+  $('modal').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <h2 style="margin:0">\ud83e\uddec\ufe0f Test Aventure</h2>
+      <button id="mClose">\u2715</button>
+    </div>
+    <p class="muted" style="font-size:12px;margin-top:6px;">Quand il est actif\u00a0: le Mode Aventure est accessible \u00e0 tous les joueurs (badge \u00ab Acc\u00e8s test \u00bb sur la tuile), et chaque \u00e9v\u00e9nement XP de l'Aventure est journalis\u00e9 en d\u00e9tail (base, multiplicateur d'\u00e9v\u00e9nement, bonus prestige, total) \u2014 consultable dans la fiche de chaque joueur ci-dessous.</p>
+    ${active
+      ? `<p><span class="pill warn">ACTIF \u00b7 depuis ${fmtDate(cur.at)}</span></p>`
+      : '<p class="muted">Inactif \u2014 le Mode Aventure reste verrouill\u00e9 pour les joueurs.</p>'}
+    <div class="actions">
+      <button class="primary" id="atToggle">${active ? '\u23f9\ufe0f D\u00e9sactiver' : '\u25b6\ufe0f Activer'}</button>
+    </div>`;
+  $('modalWrap').classList.remove('hidden');
+  $('mClose').onclick = closeModal;
+  $('atToggle').onclick = async () => {
+    try {
+      if(active){
+        if(!confirm("D\u00e9sactiver le mode test ? L'Aventure se reverrouille (sauf pour ceux qui l'ont d\u00e9j\u00e0 d\u00e9bloqu\u00e9e) et le journal XP s'arr\u00eate.")) return;
+        await remove(ref(db, 'config/advTest'));
+        toast('Mode test d\u00e9sactiv\u00e9.');
+      } else {
+        if(!confirm('Activer le mode test pour TOUS les joueurs ? L\u2019Aventure se d\u00e9verrouille et les XP sont journalis\u00e9s.')) return;
+        await set(ref(db, 'config/advTest'), { at: Date.now() });
+        toast('Mode test ACTIF \u2014 les joueurs voient d\u00e9j\u00e0 la tuile d\u00e9verrouill\u00e9e\u00a0!');
+      }
+      closeModal(); await loadAll();
+    } catch(e){ toast('Impossible : ' + (e.code || e.message), true); }
+  };
+}
+$('advTestBtn').onclick = openAdvTestPanel;
 </script>
 </body>
 </html>
