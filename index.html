@@ -1925,26 +1925,6 @@
         <span class="big">🧩 Puzzle du jour</span>
         <span class="small" id="puzzleTileSmall">Des lignes déjà jouées par l'ordi, à toi de trouver le code en un seul essai. Même puzzle pour tout le monde.</span>
       </button>
-      <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
-        <span class="xp-plus-badge" id="xpBadgeOrdi">XP</span>
-        <span class="big">🔍 Joueur vs Ordi</span>
-        <span class="small">Un code secret est tiré au hasard, à toi de le deviner.</span>
-      </button>
-      <button class="mode-btn" id="flashTile" onclick="openFlashPuzzle()">
-        <span class="xp-plus-badge" id="flashTileXpBadge">XP</span>
-        <span class="big">⚡ Puzzle Éclair</span>
-        <span class="small" id="flashTileSmall">Une grille aléatoire rien que pour toi. Un seul essai, puis 3h de recharge.</span>
-      </button>
-      <button class="mode-btn" onclick="startSerieMind()">
-        <span class="xp-plus-badge" id="xpBadgeSerie">XP</span>
-        <span class="big">🎰 Série-Mind</span>
-        <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
-      </button>
-      <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
-        <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
-        <span class="big">♾️ Monde infini</span>
-        <span class="small">7 essais par partie et 2:00 de chrono ! Chaque victoire enchaîne une nouvelle grille : continue ou encaisse ta série. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
-      </button>
       <button class="mode-btn" id="aventureTile" onclick="tryStartAdventure()">
         <span class="big">🗺️ Mode Aventure <span style="font-size:13px;background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.4);color:#ffd700;border-radius:10px;padding:2px 8px;vertical-align:middle;">🔒 Bientôt</span></span>
         <span class="small">Paliers de 5 étages à thème : « Les Limites » puis « Le Temps ». Code toujours à 4 couleurs distinctes. Chaque étage gagné, un choix : XP en réserve contre contrainte, ou tranquillité contre XP. Boutique tous les 5 étages… Le mode arrive bientôt !</span>
@@ -1967,6 +1947,26 @@
           <button class="btn-text-danger" id="advResumeBack" onclick="window.advHideResumePopup && window.advHideResumePopup()">↩️ Retour</button>
         </div>
       </div>
+      <button class="mode-btn" onclick="trainingMode=false; analysisMode=false; startGame('userGuesses')">
+        <span class="xp-plus-badge" id="xpBadgeOrdi">XP</span>
+        <span class="big">🔍 Joueur vs Ordi</span>
+        <span class="small">Un code secret est tiré au hasard, à toi de le deviner.</span>
+      </button>
+      <button class="mode-btn" id="flashTile" onclick="openFlashPuzzle()">
+        <span class="xp-plus-badge" id="flashTileXpBadge">XP</span>
+        <span class="big">⚡ Puzzle Éclair</span>
+        <span class="small" id="flashTileSmall">Une grille aléatoire rien que pour toi. Un seul essai, puis 3h de recharge.</span>
+      </button>
+      <button class="mode-btn" onclick="startSerieMind()">
+        <span class="xp-plus-badge" id="xpBadgeSerie">XP</span>
+        <span class="big">🎰 Série-Mind</span>
+        <span class="small">L'ordinateur cache un code. 8 essais pour la manche 1, puis un de moins à chaque manche. Après chaque victoire : récupère le pactole, ou tente "quitte ou double" — la banque double, mais si tu perds une manche, tu repars les mains vides.</span>
+      </button>
+      <button class="mode-btn infinite-tile" id="infiniteTile" type="button" onclick="startInfiniteMode()">
+        <span class="inf-top-btn" id="infiniteTileXp" role="button" onclick="event.preventDefault(); event.stopPropagation(); if(window.openInfiniteBoard) window.openInfiniteBoard();" title="Voir le top des séries du mois">🏆 Top séries</span>
+        <span class="big">♾️ Monde infini</span>
+        <span class="small">7 essais par partie et 2:00 de chrono ! Chaque victoire enchaîne une nouvelle grille : continue ou encaisse ta série. Ta plus longue série du mois est classée — le vainqueur remporte de l'XP !</span>
+      </button>
       <button class="mode-btn" onclick="openDuelOverlay()">
         <span class="xp-plus-badge" id="xpBadgeDuel">XP</span>
         <span class="big">⚔️ Duel en ligne (bêta)</span>
@@ -5314,9 +5314,11 @@ function renderDuelBanners(){
 function decoratedPseudoHTML(pseudo){
   const level = plvl(pseudo).level;
   const safe = escapeHtml(pseudo);
+  const pr = prestigeCount(pseudo); // ★ étoile de prestige visible partout (historiques, défis, puzzle…)
+  const star = pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : '';
   const tier = pseudoTier(level);
-  if(!tier) return safe;
-  return `<span class="pseudo-frame pseudo-frame-${tier}" title="Niveau ${level}">${safe}</span>`;
+  if(!tier) return safe + star;
+  return `<span class="pseudo-frame pseudo-frame-${tier}" title="Niveau ${level}">${safe}${star}</span>`;
 }
 
 // ============================================================
