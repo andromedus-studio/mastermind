@@ -935,6 +935,41 @@
     border-color: rgba(140,120,255,.55) !important;
     box-shadow: 0 0 22px rgba(120,100,255,.35);
   }
+  body.adv-palier5 .bg-photo {
+    background-image: url('images/aventure-palier4.png');
+    background-size: cover; background-position: center center; background-repeat: no-repeat;
+  }
+  body.adv-palier5 .game-card, body.adv-palier5 .card {
+    border-color: rgba(80,220,200,.55) !important;
+    box-shadow: 0 0 22px rgba(60,200,180,.35);
+  }
+  /* 🌫️ Palier 6 « Le Brouillard » : cadre gris-bleu, fenêtre de brouillard sur l'historique */
+  body.adv-palier6 .game-card, body.adv-palier6 .card {
+    border-color: rgba(170,190,215,.55) !important;
+    box-shadow: 0 0 22px rgba(150,170,200,.32);
+  }
+  .row.fog-row { background: linear-gradient(90deg, rgba(160,180,210,.12), transparent 70%); }
+  .row.fog-row .pegs { filter: blur(1.4px); opacity: .92; }
+  .row.fog-row.fog-blind .pegs { filter: blur(5px); opacity: .8; }
+  .row.fog-row.hide-corr .feedback-mini { filter: blur(5px); opacity: .4; }
+  .row.hidden-row .pegs { filter: blur(6px); opacity: .45; }
+  .row.hidden-row .feedback-mini { filter: blur(6px); opacity: .45; }
+  .row.hidden-row.keep-corr .feedback-mini { filter: none; opacity: 1; }
+  /* 🌑 Boule d'Ombre : l'étage 16 montre la mécanique en chair et en os */
+  .shadow-ball {
+    display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #45455c, #0a0a14 72%);
+    box-shadow: 0 0 12px rgba(15,15,40,.85), inset 0 0 8px rgba(0,0,0,.75);
+  }
+  /* 🪞 Palier 5 « Le Mirage » : ligne miroir du jeu (translucide, numérotée 🪞) */
+  .row.mirror-row {
+    opacity: .78;
+    background: linear-gradient(90deg, rgba(80,220,200,.07), transparent 65%);
+  }
+  .row.mirror-row .peg {
+    outline: 1px dashed rgba(80,220,200,.5);
+    outline-offset: -2px;
+  }
   /* 🌑 Palier 4 « L'Ombre » : pion masqué (couleur cachée à mémoriser) */
   .peg.shadow-peg {
     background: #14161f !important;
@@ -1982,10 +2017,11 @@
 
     <!-- GAME -->
     <div id="game" class="hidden">
+      <!-- 🗺️ Bannière Aventure AU-DESSUS de l'historique : le cadre stat ne passe jamais sous les lignes d'essai -->
+      <div class="serie-mind-banner hidden" id="advBanner"></div>
       <div class="history" id="history"></div>
       <div class="secret-reveal hidden" id="secretReveal"></div>
       <div class="serie-mind-banner hidden" id="infiniteBanner"></div>
-      <div class="serie-mind-banner hidden" id="advBanner"></div>
       <div class="serie-mind-banner hidden" id="serieMindBanner"></div>
       <img class="duel-result-icon hidden" id="ordiResultIcon" alt="" src="" style="width:110px;">
       <div class="status" id="status"></div>
@@ -2045,6 +2081,16 @@
             <button class="btn" style="flex:1;" onclick="modeConfirmYes()">✅ Oui, quitter</button>
             <button class="btn secondary" style="flex:1;" onclick="modeConfirmNo()">↩️ Non, continuer</button>
           </div>
+        </div>
+      </div>
+
+      <!-- 🏦 Pop-up de confirmation d'encaissement (sortie de l'Aventure en boutique) -->
+      <div class="infinite-choice hidden" id="advCashConfirm">
+        <div class="infinite-choice-panel">
+          <div class="infinite-choice-label">ENCAISSEMENT</div>
+          <div class="infinite-choice-round" style="font-size:20px;letter-spacing:.08em;">🏦 Sortie de l'Aventure</div>
+          <div class="infinite-choice-msg" id="advCashConfirmMsg" style="text-align:left;white-space:normal;line-height:1.7;margin-top:10px;"></div>
+          <button class="btn" style="margin-top:16px;" onclick="document.getElementById('advCashConfirm').classList.add('hidden')">✅ OK</button>
         </div>
       </div>
 
@@ -2499,9 +2545,18 @@ let advNoGainFloor = 0;          // étage sans gain d'XP (malus 'nogain')
 let advDistinct = true;          // bonus 4 couleurs distinctes (false si malus)
 let advShopVisited = 0;         // nombre de boutiques franchies
 let advShopBought = {};          // achats déjà faits dans la boutique courante (1 par item)
+let advFloorPct = 0;             // 🎯 % appliqué au GAIN de l'étage en cours (choix précédent) — option A : plus de % sur la réserve totale
 let advPendingXp = 0;            // XP gagnée à l'étage en cours, pas encore consolidée
-let advExitBoost = false;        // bonus +25% à la sortie (acheté aux boutiques des étages 20/30/40/50)
-let advExitBoostValidated = false; // 🚀 validé seulement après avoir franchi au moins un étage depuis l'achat
+let advExitBoostTargets = [];   // 🚀 bonus +25% à la sortie (plus vendu en boutique : s'applique à l'encaissement si le joueur en possède un)
+// 🪞 Palier 5 « Le Mirage » : { count, free, wellPlaced, quad, noDouble, misplaced,
+// twoPairs, hide } — lignes miroir jouées par le jeu après chaque coup du joueur.
+// Selon l'option, elles consomment un essai (A/B) ou sont gratuites (C / étage 21).
+let advMirage = null;
+// Essais réellement consommés : tes coups + les miroirs NON gratuits.
+// (les miroirs gratuits n'entament pas la limite d'essais)
+function advEssaisUtilises(){ return history.filter(h => !h.mirror || !h.free).length; }
+// Nombre de coups joués par le JOUEUR (les miroirs ne comptent jamais, pour l'XP).
+function advPlayerAttempts(){ return history.filter(h => !h.mirror).length; }
 let advShopPendingPct = 0;       // % achetés en boutique, appliqués au prochain étage
 let advChallenge = null;         // palier 3 « Challenge » : défi de l'étage en cours
 let advChallengeStart = 0;       // timestamp de début de l'étage (pour la pendule du défi)
@@ -2509,6 +2564,8 @@ let advChallengeTries = null;    // limite d'essais du défi (n'entame pas les e
 let advAngelRing = false;        // 😇 anneau de l'ange : en cas de défaite, rejoue l'étage perdu (consommé à l'usage)
 let advStagePalierMs = 0;        // pendule totale au début de l'étage en cours (restaurée par l'anneau)
 let advShadow = null;            // 🌑 palier 4 « L'Ombre » : { count, fixed, fixedPos, revealAt } pour l'étage en cours
+let advBrouillard = null;        // 🌫️ palier 6 « Le Brouillard » : fenêtre de l'étage { clear, fog, fogBlind, hideCorr, keepCorr, hiddenFrom }
+let advBrouillardReveal = false; // 🌫️ fin d'étage : tout l'historique est révélé (victoire ou défaite)
 let advShadowLinePos = [];       // positions masquées par ligne d'historique (stables entre les rendus)
 // 🌑 Options « L'Ombre » : choix proposé après chaque étage du palier 4 (étage VISÉ).
 const ADV_SHADOW_OPTS = {
@@ -2527,6 +2584,63 @@ const ADV_SHADOW_OPTS = {
         B: { pct: 40, masks: { count: 3, fixed: false } },
         C: { pct: -15, masks: { count: 1, fixed: false } },
         D: { pct: -10, masks: { count: 3, fixed: false, revealAt: 8 } } },
+};
+// 🪞 Palier 5 « Le Mirage » — table des options, indexée sur l'ÉTAGE VISÉ (21-24).
+// count : lignes miroir après CHAQUE coup du joueur (elles consomment des essais).
+// useful : miroirs tirés parmi les couleurs pas encore testées (très informatif).
+// noDouble : miroirs sans doublons (corrections plus lisibles).
+// minusTries : −N essais pour l'étage visé seulement.
+// userBlackOnly : TA correction ne montre que les ⚫ (les miroirs gardent tout).
+// mirrorBlackOnly : les corrections des MIROIRS ne montrent que les ⚫.
+// L'étage 25 n'a pas de choix : miroir classique renforcé (1 miroir utile/ligne).
+const ADV_MIRAGE_OPTS = {
+  // Options proposées à la FIN de l'étage 21 (elles configurent l'étage 22), etc.
+  // A/B : le miroir CONSOMME 1 essai. C : miroirs GRATUITS (ne consomment pas d'essais).
+  22: [
+    { l: 'A', pct: 10, count: 1, wellPlaced: true },   // 1 couleur du code BIEN placée
+    { l: 'B', pct: 15, count: 1 },                       // couleurs totalement aléatoires
+    { l: 'C', pct: -10, count: 3, free: true },          // 3 miroirs gratuits
+  ],
+  23: [
+    { l: 'A', pct: 10, count: 1, quad: true },           // 4 fois la même couleur
+    { l: 'B', pct: 15, count: 1, noDouble: true },        // sans doublons
+    { l: 'C', pct: -10, count: 2, free: true },          // 2 miroirs gratuits
+  ],
+  24: [
+    { l: 'A', pct: 10, count: 1, misplaced: true },       // 1 couleur du code MAL placée
+    { l: 'B', pct: 15, count: 1, twoPairs: true },       // 2 couleurs en doublon
+    { l: 'C', pct: -10, count: 1, free: true },          // 1 miroir gratuit
+  ],
+  25: [
+    { l: 'A', pct: 10, count: 1, hide: 1 },              // 1 couleur du miroir CACHÉE
+    { l: 'B', pct: 15, count: 1, hide: 2 },              // 2 couleurs cachées
+    { l: 'C', pct: -5, count: 1 },                       // miroir classique, −5% seulement
+  ],
+};
+// Étage 21 : mécanique d'introduction — 1 miroir GRATUIT après chaque coup
+// (pour montrer la mécanique au joueur AVANT de la « punir » aux étages suivants).
+const ADV_MIRAGE_AUTO = { count: 1, free: true };
+// 🌫️ Palier 6 « Le Brouillard » — étage 26 : mécanique d'introduction SANS choix.
+// 5 lignes nettes, puis mur de brume (flou lisible en plissant les yeux) : jamais complètement caché.
+const ADV_BROUILLARD_AUTO = { clear: 5, fog: 1, fogBlind: false, hideCorr: false, keepCorr: false, hiddenFrom: 99 };
+// 🌫️ Table des options « Le Brouillard », indexée sur l'ÉTAGE VISÉ (27-30).
+// clear : lignes nettes · fog : lignes floues (lisibles en plissant les yeux) ·
+// fogBlind : le flou devient illisible · hideCorr : corrections ⚫⚪ cachées sur les lignes floues ·
+// keepCorr : corrections ⚫⚪ visibles sur les lignes cachées · hiddenFrom : tout disparaît à partir de la Nᵉ ligne.
+// Les options de fin 28 (étage 29 visé) gardent la fenêtre de l'étage en cours et ne changent que la lisibilité.
+const ADV_BROUILLARD_OPTS = {
+  27: [ { l: 'A', pct: 10, clear: 4, fog: 1, hiddenFrom: 6 },       // 4 nettes + 1 floue, cachées dès la 6ᵉ
+        { l: 'B', pct: 15, clear: 3, fog: 1, hiddenFrom: 5 },       // 3 nettes, floue 4ᵉ, cachées dès la 5ᵉ
+        { l: 'C', pct: -15, clear: 5, fog: 1, hiddenFrom: 7 } ],    // 5 nettes, floue 6ᵉ, cachées dès la 7ᵉ
+  28: [ { l: 'A', pct: 10, clear: 2, fog: 1, hiddenFrom: 4 },       // 2 nettes + 1 floue, cachées dès la 4ᵉ
+        { l: 'B', pct: 15, clear: 2, fog: 0, hiddenFrom: 3 },       // 2 nettes, pas de flou, cachées dès la 3ᵉ
+        { l: 'C', pct: -15, clear: 4, fog: 2, hiddenFrom: 7 } ],    // 4 nettes + 2 floues
+  29: [ { l: 'A', pct: 10, fogBlind: true },                        // le flou devient illisible (blur total)
+        { l: 'B', pct: 15, fogBlind: true, hideCorr: true },        // flou illisible ET corrections ⚫⚪ cachées
+        { l: 'C', pct: -10, keepCorr: true } ],                     // corrections ⚫⚪ visibles sur lignes cachées
+  30: [ { l: 'A', pct: 10, clear: 3, fog: 1, fogBlind: true, hiddenFrom: 5 },  // 3 nettes, 1 floue illisible, cachées dès la 5ᵉ
+        { l: 'B', pct: 15, clear: 2, fog: 0, fogBlind: true, hiddenFrom: 3 },  // cauchemar : 2 nettes, cachées dès la 3ᵉ
+        { l: 'C', pct: -5, clear: 3, fog: 1, fogBlind: false, hiddenFrom: 5 } ], // standard : 3 nettes, 1 floue lisible
 };
 // 🌑 Masques actifs pour l'affichage ? (faux si l'option « révélation » a débloqué les masques)
 function advShadowActive(){
@@ -2554,9 +2668,9 @@ const ADV_PALIER_MS = 20 * 60000;
 
 function advPalier(){ return Math.floor((advRound - 1) / 5) + 1; } // 1..3+ sur les étages
 function advTheme(){ return advThemeFor(advRound); }
-function advThemeFor(r){ const th = ['essais', 'temps', 'challenge', 'ombre']; return th[Math.floor((r - 1) / 5) % th.length]; }
+function advThemeFor(r){ const th = ['essais', 'temps', 'challenge', 'ombre', 'mirage', 'brouillard']; return th[Math.floor((r - 1) / 5) % th.length]; }
 // Paliers avec pendule (horloge/temps définitif) : Temps, Challenge et L'Ombre.
-function advClockTheme(t){ return t === 'temps' || t === 'challenge' || t === 'ombre'; }
+function advClockTheme(t){ return t === 'temps' || t === 'challenge' || t === 'ombre' || t === 'mirage' || t === 'brouillard'; }
 function advFormatClock(ms){
   const s = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -2599,16 +2713,14 @@ function renderAdvBanner(){
   const el = document.getElementById('advBanner');
   if(!el) return;
   if(!advActive){ el.classList.add('hidden'); el.innerHTML = ''; return; }
-  const palName = advPalier() === 1 ? 'Les Limites' : advPalier() === 2 ? 'Le Temps' : advPalier() === 3 ? 'Challenge' : 'L\'Ombre';
+  const palName = ['Les Limites', 'Le Temps', 'Challenge', 'L\'Ombre', 'Le Mirage', 'Le Brouillard'][(advPalier() - 1) % 6] || 'Inconnu';
   el.classList.remove('hidden');
   // Cadres séparés pour une lecture immédiate : réserve / essais / temps / défi / malus.
   const chip = (cls, html) => `<span style="display:inline-block;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:3px 10px;margin:3px 4px 0 0;background:rgba(255,255,255,.06);font-size:12.5px;${cls ? 'border-color:' + cls + ';' : ''}">${html}</span>`;
-  const goPct = ADV_GO_BASE_PCT + 5 * advInsuranceCount;
-  const defeatAmt = Math.floor(advReserve * goPct / 100);
   let html = `🗺️ ${palName} — Étage <b>${advRound}</b><br>`;
   if(window.advTestOn && window.advTestOn()) html += chip('rgba(255,215,0,.6)', '🧪 TEST — journal XP actif');
-  // 💰 Réserve + montant récupéré en cas de défaite (avec les assurances achetées)
-  html += chip('', `💰 <b>${advReserve} XP</b>${advPendingXp ? ` <span style="color:#8cffaa;">(+${advPendingXp} à valider)</span>` : ''} <span class="muted">(défaite : ${defeatAmt} XP · ${goPct}%)</span>`);
+  // 💰 Réserve : CADRE VOYANT, juste le montant (les détails « défaite/pending » sont retirés — on veut juste savoir combien on a)
+  html += `<div style="display:inline-block;border:2px solid #ffd700;background:rgba(255,215,0,0.16);border-radius:12px;padding:5px 20px;margin:5px 0 7px;font-size:19px;font-weight:900;color:#ffd700;box-shadow:0 0 12px rgba(255,215,0,0.35);text-shadow:0 1px 2px rgba(0,0,0,.5);">💰 ${advReserve} XP</div><br>`;
   // 🎯 Essais : limite permanente + essais restants de la manche
   if(advMaxTries){
     const left = (moveLimit !== null && moveLimit !== undefined) ? Math.max(0, moveLimit - history.length) : null;
@@ -2636,7 +2748,29 @@ function renderAdvBanner(){
       : `🌑 ${advShadow.count} couleur${advShadow.count > 1 ? 's' : ''} masquée${advShadow.count > 1 ? 's' : ''}${advShadow.fixed ? ' — position fixe' : ''}${advShadow.revealAt !== null ? ` — révélées au ${advShadow.revealAt}ᵉ essai` : ''}`);
   }
   // 🛡️ Assurances achetées
-  if(advInsuranceCount > 0) html += chip('', `🛡️ ${advInsuranceCount}× assurance (${goPct}% en cas de défaite)`);
+  if(advInsuranceCount > 0) html += chip('', `🛡️ ${advInsuranceCount}× assurance (${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% en cas de défaite)`);
+  // 🌫️ Palier 6 « Le Brouillard » : fenêtre de l'étage
+  if(advBrouillard){
+    const w = advBrouillard;
+    const win = `${w.clear} ligne${w.clear > 1 ? 's' : ''} nette${w.clear > 1 ? 's' : ''}` +
+      (w.fog ? ` puis ${w.fog} floue${w.fog > 1 ? 's' : ''}${w.fogBlind ? ' (illisible)' : ''}` : '') +
+      (w.hiddenFrom < 99 ? ` — cachées dès la ${w.hiddenFrom}ᵉ` : ' — jamais cachées');
+    html += chip('rgba(170,190,215,.7)', `🌫️ ${win}`);
+  }
+  // 🪞 Palier 5 « Le Mirage » : miroirs actifs pour cet étage
+  if(advMirage && advMirage.count > 0){
+    const mNat = advMirage.wellPlaced ? ' · 1 bien placée' : advMirage.quad ? ' · 4× même couleur'
+      : advMirage.noDouble ? ' · sans doublons' : advMirage.misplaced ? ' · 1 mal placée'
+      : advMirage.twoPairs ? ' · 2 doublons' : advMirage.hide ? ' · ' + advMirage.hide + ' cachée' + (advMirage.hide > 1 ? 's' : '') : '';
+    html += chip('rgba(80,220,200,.6)', `🪞 ${advMirage.count} miroir${advMirage.count > 1 ? 's' : ''}/coup${advMirage.free ? ' GRATUIT' + (advMirage.count > 1 ? 'S' : '') : ' (1 essai)'}${mNat}`);
+  }
+  // 🎯 Option A : le % du choix s'applique au gain de l'étage en cours
+  if(advFloorPct) html += chip(advFloorPct > 0 ? 'rgba(140,255,170,.6)' : 'rgba(255,138,128,.6)', `🎯 ${advFloorPct > 0 ? '+' : ''}${advFloorPct}% gain d'étage`);
+  // 🚀 Bonus de sortie cumulable : actifs + en attente
+  const bActive = advExitBoostTargets.filter(t => t <= advRound).length;
+  const bPending = advExitBoostTargets.filter(t => t > advRound).length;
+  if(bActive) html += chip('rgba(255,215,0,.6)', `🚀 +${bActive * 25}% sortie`);
+  if(bPending) html += chip('', `🚀 +${bPending * 25}% en attente (dès l'étage ${Math.min(...advExitBoostTargets.filter(t => t > advRound))})`);
   el.innerHTML = html;
 }
 // Malus aléatoires (boutiques, annoncés avant le début du palier suivant)
@@ -2781,12 +2915,7 @@ function closeAdvIntro(){
     advLaunchNextRound();
     return;
   }
-  // 🏆 Sommet atteint (fin du contenu) : encaissement automatique de la réserve.
-  if(advIntroNext === 'finale'){
-    advIntroNext = null;
-    advFinaleCashOut();
-    return;
-  }
+  // (le sommet a été retiré : plus d'encaissement automatique — la tour continue)
   if(advIntroNext === 'choices'){
     advIntroNext = null;
     showAdvChoices();
@@ -2862,11 +2991,11 @@ function startAdventure(){
   trainingMode = false;
   analysisMode = false;
   advActive = true; advRound = 1; advReserve = 0; advPendingXp = 0;
-  advShopPendingPct = 0; advExitBoost = false; advExitBoostValidated = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
+  advShopPendingPct = 0; advExitBoostTargets = []; advMirage = null; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
   advDistinct = true; advShopVisited = 0;
-  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
   advNumbersMode = false; advNumbersMap = null; advShopBought = {};
   advClearSavedRun(); // une nouvelle run remplace l'ancienne sauvegarde
@@ -2883,11 +3012,11 @@ function startAdventure(){
 }
 function endAdvRun(){
   advActive = false;
-  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false; advExitBoostValidated = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
+  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoostTargets = []; advMirage = null; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
   advDistinct = true; advShopVisited = 0;
-  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
   advNumbersMode = false; advNumbersMap = null;
   moveLimit = advSavedMoveLimit;
@@ -2908,7 +3037,7 @@ function advSaveRun(){
     malusId: advMalus ? advMalus.id : null, malusUntil: advMalusUntil,
     noGainFloor: advNoGainFloor,
     shopVisited: advShopVisited, shopBought: advShopBought,
-    exitBoost: advExitBoost, exitBoostValidated: advExitBoostValidated,
+    exitBoostTargets: advExitBoostTargets, mirage: advMirage, floorPct: advFloorPct, brouillard: advBrouillard,
     pendingPct: advShopPendingPct, angelRing: advAngelRing,
     at: Date.now()
   });
@@ -2938,12 +3067,18 @@ async function resumeAdventure(){
   advDistinct = !(advMalus && advMalus.id === 'doubles');
   advNumbersMode = !!(advMalus && advMalus.id === 'numbers');
   advShopVisited = s.shopVisited || 0; advShopBought = s.shopBought || {};
-  advExitBoost = !!s.exitBoost; advExitBoostValidated = !!s.exitBoostValidated;
+  // 🚀 Bonus de sortie cumulable : liste d'étages-cibles (20/30/40/50). Anciennes
+  // sauvegardes (booléen unique) → migrate vers [20].
+  advExitBoostTargets = Array.isArray(s.exitBoostTargets) ? s.exitBoostTargets.map(Number).filter(Boolean)
+    : (s.exitBoost ? [20] : []);
+  advMirage = s.mirage || null; // 🪞 palier 5 : le miroir de l'étage en cours est restauré
+  advBrouillard = s.brouillard || null; advBrouillardReveal = false; // 🌫️ palier 6 : fenêtre restaurée (l'étage reprend au début)
+  advFloorPct = Number(s.floorPct) || 0; // 🎯 % de gain de l'étage en cours (reprise de run)
   advShopPendingPct = s.pendingPct || 0; advAngelRing = !!s.angelRing;
   moveLimit = advMaxTries;
   // Thème visuel du palier courant.
-  document.body.classList.remove('adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4');
-  const p = Math.min(advPalier(), 4);
+  document.body.classList.remove('adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4', 'adv-palier5', 'adv-palier6');
+  const p = Math.min(advPalier(), 6);
   if(p >= 1) document.body.classList.add('adv-palier' + p);
   // Écrans : menu caché, plateau affiché, boutique rouverte (le temps est en pause
   // en boutique ; il reprendra au clic sur « Continuer »).
@@ -2991,7 +3126,8 @@ function advShowResumePopup(s){
   const ins = Number(s.insurance) || 0;
   if(ins > 0) bonuses.push(`🛡️ ${ins}×5 % assurance`);
   if(s.angelRing) bonuses.push('😇 Anneau de l\'ange');
-  if(s.exitBoost) bonuses.push(`🚀 +25 % sortie${s.exitBoostValidated ? ' (validé)' : ' (non validé)'}`);
+  const tTargets = Array.isArray(s.exitBoostTargets) ? s.exitBoostTargets.map(Number).filter(Boolean) : (s.exitBoost ? [20] : []);
+  if(tTargets.length) bonuses.push(`🚀 +${tTargets.length * 25} % sortie (actif dès l'étage ${Math.min(...tTargets)})`);
   if(Number(s.pendingPct) > 0) bonuses.push(`🎲 Gamble +${Number(s.pendingPct)} % en attente`);
   lines.push(bonuses.length ? `✨ Bonus : ${bonuses.join(' · ')}` : '✨ Bonus : aucun');
   if(s.malusId){
@@ -3019,53 +3155,63 @@ window.advResumeDelete = advResumeDelete;
 // Les options après chaque étage — A/B/C (+D au palier Temps). % sur la réserve.
 // NB : les limites d'essais sont indexées sur l'étage QUI VIENT DE SE TERMINER
 // (après l'étage 1 on entre à l'étage 2 avec 20/16 essais, etc.).
-const ADV_FLOOR_TRIES = { 1: 20, 2: 18, 3: 16, 4: 14 }; // option A
-const ADV_GREED_TRIES = { 1: 16, 2: 14, 3: 12, 4: 10 }; // option B
+const ADV_FLOOR_TRIES = { 1: 18, 2: 16, 3: 14, 4: 12 }; // option A (+10% vert) — v3
+const ADV_GREED_TRIES = { 1: 16, 2: 14, 3: 12, 4: 10 }; // option B (🟦 bleu : boost de réserve) — v3
+const ADV_GREED_PCT = { 1: 15, 2: 15, 3: 20, 4: 20 };  // % du boost bleu B selon l'étage visé (2→5)
+const ADV_TEMPS_BLUE = { 1: 5, 2: 5, 3: 10, 4: 10 };  // 🟦 % du boost bleu B du palier Temps (étages visés 7→10) — v3
+const ADV_PALIER_MULT = { 1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3, 6: 3.5 };  // v3 : pente douce du gain de base par palier (Saphir/5 coups ≈ 20/30/40/50/60/70 XP)
 // Palier 3 « Challenge » — table des défis, indexée sur l'ÉTAGE VISÉ.
-// pct : % de réserve (négatif = malus) · capMs : pendule du défi · tries : finir
+// pct : % sur le gain d'étage (négatif = malus) · capMs : pendule du défi · tries : finir
 // avec N essais de moins (essais du défi, pas les totaux) · permTry : baisse
 // permanente après l'étage · timeMs : rend du temps sur la pendule totale ·
 // freeze : gèle la pendule totale pendant l'étage visé.
 const ADV_CHALLENGES = {
-  // Étage 11 : manche classique d'échauffement (pas de défi — warm-up du palier 3).
+  // v3 : A vert +% sur le gain · B vert ou BLEU (++% réserve immédiat) ·
+  // C vert léger · D rouge −100% du gain (contre du temps ou un gel).
   12: [
-    { l: 'A', pct: 20, capMs: 3.5 * 60000 },
-    { l: 'B', pct: 20, tries: 2 },
-    { l: 'C', pct: 10, capMs: 4.5 * 60000 },
+    { l: 'A', pct: 10, capMs: 3.5 * 60000 },
+    { l: 'B', pct: 10, tries: 2 },
+    { l: 'C', pct: 5, capMs: 4.5 * 60000 },
   ],
   13: [
-    { l: 'A', pct: 25, capMs: 3 * 60000 },
-    { l: 'B', pct: 25, tries: 3 },
-    { l: 'C', pct: 10, capMs: 4 * 60000, tries: 1 },
-    { l: 'D', pct: -25, timeMs: 3 * 60000 },
+    { l: 'A', pct: 10, capMs: 3 * 60000 },
+    { l: 'B', pct: 10, tries: 3 },
+    { l: 'C', pct: 5, capMs: 4 * 60000, tries: 1 },
+    { l: 'D', pct: -100, timeMs: 3 * 60000 },
   ],
   14: [
-    { l: 'A', pct: 30, capMs: 2.5 * 60000 },
-    { l: 'B', pct: 30, tries: 2, permTry: 1 },
-    { l: 'C', pct: 10, capMs: 3.5 * 60000, tries: 1 },
-    { l: 'D', pct: -25, freeze: true },
+    { l: 'A', pct: 10, capMs: 2.5 * 60000 },
+    { l: 'B', bluePct: 10, tries: 2, permTry: 1 },
+    { l: 'C', pct: 5, capMs: 3.5 * 60000, tries: 1 },
+    { l: 'D', pct: -100, freeze: true },
   ],
-  // Étage 15 : défi lui aussi (le joueur veut un choix avant la boutique 3).
+  // Étage 15 (v3) : ligne droite durcie avant la boutique 3.
   15: [
-    { l: 'A', pct: 30, capMs: 2.5 * 60000 },
-    { l: 'B', pct: 30, tries: 2, permTry: 1 },
-    { l: 'C', pct: 10, capMs: 3.5 * 60000, tries: 1 },
-    { l: 'D', pct: -25, freeze: true },
+    { l: 'A', pct: 10, capMs: 2 * 60000 },
+    { l: 'B', pct: 10, tries: 3 },
+    { l: 'C', pct: 5, capMs: 2.5 * 60000, tries: 1 },
   ],
 };
 function advChoiceSet(){
   const theme = advThemeFor(advRound + 1); // thème de l'ÉTAGE VISÉ (ex: défis pour l'étage 11)
   const opts = [];
   if(theme === 'essais'){
-    opts.push({ l: 'A', bonus: '+15% de réserve', malus: `${ADV_FLOOR_TRIES[advRound]} essais max` });
-    opts.push({ l: 'B', bonus: '+30% de réserve', malus: `${ADV_GREED_TRIES[advRound]} essais max` });
+    // Palier 1 v3 : A vert (+10% sur le gain), B bleu (++% de réserve immédiat, gain neutre),
+    // C bleu (++40%) proposé pour l'étage charnière (5, 35…). Plus d'option tranquillité ici.
+    const k = ((advRound - 1) % 5) + 1;
+    opts.push({ l: 'A', pct: 10, bonus: '+10% sur le gain d\u2019étage', malus: `${ADV_FLOOR_TRIES[k]} essais max` });
+    opts.push({ l: 'B', blue: ADV_GREED_PCT[k], bonus: `++${ADV_GREED_PCT[k]}% de réserve (immédiat)`, malus: `${ADV_GREED_TRIES[k]} essais max` });
+    if(advRound % 5 === 4) opts.push({ l: 'C', blue: 40, bonus: '++40% de réserve (immédiat)', malus: `8 essais max` });
   } else if(theme === 'temps'){
-    opts.push({ l: 'A', bonus: '+10% de réserve', malus: '−30 s sur l\'horloge du palier' });
-    opts.push({ l: 'B', bonus: '+15% de réserve', malus: '−1 min sur l\'horloge du palier' });
-    opts.push({ l: 'D', bonus: '+30 s sur l\'horloge du palier', malus: '−15% de réserve' });
+    // Palier 2 v3 : A vert +5% sur le gain ; B BLEU ++5/++10% de réserve immédiat ;
+    // D rouge −75% (+30 s). C tranquillité : rouge −50% (voir plus bas).
+    const kt = ((advRound - 1) % 5) + 1;
+    opts.push({ l: 'A', pct: 5, bonus: '+5% sur le gain d\'étage', malus:'−30 s sur l\'horloge du palier' });
+    opts.push({ l: 'B', blue: ADV_TEMPS_BLUE[kt], bonus: `++${ADV_TEMPS_BLUE[kt]}% de réserve (immédiat)`, malus:'−1 min sur l\'horloge du palier' });
+    opts.push({ l: 'D', pct: -75, bonus: '+30 s sur l\'horloge du palier', malus: '−75% sur le gain d\'étage' });
   } else if(theme === 'challenge'){
-    // Palier 3 « Challenge » : défis pour l'étage SUIVANTE (target = advRound + 1).
-    // Pendule du défi séparée de la pendule totale ; essais du défi séparés des essais totaux.
+    // Palier 3 « Challenge » v3 : A vert (+% sur le gain), B peut être BLEU
+    // (++% de réserve immédiat), C vert léger, D rouge (−100% du gain).
     const target = advRound + 1;
     const ch = ADV_CHALLENGES[target] || [];
     ch.forEach(spec => {
@@ -3073,12 +3219,12 @@ function advChoiceSet(){
       if(spec.capMs && spec.tries) mal = `finir en moins de ${advFormatClock(spec.capMs)} ET avec ${spec.tries} essai${spec.tries>1?'s':''} de moins`;
       else if(spec.capMs) mal = `finir l'étage en moins de ${advFormatClock(spec.capMs)}`;
       else if(spec.tries) mal = `finir avec ${spec.tries} essai${spec.tries>1?'s':''} de moins${spec.permTry ? ' ET −1 essai permanent' : ''}`;
-      else if(spec.timeMs) mal = '−25% de réserve';
-      else if(spec.freeze) mal = '−25% de réserve';
-      let bon = `+${spec.pct}% de réserve`;
+      else if(spec.timeMs) mal = '−100% sur le gain d\'étage';
+      else if(spec.freeze) mal = '−100% sur le gain d\'étage';
+      let bon = spec.bluePct ? `++${spec.bluePct}% de réserve (immédiat)` : `+${spec.pct}% sur le gain d'étage`;
       if(spec.timeMs) bon = `+${Math.round(spec.timeMs/60000)} min sur la pendule totale`;
       if(spec.freeze) bon = `geler la pendule totale pendant l'étage ${target}`;
-      opts.push({ l: spec.l, bonus: bon, malus: mal });
+      opts.push({ l: spec.l, pct: spec.pct, blue: spec.bluePct, bonus: bon, malus: mal });
     });
   } else if(theme === 'ombre'){
     // Palier 4 « L'Ombre » : masques de couleurs à mémoriser pour l'étage VISÉ.
@@ -3092,20 +3238,64 @@ function advChoiceSet(){
       const posTxt = s.masks && s.masks.fixed ? 'position fixe pour tout l\'étage' : 'position aléatoire à chaque ligne';
       const revTxt = s.masks && s.masks.revealAt ? ` — masques révélés au ${s.masks.revealAt}ᵉ essai` : '';
       let bonus, malus;
-      if(!s.masks){ bonus = 'aucune couleur masquée'; malus = `−${-s.pct}% de réserve`; }
-      else if(s.pct > 0){ bonus = `+${s.pct}% de réserve`; malus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} (${posTxt})${revTxt}`; }
-      else { bonus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} seulement`; malus = `−${-s.pct}% de réserve${revTxt}`; }
-      opts.push({ l, bonus, malus });
+      if(!s.masks){ bonus = 'aucune couleur masquée'; malus = `−${-s.pct}% sur le gain d'étage`; }
+      else if(s.pct > 0){ bonus = `+${s.pct}% sur le gain d'étage`; malus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} (${posTxt})${revTxt}`; }
+      else { bonus = `${n} couleur${n > 1 ? 's' : ''} masquée${n > 1 ? 's' : ''} seulement`; malus = `−${-s.pct}% sur le gain d'étage${revTxt}`; }
+      opts.push({ l, pct: s.pct, bonus, malus });
+    });
+  } else if(theme === 'mirage'){
+    // 🪞 Palier 5 « Le Mirage » : options pour l'étage VISÉ.
+    // A/B : le miroir consomme 1 essai par coup. C : miroirs gratuits (−10%).
+    const target = advRound + 1;
+    const mo = ADV_MIRAGE_OPTS[target] || [];
+    mo.forEach(spec => {
+      let bon, malus;
+      // Description de la nature du miroir, selon l'étage visé.
+      let nature = '';
+      if(spec.wellPlaced) nature = ' — contient 1 couleur du code BIEN placée';
+      else if(spec.quad) nature = ' — 4 fois la même couleur';
+      else if(spec.noDouble) nature = ' — 4 couleurs distinctes (sans doublons)';
+      else if(spec.misplaced) nature = ' — contient 1 couleur du code MAL placée';
+      else if(spec.twoPairs) nature = ' — 2 couleurs jouées en doublon';
+      else if(spec.hide) nature = ` — ${spec.hide} couleur${spec.hide > 1 ? 's' : ''} de la ligne cachée${spec.hide > 1 ? 's' : ''}`;
+      else nature = ' — couleurs totalement aléatoires';
+      if(spec.free){
+        bon = `${spec.count} miroir${spec.count > 1 ? 's' : ''} GRATUIT${spec.count > 1 ? 'S' : ''} après chacun de tes coups${nature}`;
+        malus = `−${-spec.pct}% sur le gain d'étage`;
+      } else if(spec.pct < 0){
+        bon = `1 ligne miroir 🪞 après chacun de tes coups${nature}`;
+        malus = `consomme 1 essai ET −${-spec.pct}% sur le gain d'étage`;
+      } else {
+        bon = `+${spec.pct}% sur le gain d'étage`;
+        malus = `1 ligne miroir 🪞 après chacun de tes coups${spec.count > 1 ? ` (${spec.count})` : ''}${nature} — CONSOMME 1 essai`;
+      }
+      opts.push({ l: spec.l, pct: spec.pct, bonus: bon, malus });
+    });
+  } else if(theme === 'brouillard'){
+    // 🌫️ Palier 6 « Le Brouillard » : fenêtre d'historique pour l'étage VISÉ.
+    const target = advRound + 1;
+    const bo = ADV_BROUILLARD_OPTS[target] || [];
+    bo.forEach(spec => {
+      let bon = `+${spec.pct}% sur le gain d'étage`;
+      let mal;
+      if(spec.clear !== undefined){
+        mal = `${spec.clear} ligne${spec.clear > 1 ? 's' : ''} nette${spec.clear > 1 ? 's' : ''}` +
+          (spec.fog ? ` puis ${spec.fog} floue${spec.fog > 1 ? 's' : ''}` : '') +
+          ` — cachées dès la ${spec.hiddenFrom}ᵉ ligne`;
+      } else {
+        // Fin 28 : la fenêtre de l'étage en cours est conservée, seule la lisibilité change.
+        mal = spec.fogBlind
+          ? (spec.hideCorr ? 'le flou devient illisible ET les corrections ⚫⚪ cachées' : 'le flou devient illisible (blur total)')
+          : 'les corrections ⚫⚪ restent visibles sur les lignes cachées';
+        if(spec.pct < 0) bon = `${spec.pct < 0 ? 'tranquillité' : ''} — le flou reste lisible`;
+      }
+      opts.push({ l: spec.l, pct: spec.pct, bonus: bon, malus: mal });
     });
   }
-  if(theme !== 'challenge' && theme !== 'ombre' && !(advMalus && advMalus.id === 'noC')){
-      // Avant la boutique 1 (étage 5 visé) : l'option C limite quand même les essais (16).
-      // Avant les autres boutiques (10/15/…) : −25% sans limite.
-      if(advRound + 1 === 5){
-        opts.push({ l: 'C', bonus: 'aucun autre malus', malus: '−25% de réserve et 16 essais max' });
-      } else {
-        opts.push({ l: 'C', bonus: 'aucun malus', malus: '−25% de réserve' });
-      }
+  if(theme !== 'essais' && theme !== 'challenge' && theme !== 'ombre' && theme !== 'mirage' && theme !== 'brouillard' && !(advMalus && advMalus.id === 'noC')){
+      // Option C tranquillité (−25%) : proposée au palier Temps en v3
+      // (le palier Essais a ses propres options A/B/C depuis la refonte).
+        opts.push({ l: 'C', pct: -50, bonus: 'aucun malus', malus: '−50% sur le gain d\'étage' }); // v3 : tranquillité du palier Temps
   }
   // Affichage dans l'ordre alphabétique : A, B, C, D.
   opts.sort((a, b) => a.l.localeCompare(b.l));
@@ -3115,16 +3305,24 @@ function applyAdvChoice(letter){
   document.getElementById('advChoice').classList.add('hidden');
   const _tReserveAvant = advReserve; // 🧪 avant consolidation
   const _tPending = advPendingXp;    // 🧪
+  advMirage = null; // 🪞 le miroir est propre à chaque étage (redéfini par le choix Mirage)
+  advFloorPct = 0;  // 🎯 le % de gain se redéfinit à chaque choix
+  advShadow = null; advShadowLinePos = []; // 🌑 les masques de l'Ombre ne survivent jamais au changement d'étage
   // Consolidation : l'XP de l'étage gagné rejoint la réserve AVANT d'appliquer le %.
   advReserve += advPendingXp;
   advPendingXp = 0;
   const theme = advThemeFor(advRound + 1); // thème de l'ÉTAGE VISÉ (ex: défi si on entre au palier 3)
   if(theme === 'essais'){
-    if(letter === 'A'){ advReserve = Math.floor(advReserve * 1.15); advMaxTries = ADV_FLOOR_TRIES[advRound]; }
-    else if(letter === 'B'){ advReserve = Math.floor(advReserve * 1.30); advMaxTries = ADV_GREED_TRIES[advRound]; }
+    // Palier 1 v3 : A vert ; B/C bleus — le boost de réserve s'applique IMMÉDIATEMENT
+    // (après consolidation du gain de l'étage qui vient d'être gagné), le gain du
+    // prochain étage reste NEUTRE en échange (levier anti-camping).
+    const k = ((advRound - 1) % 5) + 1;
+    if(letter === 'A'){ advFloorPct = 10; advMaxTries = ADV_FLOOR_TRIES[k]; }
     else {
-      advReserve = Math.floor(advReserve * 0.75);
-      if(advRound === 4) advMaxTries = 16; // option C avant la boutique 1 : 16 essais max
+      const pct = (letter === 'C') ? 40 : ADV_GREED_PCT[k];
+      advFloorPct = 0;
+      advReserve = Math.round(advReserve * (1 + pct / 100));
+      advMaxTries = (letter === 'C') ? 8 : ADV_GREED_TRIES[k];
     }
   } else if(theme === 'challenge'){
     // Palier 3 « Challenge » : le choix installe un DÉFI pour l'étage qui vient (target).
@@ -3142,7 +3340,8 @@ function applyAdvChoice(letter){
       }
       if(spec.timeMs) advPalierMs += spec.timeMs;                 // 13-D : +3 min sur la pendule totale
       if(spec.freeze) advTimeFrozen = true;                       // 14-D : gel de la pendule pour l'étage 15
-      if(spec.pct) advReserve = Math.floor(advReserve * (1 + spec.pct / 100)); // (un seul passage : les options D à pct négatif s'appliquent UNE fois)
+      if(spec.bluePct){ advReserve = Math.round(advReserve * (1 + spec.bluePct / 100)); advFloorPct = 0; } // 🟦 bleu : boost de réserve immédiat, gain neutre
+      else if(spec.pct) advFloorPct = spec.pct; // % appliqué au GAIN de l'étage visé (option A d'équilibrage)
     } else {
       advChallenge = null; // étage sans défi
     }
@@ -3150,9 +3349,9 @@ function applyAdvChoice(letter){
     // 🌑 Palier 4 : application du choix « L'Ombre » pour l'étage visé.
     const target = advRound + 1;
     const s = (ADV_SHADOW_OPTS[target] || {})[letter];
-    advShadow = null; advShadowLinePos = [];
+    advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
     if(s){
-      if(s.pct) advReserve = Math.floor(advReserve * (1 + s.pct / 100));
+      if(s.pct) advFloorPct = s.pct; // 🌑 % sur le gain de l'étage visé
       if(s.masks){
         advShadow = { count: s.masks.count, fixed: !!s.masks.fixed, fixedPos: null, revealAt: s.masks.revealAt || null };
         if(s.masks.fixed){
@@ -3162,11 +3361,45 @@ function applyAdvChoice(letter){
         }
       }
     }
+  } else if(theme === 'mirage'){
+    // 🪞 Palier 5 : application du choix « Le Mirage » pour l'étage visé.
+    const target = advRound + 1;
+    const spec = (ADV_MIRAGE_OPTS[target] || []).find(s => s.l === letter);
+    advMirage = null;
+    if(spec){
+      if(spec.pct) advFloorPct = spec.pct; // 🪞 % sur le gain de l'étage visé
+      if(spec.count > 0){
+        advMirage = { count: spec.count, free: !!spec.free,
+                      wellPlaced: !!spec.wellPlaced, quad: !!spec.quad,
+                      noDouble: !!spec.noDouble, misplaced: !!spec.misplaced,
+                      twoPairs: !!spec.twoPairs, hide: spec.hide || 0 };
+      }
+    }
+  } else if(theme === 'brouillard'){
+    // 🌫️ Palier 6 : application du choix « Le Brouillard » pour l'étage visé.
+    const target = advRound + 1;
+    const spec = (ADV_BROUILLARD_OPTS[target] || []).find(s => s.l === letter);
+    const prevWin = advBrouillard; // fin 28 : les options gardent la fenêtre de l'étage en cours
+    advBrouillard = null; advBrouillardReveal = false;
+    if(spec){
+      if(spec.clear !== undefined){
+        advBrouillard = { clear: spec.clear, fog: spec.fog || 0, fogBlind: !!spec.fogBlind,
+                          hideCorr: !!spec.hideCorr, keepCorr: !!spec.keepCorr,
+                          hiddenFrom: spec.hiddenFrom || 99 };
+      } else {
+        const base = prevWin || { clear: 2, fog: 1, fogBlind: false, hideCorr: false, keepCorr: false, hiddenFrom: 4 };
+        advBrouillard = Object.assign({}, base, { fogBlind: !!spec.fogBlind, hideCorr: !!spec.hideCorr, keepCorr: !!spec.keepCorr });
+      }
+      if(spec.pct) advFloorPct = spec.pct; // 🌫️ % sur le gain de l'étage visé
+    }
   } else {
-    if(letter === 'A'){ advReserve = Math.floor(advReserve * 1.10); advPalierMs -= 30000; }
-    else if(letter === 'B'){ advReserve = Math.floor(advReserve * 1.15); advPalierMs -= 60000; }
-    else if(letter === 'D'){ advPalierMs += 30000; advReserve = Math.floor(advReserve * 0.85); }
-    else { advReserve = Math.floor(advReserve * 0.75); }
+    // Palier 2 v3 : A vert +5% ; B BLEU ++5/++10% de réserve immédiat ;
+    // C rouge −50% ; D rouge −75% (+30 s).
+    const k = ((advRound - 1) % 5) + 1;
+    if(letter === 'A'){ advFloorPct = 5; advPalierMs -= 30000; }
+    else if(letter === 'B'){ advFloorPct = 0; advReserve = Math.round(advReserve * (1 + ADV_TEMPS_BLUE[k] / 100)); advPalierMs -= 60000; }
+    else if(letter === 'D'){ advPalierMs += 30000; advFloorPct = -75; }
+    else { advFloorPct = -50; }
   }
   if(advMalus && advMalus.id === 'minus1min' && (advRound + 1) <= advMalusUntil && advThemeFor(advRound + 1) === 'temps') advPalierMs -= 60000; // malus : −1 min par étage, palier Temps seulement
   advRound++;
@@ -3215,11 +3448,20 @@ function advRoundCompleted(){
     advTimeFrozen = false; // 🧊 le gel ne dure que l'étage concerné (ex: 14-D gèle l'étage 15) — il ne persiste jamais en boutique ni au palier suivant
     advShopBought = {}; showAdvShop(); return;
   }
-  // 🚀 Le bonus de sortie acheté se valide dès qu'un étage est franchi après l'achat.
-  if(advExitBoost) advExitBoostValidated = true;
+  // 🚀 (plus de drapeau « validé » : un achat de bonus de sortie devient actif
+  // automatiquement quand son étage-cible 20/30/40/50 est atteint.)
   // Étage sans choix (ex. étage 15 : pas de défi) : on lance l'étage directement.
   if(advChoiceSet().length === 0){ advLaunchNextRound(); return; }
   showAdvChoices();
+}
+// 💛 Estimation du gain de l'étage VISÉ (hypothèse : victoire en 5 coups), pour
+// l'aperçu jaune affiché à côté de chaque option de l'écran de choix.
+function advPreviewGain(pct){
+  const p = advPalier();
+  const mult = (ADV_PALIER_MULT[p] !== undefined) ? ADV_PALIER_MULT[p] : p;
+  const capBase = (p === 1) ? 10 : 14;
+  const baseXp = Math.min(Math.max(window.xpForAttempts(5), 5), capBase);
+  return Math.max(1, Math.round((baseXp + rankWinBonus()) * mult * (1 + pct / 100)));
 }
 function showAdvChoices(){
   stopAdvClock(); // le temps est en pause hors manche
@@ -3231,10 +3473,21 @@ function showAdvChoices(){
   document.getElementById('advChoiceMsg').textContent = isChallenge
     ? `Étage ${advRound} franchi ! Réserve : ${advReserve} XP — choisis ton DÉFI pour l'étage ${advRound + 1} :`
     : `Étage ${advRound} franchi ! Réserve : ${advReserve} XP — choisis pour l'étage ${advRound + 1} :`;
-  document.getElementById('advChoiceBtns').innerHTML = opts.map(c =>
-    `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
-      <b style="color:#8cffaa;">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}
-    </button>`).join('');
+  document.getElementById('advChoiceBtns').innerHTML = opts.map(c => {
+    // 🟦 Le bonus IMMÉDIAT (boost de réserve) s'affiche en bleu, le reste en vert.
+    const isBlue = c.bonus.indexOf('réserve (immédiat)') !== -1;
+    const col = isBlue ? '#64c8ff' : '#8cffaa';
+    // 💛 Aperçu jaune du bénéfice concret de l'option.
+    let prev = '';
+    if(c.blue){
+      const nouv = Math.round(advReserve * (1 + c.blue / 100));
+      prev = ` <span style="color:#ffd700;">💛 réserve : ${advReserve} → ${nouv} XP</span>`;
+    } else if(c.pct !== undefined){
+      prev = ` <span style="color:#ffd700;">💛 gain estimé : +${advPreviewGain(c.pct)} XP</span>`;
+    }
+    return `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
+      <b style="color:${col};">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}${prev}
+    </button>`;}).join('');
   document.getElementById('advChoice').classList.remove('hidden');
 }
 function advDefeat(reason){
@@ -3246,7 +3499,7 @@ function advDefeat(reason){
     advPalierMs = advStagePalierMs; // pendule totale remise à son niveau de début d'étage
     advIntroNext = 'ringreplay';
     showAdvIntro('😇 L\'ANNEAU DE L\'ANGE', `L\'anneau de l\'ange brille et <b>efface ta défaite</b> !<br><br>
-      Tu vas <b>rejouer l\'étage ${advRound}</b> : nouveau puzzle, même défi, pendule totale remise à son niveau de début d\'étage (<b>${advFormatClock(advPalierMs)}</b>).<br><br>
+      Tu vas <b>rejouer l\'étage ${advRound}</b> : nouveau puzzle, même défi, pendule totale remise à son niveau de début d'étage (<b>${advFormatClock(advPalierMs)}</b>).<br><br>
       <span class="muted">L\'anneau est consommé. Ta réserve (<b>${advReserve} XP</b>) et tes essais totaux sont intacts.</span>`);
     renderAdvBanner();
     return;
@@ -3258,6 +3511,8 @@ function advDefeat(reason){
   const awarded = window.addXp(consolation);
   const secretLisible = secretCode.map(ci => advLabel(ci)).join(', '); // malus « chiffres » : le code est révélé en chiffres
   showSecretReveal(secretCode);
+  // 🌫️ Défaite dans Le Brouillard : tout l'historique est révélé avant de conclure.
+  if(advBrouillard){ advBrouillardReveal = true; renderHistory(); }
   setStatus(`💀 Aventure terminée à l'étage ${advRound} (${reason}) ! Tu repars avec ${goPct}% de ta réserve : ${awarded} XP. Le code était : ${secretLisible}.`, '');
   document.getElementById('userInputArea').classList.add('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
@@ -3272,25 +3527,34 @@ function advShopOffers(){
   const p = advPalier(); // palier qu'on vient de terminer
   const offers = [
     { id: 'insurance', icon: '🛡️', label: '+5% de réserve en cas de défaite', desc: `Game over actuel : ${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% → ${ADV_GO_BASE_PCT + 5 * (advInsuranceCount + 1)}% (permanent, cumulable)`, costPct: 10 },
-    { id: 'tries', icon: '➕', label: '+2 essais', desc: `Relève ta limite d'essais permanente${advMaxTries ? ` (actuellement ${advMaxTries})` : ''}`, costPct: 20 },
+    { id: 'tries', icon: '➕', label: (p <= 3 ? '+1 essai' : '+2 essais'), desc: `Relève ta limite d\u2019essais permanente${advMaxTries ? ` (actuellement ${advMaxTries})` : ''}`, costPct: 20 },
   ];
   if(p >= 2){
     offers.push({ id: 'time50', icon: '⏱️', label: '+50% du temps restant', desc: `Rend la moitié de ton temps restant (${advFormatClock(advPalierMs)})`, costPct: 30 });
-    offers.push({ id: 'time3', icon: '⏱️', label: '+3 minutes', desc: 'Ajoute 3 minutes à ton horloge de palier', costPct: 20 });
-    offers.push({ id: 'tries1', icon: '➕', label: '+1 essai', desc: 'Permanent', costPct: 15 });
+    offers.push({ id: 'time3', icon: '⏱️', label: (p <= 3 ? '+5 minutes' : '+3 minutes'), desc: `Ajoute ${p <= 3 ? 5 : 3} minutes à ton horloge de palier`, costPct: 20 });
+    if(p >= 4) offers.push({ id: 'tries1', icon: '➕', label: '+1 essai', desc: 'Permanent', costPct: 15 });
   }
   // 😇 Anneau de l'ange (boutiques 3+) : en cas de défaite, rejoue l'étage perdu.
   if(p >= 3){
     offers.push({ id: 'angelring', icon: '😇', label: 'Anneau de l\'ange', desc: 'En cas de défaite : tu rejoues l\'étage perdu au lieu de tout perdre (pendule totale remise au début de l\'étage). Consommé à l\'usage, un seul à la fois.', costPct: 30 });
   }
-  // Bonus multiplicateur de sortie (boutiques 3 et 4, étages 15 et 20) : +25% sur
-  // la réserve encaissée au moment de sortir, pour 25% de la réserve.
-  if([15, 20].includes(advRound)){
-    offers.push({ id: 'exitboost', icon: '🚀', label: '+25% à la sortie', desc: 'Ta sortie encaisse 25% de réserve en plus. Ne s\'applique que si tu continues au moins un étage.', costPct: 25 });
+  // 🚀 Bonus de sortie +25% : de retour en boutique (15/25/35/45) — la cible est
+  // l'étage-charnière suivant, le bonus n'est actif qu'après l'avoir atteint.
+  // 🚀 Bonus de sortie +25% : vendu aux boutiques des étages 15, 25, 35, 45.
+  // La cible est l'étage-charnière suivant (20/30/40/50) : sortir en boutique
+  // APRÈS l'avoir atteint applique +25% cumulables sur l'encaissement.
+  if([15, 25, 35, 45].includes(advRound)){ // boutiques 15/25/35/45 SEULEMENT (pas la boutique 1) → cibles 20/30/40/50
+    const target = advRound + 5;
+    if(!advExitBoostTargets.includes(target)){
+      offers.push({ id: 'exitboost', icon: '🚀', label: `+25% à la sortie (dès l'étage ${target})`,
+        desc: `Sortir en boutique après l'étage ${target} encaisse ta réserve avec +25% (achat validé en atteignant l'étage). Cumulable avec les autres cibles.`, costPct: (advRound === 15 ? 20 : 25) });
+    }
   }
-  // Pas de 🎲 au sommet (boutique de l'étage 20) : le +20% en attente ne serait
-  // jamais appliqué (encaissement automatique) — on évite le piège.
-  if(advRound !== 20) offers.push({ id: 'gamble', icon: '🎲', label: '+20% de réserve…', desc: '…mais malus aléatoire au prochain palier (annoncé avant de commencer). Ne s\'applique qu\'au prochain étage : partir aussitôt ne le valide pas.', costPct: 0, risky: true });
+  // 🎲 Le gamble est proposé à toutes les boutiques (le sommet a été retiré :
+  // continuer après n'importe quelle boutique est toujours possible).
+  offers.push({ id: 'gamble', icon: '🎲', label: '+20% de réserve…', desc:'…mais malus aléatoire au prochain palier (annoncé avant de commencer). Ne s\'applique qu\'au prochain étage : partir aussitôt ne le valide pas.', costPct: 0, risky: true });
+  // (la case « PALIER SPÉCIAL » a été retirée : le palier 6 « Le Brouillard »
+  // est accessible normalement, pas besoin de clé pour l'étage 30.)
   return offers;
 }
 function showAdvShop(){
@@ -3311,10 +3575,10 @@ function showAdvShop(){
   }).join('');
   document.getElementById('advShopContinue').textContent = `▶️ Continuer l'aventure`;
   const cashBtn = document.getElementById('advShopCashOut');
-  // 🚀 Bonus de sortie acheté : le bouton « Sortir » affiche le +25% en clair.
-  const boostOn = advExitBoost && advExitBoostValidated; // 🚀 seulement s'il a été validé par au moins un étage
-  cashBtn.innerHTML = boostOn
-    ? `🏦 Sortir et encaisser <b style="color:#ffd700;">+25%</b> (${Math.floor(advReserve * mult * 1.25)} XP)`
+  // 🚀 Bonus de sortie acheté (cumulable) : le bouton « Sortir » affiche le % en clair.
+  const shopActiveBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
+  cashBtn.innerHTML = shopActiveBoosts
+    ? `🏦 Sortir et encaisser <b style="color:#ffd700;">+${shopActiveBoosts * 25}%</b> (${Math.floor(advReserve * mult * (1 + 0.25 * shopActiveBoosts))} XP)`
     : `🏦 Sortir et encaisser (${Math.floor(advReserve * mult)} XP)`;
   document.getElementById('advShop').classList.remove('hidden');
 }
@@ -3342,12 +3606,12 @@ function advBuy(id){
   } else {
     advReserve -= cost;
     if(id === 'insurance') advInsuranceCount++;
-    else if(id === 'tries') advMaxTries = (advMaxTries === null ? 40 : advMaxTries + 2);
+    else if(id === 'tries') advMaxTries = (advMaxTries === null ? 40 : advMaxTries + (advPalier() <= 3 ? 1 : 2)); // boutiques 1-3 : +1 essai (v3)
     else if(id === 'tries1') advMaxTries = (advMaxTries === null ? 40 : advMaxTries + 1);
     else if(id === 'time50') advPalierMs += Math.floor(advPalierMs * 0.5); // +50% du temps RESTANT
-    else if(id === 'time3') advPalierMs += 3 * 60000;
-    else if(id === 'exitboost'){ advExitBoost = true; advExitBoostValidated = false; } // 🚀 +25% à la sortie, validé après un étage, consommé en sortant
+    else if(id === 'time3') advPalierMs += (advPalier() <= 3 ? 5 : 3) * 60000; // boutiques 2-3 : +5 min (v3)
     else if(id === 'angelring') advAngelRing = true; // 😇 rejoue l'étage perdu en cas de défaite
+    else if(id === 'exitboost'){ advExitBoostTargets.push(advRound + 5); } // 🚀 +25% encaissés après l'étage-charnière
   }
   if(window.testLog) window.testLog('advBuy', { achat: id, cout: cost, reserveApres: advReserve, essaisMax: advMaxTries === null ? -1 : advMaxTries }); // 🧪
   showAdvShop();
@@ -3384,15 +3648,45 @@ function advShopContinue(){
     renderAdvBanner();
     return;
   }
-  // 🏆 Fin du contenu actuel : la boutique 4 (étage 20) est le sommet de la tour
-  // tant que le palier 5 n'est pas construit — pas de manche « dans le vide ».
-  if(advRound === 20){
+  if(advRound === 20 && advThemeFor(21) === 'mirage'){
+    // 🪞 Palier 5 « Le Mirage » : entrée après la boutique 4 (étage 21).
     advIntroShownRound = 21;
-    advIntroNext = 'finale'; // à la fermeture : encaissement automatique
-    showAdvIntro('🏆 SOMMET DE LA TOUR', `Tu as franchi les <b>20 étages</b> de la tour !<br><br>
-      Le <b>palier 5</b> est encore <b>en construction</b> — les étages suivants arriveront plus tard.<br><br>
-      Ta réserve de <b>${advReserve} XP</b> va être <b>encaissée automatiquement</b>${advExitBoost ? ' avec ton bonus <b>🚀 +25%</b> (le sommet le valide !)' : ''}.<br><br>
-      <span class="muted">Reviens bientôt pour la suite de l'aventure…</span>`);
+    advIntroNext = 'stage'; // à la fermeture de l'intro : l'étage 21 démarre direct
+    document.body.classList.remove('adv-palier4');
+    document.body.classList.add('adv-palier5'); // cadre turquoise — palier « Le Mirage »
+    const warn = advMalus && advRound <= advMalusUntil ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '<br><br>✅ Aucun malus actif.';
+    showAdvIntro('LE MIRAGE', `Nouveau palier : <b>Le Mirage</b>. 🪞<br><br>
+      <b>Ta situation en entrant dans le palier :</b><br>
+      • Réserve : <b>${advReserve} XP</b><br>
+      • Essais max : <b>${advMaxTries === null ? 'illimité' : advMaxTries}</b><br>
+      • Pendule totale : <b>${advFormatClock(advPalierMs)}</b> (toujours ton temps définitif)<br>
+      • Assurances : <b>${advInsuranceCount}</b>${advAngelRing ? ' · 😇 anneau de l\'ange actif' : ''}${warn}<br><br>
+      <b>Le principe du palier :</b> après <b>chacun de tes coups</b>, le jeu ajoute sa propre ligne — le <b>miroir 🪞</b> — avec sa correction <b>vraie</b> contre le même code.<br><br>
+      🎁 <b>À l'étage 21, le miroir est GRATUIT :</b> il ne consomme aucun essai — profite-en pour apprivoiser la mécanique !<br><br>
+      ⚠️ <b>À partir de l'étage 22, chaque choix fera payer les miroirs :</b> certaines lignes miroir <b>consommeront 1 essai</b>… sauf si tu choisis les options « miroirs gratuits », qui coûtent de la réserve.<br><br>
+      Leurs corrections sont de l'or : <b>croise-les avec les tiennes</b> pour déduire le code plus vite. Un miroir ne peut jamais gagner à ta place.<br><br>
+      Bonne déduction…`);
+    renderAdvBanner();
+    return;
+  }
+  if(advRound === 25 && advThemeFor(26) === 'brouillard'){
+    // 🌫️ Palier 6 « Le Brouillard » : entrée après la boutique 5 (étage 26).
+    advIntroShownRound = 26;
+    advIntroNext = 'stage'; // à la fermeture de l'intro : l'étage 26 démarre direct
+    document.body.classList.remove('adv-palier5');
+    document.body.classList.add('adv-palier6'); // cadre gris-bleu — palier « Le Brouillard »
+    const warn = advMalus && advRound <= advMalusUntil ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '<br><br>✅ Aucun malus actif.';
+    showAdvIntro('LE BROUILLARD', `Nouveau palier : <b>Le Brouillard</b>. 🌫️<br><br>
+      <b>Ta situation en entrant dans le palier :</b><br>
+      • Réserve : <b>${advReserve} XP</b><br>
+      • Essais max : <b>${advMaxTries === null ? 'illimité' : advMaxTries}</b><br>
+      • Pendule totale : <b>${advFormatClock(advPalierMs)}</b> (toujours ton temps définitif)<br>
+      • Assurances : <b>${advInsuranceCount}</b>${advAngelRing ? ' · 😇 anneau de l\'ange actif' : ''}${warn}<br><br>
+      <b>Le principe du palier :</b> tes vieilles lignes d'historique <b>se dissolvent dans la brume</b>. Seules les dernières restent nettes ; les précédentes deviennent <b>floues</b> (lisibles en plissant les yeux), puis disparaissent complètement — <b>couleurs ET corrections ensemble</b>.<br><br>
+      🎁 <b>À l'étage 26, aucun danger :</b> 5 lignes nettes, puis un mur de brume <b>toujours lisible en plissant les yeux</b> — rien ne disparaît vraiment. Apprivoise la mécanique !<br><br>
+      ⚠️ <b>À partir de l'étage 27</b>, chaque choix décidera de ta fenêtre : nombre de lignes nettes, flou lisible ou non, corrections cachées… contre un % sur le gain d'étage.<br><br>
+      ✨ <b>Bonne nouvelle :</b> à la fin de CHAQUE étage (victoire ou défaite), <b>tout l'historique est révélé</b> — le brouillard ne traverse jamais un changement d'étage.<br><br>
+      Bonne déduction…`);
     renderAdvBanner();
     return;
   }
@@ -3403,6 +3697,14 @@ function advLaunchNextRound(){
   // 🧊 Ceinture de sécurité : un gel ne peut JAMAIS traverser une entrée d'étage
   // directe (le gel ne concerne que l'étage ciblé par le choix 14-D, géré ailleurs).
   advTimeFrozen = false;
+  advMirage = null; // 🪞 entrée d'étage directe : pas de choix Mirage → pas de miroir…
+  advFloorPct = 0;  // 🎯 pas de choix → pas de bonus de gain
+  advShadow = null; advShadowLinePos = []; // 🌑 ni masque : une entrée d'étage directe efface l'Ombre
+  advBrouillard = null; advBrouillardReveal = false; // 🌫️ entrée d'étage directe : fenêtre effacée (sauf intro 26)
+  // 🪞 Étage 21 : miroir d'introduction automatique (gratuit, 1/coup).
+  if(advRound + 1 === 21 && advThemeFor(21) === 'mirage') advMirage = Object.assign({}, ADV_MIRAGE_AUTO);
+  // 🌫️ Étage 26 : brouillard d'introduction automatique (5 nettes, puis brume lisible — jamais caché).
+  if(advRound + 1 === 26 && advThemeFor(26) === 'brouillard') advBrouillard = Object.assign({}, ADV_BROUILLARD_AUTO);
   advRound++;
   advClearMalusIfDone(); // malus de palier consommé si sa fenêtre est passée
   moveLimit = advMaxTries;
@@ -3419,22 +3721,9 @@ function advLaunchNextRound(){
   renderAdvBanner();
 }
 window.advLaunchNextRound = advLaunchNextRound;
-// 🏆 Sommet de la tour (fin du contenu actuel) : encaissement automatique.
-// Au sommet, le bonus 🚀 acheté en boutique 4 compte même sans étage franchi
-// derrière — atteindre le sommet le valide.
-function advFinaleCashOut(){
-  const mult = advShopMultiplier();
-  const boostOn = advExitBoost; // le sommet valide le bonus de sortie
-  const banked = window.addXp(Math.floor(advReserve * mult * (boostOn ? 1.25 : 1)));
-  recordGameHistory({type: 'aventure', result: `sommet étage ${advRound}`, attempts: history.length, xp: banked});
-  if(window.testLog) window.testLog('advCashOut', { type: 'sommet', etage: advRound, reserve: advReserve, boost: boostOn, encaisse: banked }); // 🧪
-  advClearSavedRun(); // sommet atteint : la run est terminée
-  setStatus(`🏆 SOMMET DE LA TOUR atteint à l'étage ${advRound} ! +${banked} XP encaissés${boostOn ? ' (+25% 🚀 !)' : ' !'} Le palier 5 arrive…`, 'win');
-  document.getElementById('replayBtn').classList.remove('hidden');
-  endAdvRun();
-  advExitBoost = false; advExitBoostValidated = false;
-}
-window.advFinaleCashOut = advFinaleCashOut;
+  // 🏆 Sommet retiré : la tour continue — la boutique 5 (étage 25) n'est PAS une
+  // fin : « Continuer » mène à l'étage 26 (les paliers cyclent), et l'encaissement
+  // ne se fait qu'en sortant volontairement d'une boutique.
 // 🛡️ Filet de sécurité : au lancement d'un étage, si aucune intro n'est affichée,
 // le plateau (historique + saisie + légende) doit être visible — un état « hidden »
 // résiduel ne doit jamais masquer les essais du joueur.
@@ -3452,15 +3741,22 @@ function advShopCashOut(){
   // et le bonus de sortie ne compte que s'il a été acheté puis validé par un étage.
   advShopPendingPct = 0;
   const mult = advShopMultiplier();
-  const boostOn = advExitBoost && advExitBoostValidated; // 🚀 appliqué seulement si validé par un étage
-  const banked = window.addXp(Math.floor(advReserve * mult * (boostOn ? 1.25 : 1)));
+  const activeBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
+  const pendingBoosts = advExitBoostTargets.filter(t => t > advRound).length;
+  const boostMult = 1 + 0.25 * activeBoosts; // 🚀 cumulable : +25% par achat validé
+  const banked = window.addXp(Math.floor(advReserve * mult * boostMult));
   recordGameHistory({type: 'aventure', result: `sortie étage ${advRound}`, attempts: history.length, xp: banked});
-  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, boost: boostOn, encaisse: banked }); // 🧪
+  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, boost: activeBoosts, boostPct: activeBoosts * 25, encaisse: banked }); // 🧪
   advClearSavedRun(); // encaissement : la run est terminée
-  setStatus(`🏦 Sorti de l'aventure à l'étage ${advRound} : +${banked} XP encaissés${boostOn ? ' (+25% 🚀 !)' : ' !'}${advExitBoost && !boostOn ? ' (bonus 🚀 non validé : aucun étage franchi depuis l\'achat)' : ''}`, 'win');
+  // 🏦 Confirmation en POP-UP (plus de message éphémère en haut de page).
+  const cashMsg = `Tu sors de l'Aventure à l'étage <b>${advRound}</b>.<br><br>
+    <b style="color:#ffd700;">💰 +${banked} XP encaissés !</b>${activeBoosts ? ` <span style="color:#ffd700;">(+${activeBoosts * 25}% 🚀)</span>` : ''}<br><br>
+    <span class="muted">${pendingBoosts ? `${pendingBoosts} bonus 🚀 non validé${pendingBoosts > 1 ? 's' : ''} : actif seulement plus loin dans la tour.` : 'Bonne progression — à la prochaine run !'}</span>`;
+  document.getElementById('advCashConfirmMsg').innerHTML = cashMsg;
+  document.getElementById('advCashConfirm').classList.remove('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
   endAdvRun();
-  advExitBoost = false; advExitBoostValidated = false;
+  advExitBoostTargets = []; advMirage = null;
 }
 
 // --- Mode développeur : taper "dev" sur le clavier pour afficher/masquer.
@@ -3824,7 +4120,7 @@ function renderAttemptsLeft(){
   if(advActive) renderAdvBanner();
   if(moveLimit === null){ el.classList.add('hidden'); return; }
   el.classList.remove('hidden');
-  const left = moveLimit - history.length;
+  const left = moveLimit - (advActive ? advEssaisUtilises() : history.length); // 🪞 les miroirs gratuits ne consument pas d'essais
   el.className = 'attempts-left' + (left <= 2 ? ' low' : '');
   el.innerHTML = `<b>${left}</b> essai${left>1?'s':''} restant${left>1?'s':''} sur ${moveLimit}`;
 }
@@ -3885,7 +4181,7 @@ updateXpBadgeOrdi();
 function replayVsOrdi(){
   // Si on relance une partie depuis un écran de fin (Monde infini / Aventure),
   // on retrouve le thème et les réglages normaux.
-  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4');
+  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4', 'adv-palier5', 'adv-palier6');
   startGame('userGuesses');
 }
 
@@ -3904,7 +4200,7 @@ function askModeChange(){
   if(!g.active){ resetToMenu(); return; }
   let msg = 'Une <b>partie est en cours</b> ! Si tu changes de mode maintenant, elle sera <b>perdue</b>.';
   if(advActive){
-    msg += `<br><br>🗺️ <b>Mode Aventure</b> : tu es à l'étage <b>${advRound}</b> avec <b>${advReserve} XP</b> en réserve${advAngelRing ? ' et l\'anneau de l\'ange 😇' : ''}. La progression depuis la <b>dernière boutique</b> sera perdue — tu pourras reprendre la run depuis cette boutique via le bouton <b>↩️ Reprendre l'Aventure</b> du menu.`;
+    msg += `<br><br>🗺️ <b>Mode Aventure</b> : tu es à l'étage <b>${advRound}</b> avec <b>${advReserve} XP</b> en réserve${advAngelRing ? ' et l\'anneau de l\'ange 😇' : ''}.<br><br><b style="color:#ff8a80;">⚠️ La sortie est DÉFINITIVE :</b> la run sera <b>terminée</b> et ta réserve non encaissée (<b>${advReserve} XP</b>) sera <b>PERDUE</b>. Impossible de revenir à la boutique précédente — seule la fermeture de l'onglet garde une sauvegarde passive.`;
   } else if(infiniteActive){
     msg += `<br><br>♾️ <b>Série infinie</b> : ta série en cours (<b>${infiniteStreak}</b> manche${infiniteStreak > 1 ? 's' : ''}) sera interrompue.`;
   } else if(serieMindActive){
@@ -3915,6 +4211,9 @@ function askModeChange(){
 }
 function modeConfirmYes(){
   document.getElementById('modeConfirm').classList.add('hidden');
+  // 🗺️ Sortir volontairement de l'Aventure est DÉFINITIF : la sauvegarde de
+  // reprise (boutique précédente) est supprimée — la réserve non encaissée est perdue.
+  if(advActive && advClearSavedRun) advClearSavedRun();
   resetToMenu();
 }
 function modeConfirmNo(){
@@ -3946,17 +4245,17 @@ function resetToMenu(){
     stopAdvClock();
   }
   advActive = false;
-  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoost = false; advExitBoostValidated = false; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = [];
+  advRound = 0; advReserve = 0; advPendingXp = 0; advShopPendingPct = 0; advExitBoostTargets = []; advMirage = null; advAngelRing = false; advStagePalierMs = 0; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMaxTries = null; advPalierMs = 0; advPalierBaseMs = 0;
   advInsuranceCount = 0; advMalus = null; advNoGainFloor = 0;
   advDistinct = true; advShopVisited = 0;
-  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = [];
+  advChallenge = null; advChallengeStart = 0; advChallengeTries = null; advTimeFrozen = false; advShadow = null; advShadowLinePos = []; advFloorPct = 0; advBrouillard = null; advBrouillardReveal = false;
   advMalusUntil = 0; advIntroNext = null; advIntroShownRound = 0; advIntroPrevHidden = {};
   advNumbersMode = false; advNumbersMap = null;
   document.getElementById('advChoice').classList.add('hidden');
   document.getElementById('advShop').classList.add('hidden');
   renderAdvBanner();
-  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4'); // sécurité : aucun thème collant au menu
+  document.body.classList.remove('infinite-mode', 'infinite-bg2', 'adv-palier1', 'adv-palier2', 'adv-palier3', 'adv-palier4', 'adv-palier5', 'adv-palier6'); // sécurité : aucun thème collant au menu
   renderInfiniteBanner();
   serieMindActive = false;
   serieMindRound = 1;
@@ -3971,7 +4270,7 @@ function resetToMenu(){
 
 function setStatus(text, cls){
   const el = document.getElementById('status');
-  el.textContent = text;
+  el.innerHTML = text; // les messages du jeu contiennent des balises HTML (<b>…) qui doivent être rendues, pas affichées en clair
   el.className = 'status' + (cls ? ' ' + cls : '');
   // Icône de victoire / défaite (contre l'ordi) : trophée doré ou bouclier brisé,
   // affichée au-dessus du message de statut. Ne concerne que les vraies parties.
@@ -4019,18 +4318,49 @@ function hideSecretReveal(){
 
 function renderHistory(){
   const el = document.getElementById('history');
-  el.innerHTML = history.map((h, idx) => {
+  // 🌫️ Palier 6 « Le Brouillard » : fenêtre glissante — nettes / floues / cachées.
+  // À la fin de l'étage (victoire ou défaite), advBrouillardReveal révèle TOUT l'historique.
+  const fw = advActive && advBrouillard && !advBrouillardReveal ? advBrouillard : null;
+  // 🌑 Boule d'Ombre : l'étage 16 (premier étage du palier 4, sans masque) montre la mécanique.
+  const shadowBall = advActive && advTheme() === 'ombre' && advRound === 16;
+  const ballHTML = shadowBall
+    ? `<div class="row" style="justify-content:center;gap:10px;">
+        <span class="shadow-ball"></span>
+        <span style="color:#b0a8d0;font-size:12.5px;">L'Ombre observe… (aucune couleur masquée à cet étage)</span>
+      </div>`
+    : '';
+  el.innerHTML = ballHTML + history.map((h, idx) => {
     // 🌑 Palier 4 « L'Ombre » : masque des positions tirées pour cette ligne.
-    const hid = advShadowActive() ? advShadowPosFor(idx) : [];
+    // 🪞 Palier 5 : un miroir peut aussi avoir ses propres couleurs CACHÉES (option 25-A/B).
+    const hid = advShadowActive() ? advShadowPosFor(idx) : (h.mirror && h.hiddenPos ? h.hiddenPos : []);
     const pegs = h.guess.map((ci, pi) => hid.includes(pi)
       ? '<div class="peg shadow-peg">?</div>'
       : pegHTML(ci, 'peg')).join('');
     const fpegs = [];
-    for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
-    for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
+    // 🪞 Palier 5 : corrections partielles — les blancs peuvent être cachés
+    // (userBlackOnly pour TES lignes, mirrorBlackOnly pour les miroirs).
+    const hideWhite = advActive && advMirage && (h.mirror ? advMirage.mirrorBlackOnly : advMirage.userBlackOnly);
+    const showBlack = h.black, showWhite = hideWhite ? 0 : h.white;
+    for(let i=0;i<showBlack;i++) fpegs.push('<div class="fpeg black"></div>');
+    for(let i=0;i<showWhite;i++) fpegs.push('<div class="fpeg white"></div>');
     while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
-    return `<div class="row">
-      <span class="num">${idx+1}</span>
+    const mirCls = h.mirror ? ' mirror-row' : '';
+    // 🌫️ Classification de la ligne dans la fenêtre de brouillard.
+    // La fenêtre est comptée DEPUIS LES DERNIÈRES lignes (les plus récentes restent
+    // nettes) : ce sont les ANCIENNES qui se noient dans la brume — le joueur doit
+    // mémoriser ses vieux coups, jamais son essai en cours.
+    let fogCls = '';
+    if(fw){
+      const dist = history.length - idx; // 1 = ligne la plus récente (en bas)
+      if(dist >= fw.hiddenFrom){
+        fogCls = ' hidden-row' + (fw.keepCorr ? ' keep-corr' : ''); // trop vieille : cachée
+      } else if(dist > fw.clear){
+        fogCls = ' fog-row' + (fw.fogBlind ? ' fog-blind' : '') + (fw.hideCorr ? ' hide-corr' : ''); // floue
+      }
+    }
+    const numTxt = h.mirror ? '🪞' : String(idx+1);
+    return `<div class="row${mirCls}${fogCls}">
+      <span class="num">${numTxt}</span>
       <div class="pegs">${pegs}</div>
       <div class="feedback-mini">${fpegs.join('')}</div>
     </div>`;
@@ -4115,29 +4445,32 @@ function submitUserGuess(){
         if(advChallenge.maxMs && elapsedMs > advChallenge.maxMs + 900){
           failReason = `défi raté : ${advFormatClock(elapsedMs)} au lieu de moins de ${advFormatClock(advChallenge.maxMs)}`;
         }
-        if(!failReason && advChallenge.maxAttempts !== undefined && history.length > advChallenge.maxAttempts){
-          failReason = `défi raté : ${history.length} essais au lieu de ${advChallenge.maxAttempts} max`;
+        if(!failReason && advChallenge.maxAttempts !== undefined && advEssaisUtilises() > advChallenge.maxAttempts){
+          failReason = `défi raté : ${advEssaisUtilises()} essais au lieu de ${advChallenge.maxAttempts} max`;
         }
         // (le −1 essai permanent de l'option B/14 est appliqué au moment du choix)
         if(failReason){ advDefeat(failReason); return; } // 😇 l'anneau de l'ange peut rejouer le défi : advChallenge est conservé pour le replay
       }
       advChallenge = null;
       const noGain = (advNoGainFloor === advRound);
-      // XP d'étage — anti-farm : palier 1 volontairement peu rentable (15 XP max),
-      // la vraie récompense pousse vers les paliers profonds (le multiplicateur ×palier
-      // amplifie les barèmes élevés des paliers 3+). Bonus de rang inclus.
-      const p = advPalier();
+      // XP d'étage — v3 : pente douce, le multiplicateur de palier est
+      // ADV_PALIER_MULT (×1 → ×3.5) au lieu de ×palier à la hausse brutale.
+      // Bonus de rang inclus.
       // Anti-farm : le palier 1 est un tutorial, le palier 2 reste modeste. Les
       // barèmes élevés ne s'ouvrent qu'aux paliers profonds (3+, à venir).
+      const p = advPalier();
       const capBase = (p === 1) ? 10 : 14;
-      const baseXp = Math.min(Math.max(xpForAttempts(history.length), 5), capBase);
-      const wonAdv = noGain ? 0 : Math.round((baseXp + rankWinBonus()) * p);
+      const advCoups = advPlayerAttempts(); // 🪞 seuls TES coups comptent pour l'XP (jamais les miroirs)
+      const baseXp = Math.min(Math.max(xpForAttempts(advCoups), 5), capBase);
+      const wonAdv = noGain ? 0 : Math.max(1, Math.round((baseXp + rankWinBonus()) * (ADV_PALIER_MULT[p] !== undefined ? ADV_PALIER_MULT[p] : p) * (1 + advFloorPct / 100))); // 🎯 option A : le % du choix s'applique au GAIN, jamais à la réserve · v3 : multiplicateur doux par palier
       advPendingXp = wonAdv; // prévisionnel : consolidé au choix suivant
-      sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: false});
+      sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: advCoups, training: false});
       // Pas d'entrée d'historique ici : une seule entrée « Aventure » est écrite
       // à la FIN du run (sortie, sommet ou défaite) — pas une par étage.
-      setStatus(`🗺️ Étage ${advRound} réussi en ${history.length} coup${history.length>1?'s':''} !${noGain ? ' ⚠️ Malus : cet étage ne rapporte rien.' : ` +${wonAdv} XP en attente (${advReserve} + ${advPendingXp} XP).`}`, 'win');
+      setStatus(`🗺️ Étage ${advRound} réussi en ${advCoups} coup${advCoups>1?'s':''} !${noGain ? ' ⚠️ Malus : cet étage ne rapporte rien.' : ` +${wonAdv} XP — réserve : <b>${advReserve + wonAdv} XP</b>.`}`, 'win');
       launchConfetti();
+      // 🌫️ Fin d'étage dans Le Brouillard : TOUT l'historique est révélé avant l'écran de choix/boutique.
+      if(advBrouillard){ advBrouillardReveal = true; renderHistory(); }
       document.getElementById('userInputArea').classList.add('hidden');
       advRoundCompleted();
       return;
@@ -4175,7 +4508,63 @@ function submitUserGuess(){
     return;
   }
 
-  if(moveLimit !== null && history.length >= moveLimit){
+  // 🪞 Palier 5 « Le Mirage » : lignes miroir du jeu, ajoutées après TON coup.
+  // Selon l'option choisie, elles CONSOMMENT un essai (A/B) ou sont GRATUITES (C).
+  // Leurs corrections sont toujours VRAIES : croise-les avec les tiennes pour
+  // déduire le code. Un miroir ne gagne jamais à ta place.
+  let mirageAdded = 0;
+  if(advActive && advMirage && advMirage.count > 0 && !(moveLimit !== null && advEssaisUtilises() >= moveLimit)){
+    for(let m = 0; m < advMirage.count; m++){
+      let mg = null;
+      for(let t = 0; t < 40 && !mg; t++){
+        const rnd = () => Math.floor(Math.random() * NB_COULEURS);
+        const g = [rnd(), rnd(), rnd(), rnd()];
+        if(advMirage.wellPlaced){
+          // 1 couleur du code BIEN placée (position et couleur garanties).
+          const p = Math.floor(Math.random() * NB_TROUS);
+          g[p] = secretCode[p];
+        } else if(advMirage.quad){
+          // 4 fois la même couleur (le code du palier est distinct : jamais gagnant).
+          const c = rnd(); g[0] = c; g[1] = c; g[2] = c; g[3] = c;
+        } else if(advMirage.noDouble){
+          // 4 couleurs distinctes, mélangées.
+          const pool = [...Array(NB_COULEURS).keys()];
+          for(let i = pool.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+          g[0] = pool[0]; g[1] = pool[1]; g[2] = pool[2]; g[3] = pool[3];
+        } else if(advMirage.misplaced){
+          // 1 couleur du code MAL placée (1 blanc garanti).
+          const p = Math.floor(Math.random() * NB_TROUS);
+          let js = [0, 1, 2, 3].filter(j => j !== p && secretCode[j] !== secretCode[p]);
+          if(!js.length) js = [0, 1, 2, 3].filter(j => j !== p);
+          g[js[Math.floor(Math.random() * js.length)]] = secretCode[p];
+        } else if(advMirage.twoPairs){
+          // 2 couleurs jouées en doublon : [a,a,b,b] mélangé.
+          let a = rnd(), b = rnd();
+          let guard = 0; while(b === a && guard++ < 24) b = rnd();
+          const q = [a, a, b, b];
+          for(let i = q.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [q[i], q[j]] = [q[j], q[i]]; }
+          g[0] = q[0]; g[1] = q[1]; g[2] = q[2]; g[3] = q[3];
+        }
+        if(g.join(',') === secretCode.join(',')) continue; // le miroir ne gagne JAMAIS à ta place
+        mg = g;
+      }
+      if(mg){
+        const mfb = feedback(mg, secretCode);
+        const row = {guess: mg, black: mfb.black, white: mfb.white, mirror: true, free: !!advMirage.free};
+        if(advMirage.hide){
+          // Couleurs du miroir CACHÉES : positions tirées une fois pour toutes (stables au rendu).
+          const pos = [0, 1, 2, 3];
+          for(let i = pos.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [pos[i], pos[j]] = [pos[j], pos[i]]; }
+          row.hiddenPos = pos.slice(0, advMirage.hide);
+        }
+        history.push(row);
+        mirageAdded++;
+      }
+    }
+    if(mirageAdded) renderHistory();
+  }
+
+  if(moveLimit !== null && (advActive ? advEssaisUtilises() : history.length) >= moveLimit){
     if(serieMindActive){
       serieMindLose();
       return;
@@ -4214,7 +4603,8 @@ function submitUserGuess(){
   renderSlots();
   renderAttemptsLeft();
   document.getElementById('submitGuessBtn').disabled = true;
-  setStatus(`Essai ${history.length} : ${fb.black} bien placé(s), ${fb.white} mal placé(s). À toi de rejouer.`);
+  const _essais = advActive ? advEssaisUtilises() : history.length; // 🪞 les miroirs gratuits ne consomment pas d'essai
+  setStatus(`Essai ${_essais} : ${fb.black} bien placé(s), ${fb.white} mal placé(s). À toi de rejouer.${mirageAdded ? ` 🪞 ${mirageAdded} ligne${mirageAdded > 1 ? 's' : ''} miroir ajoutée${mirageAdded > 1 ? 's' : ''}${advMirage && advMirage.free ? ' (gratuite' + (mirageAdded > 1 ? 's' : '') + ' 🎁)' : ' (essai' + (mirageAdded > 1 ? 's' : '') + ' consommé' + (mirageAdded > 1 ? 's' : '') + ')'}.` : ''}`);
 }
 
 function renderAnalysisLoading(){
@@ -5522,6 +5912,26 @@ window.openInfiniteBoard = async () => {
     .sort((a, b) => b.best - a.best)
     .slice(0, 20);
   document.getElementById('infiniteBoardMonth').textContent = `Classement de la semaine — remise à zéro chaque lundi à 0h00 · 🎁 Le vainqueur remporte ${infiniteRewardXp} XP !`;
+  // 🏆 Cadre « semaine dernière » : le podium de la semaine écoulée reste visible,
+  // pour savoir qui a gagné (et à quel score) même après la remise à zéro.
+  const pk = window.getParisPrevWeekKey();
+  const prevRows = Object.entries(playersData)
+    .map(([p, d]) => ({ p, best: d && d.stats && d.stats.infiniteWeek === pk ? (d.stats.infiniteBest || 0) : 0 }))
+    .filter(r => r.best > 0)
+    .sort((a, b) => b.best - a.best)
+    .slice(0, 10);
+  const pt = document.getElementById('infiniteBoardPrevTitle');
+  const pl = document.getElementById('infiniteBoardPrevList');
+  if(pt && pl){
+    if(prevRows.length){
+      pt.textContent = `🏆 Semaine dernière (${window.weekLabelFromKey(pk)}) — vainqueur : ${prevRows[0].p} avec ${prevRows[0].best} victoire${prevRows[0].best > 1 ? 's' : ''} d'affilée`;
+      pl.innerHTML = prevRows.map((r, i) =>
+        `<div class="row"><span class="num">${i + 1}</span><b${i === 0 ? ' style="color:#ffd700;"' : ''}>${escapeHtml(r.p)}</b><span style="margin-left:auto;">${r.best} victoire${r.best > 1 ? 's' : ''} d'affilée</span></div>`).join('');
+    } else {
+      pt.textContent = '🏆 Semaine dernière : aucune série enregistrée';
+      pl.innerHTML = '';
+    }
+  }
   const el = document.getElementById('infiniteBoardList');
   el.innerHTML = rows.length
     ? rows.map((r, i) => `<div class="row"><span class="num">${i+1}</span><b>${r.p}</b>${i===0 && infiniteRewardXp ? '<span style="margin-left:6px;">🎁</span>' : ''}<span style="margin-left:auto;">${r.best} victoire${r.best>1?'s':''} d'affilée</span></div>`).join('')
@@ -5555,11 +5965,42 @@ window.maybePayInfiniteWeekly = async () => {
   }
   if(!winner || !infiniteRewardXp) return;
   runTransaction(ref(db, `players/${winner}/xp`), (cur) => (cur || 0) + infiniteRewardXp);
-  // Trace la remise pour l'admin.
-  set(ref(db, 'config/infiniteReward/lastPaid'), { week: pk, winner, amount: infiniteRewardXp, at: Date.now() }).catch(() => {});
+  // Trace la remise pour l'admin (et pour la pop-up « vainqueur de la semaine »).
+  set(ref(db, 'config/infiniteReward/lastPaid'), { week: pk, winner, amount: infiniteRewardXp, best, at: Date.now() }).catch(() => {});
 };
-window.maybePayInfiniteWeekly();
-setInterval(() => { window.maybePayInfiniteWeekly(); }, 10 * 60 * 1000); // check toutes les 10 min
+// 📅 Libellé lisible d'une semaine (clé lundi YYYY-MM-DD) : « 20 au 26 octobre 2026 ».
+window.weekLabelFromKey = (k) => {
+  const parts = (k || '').split('-').map(Number);
+  if(!parts[0]) return k || '';
+  const mo = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  const end = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + 6));
+  return `${parts[2]} au ${end.getUTCDate()} ${mo[end.getUTCMonth()]} ${parts[0]}`;
+};
+// 🏆 Pop-up « vainqueur de la semaine » : montrée UNE SEULE fois par joueur,
+// quand la page est chargée après le changement de semaine (lundi 0h00) et que
+// la récompense de la semaine écoulée a bien été distribuée.
+window.maybeShowInfiniteWeeklyWinner = async () => {
+  let info = null;
+  try { info = (await get(ref(db, 'config/infiniteReward/lastPaid'))).val(); } catch(e) { return; }
+  if(!info || !info.winner || info.week !== window.getParisPrevWeekKey()) return;
+  const seenKey = 'bm_infWinShown_' + info.week;
+  try { if(localStorage.getItem(seenKey) === '1') return; } catch(e) {}
+  const best = info.best || 0;
+  const amount = info.amount || infiniteRewardXp;
+  document.getElementById('infiniteWinnerMsg').innerHTML =
+    `La semaine du <b>${window.weekLabelFromKey(info.week)}</b> est terminée !<br><br>
+     <b style="color:#ffd700;">🏆 ${escapeHtml(info.winner)}</b> remporte le classement du Monde infini avec
+     <b style="color:#ffd700;">${best} victoire${best > 1 ? 's' : ''} d'affilée</b> !<br><br>
+     <span class="muted">Récompense : <b style="color:#ffd700;">${amount} XP</b>. Le classement de la nouvelle semaine est remis à zéro — à toi de jouer !</span>`;
+  document.getElementById('infiniteWinnerScreen').classList.remove('hidden');
+};
+window.closeInfiniteWinnerPopup = () => {
+  document.getElementById('infiniteWinnerScreen').classList.add('hidden');
+  // La pop-up ne sera plus montrée pour cette semaine.
+  try { localStorage.setItem('bm_infWinShown_' + window.getParisPrevWeekKey(), '1'); } catch(e) {}
+};
+window.maybePayInfiniteWeekly().then(() => window.maybeShowInfiniteWeeklyWinner());
+setInterval(() => { window.maybePayInfiniteWeekly().then(() => window.maybeShowInfiniteWeeklyWinner()); }, 10 * 60 * 1000); // check toutes les 10 min
 
 // Récompense du mois (montant défini dans l'admin : config/infiniteReward.amount)
 let infiniteRewardXp = 0;
@@ -6289,7 +6730,7 @@ function renderOnlinePlayers(data){
     const onlineNow = !!presence;
     const isFriend = !!myFriends[pseudo];
     const safePseudo = escapeHtml(pseudo);
-    const safeJs = safePseudo.replace(/'/g, "\\'");
+    const safeJs = safePseudo.replace(/'/g, "'");
     const info = plvl(pseudo);
     const statusLabel = !onlineNow ? '😴 hors ligne'
       : presence.status === 'in_duel' ? '⚔️ en duel'
@@ -7822,8 +8263,20 @@ setInterval(updateDailyTileGoldenState, 30000);
   <div class="card duel-card">
     <div class="duel-title">♾️ Monde infini — Top séries</div>
     <div class="muted" id="infiniteBoardMonth" style="font-size:.85em;margin-bottom:8px;"></div>
+    <div class="muted" id="infiniteBoardPrevTitle" style="font-size:.85em;margin:8px 0 4px;color:#ffd700;"></div>
+    <div class="history" id="infiniteBoardPrevList" style="max-height:150px;"></div>
+    <div class="muted" style="margin-top:12px;font-size:.85em;">Classement en cours :</div>
     <div class="history" id="infiniteBoardList"></div>
     <button class="btn secondary" onclick="window.closeInfiniteBoard()">Fermer</button>
+  </div>
+</div>
+
+<!-- 🏆 Pop-up « vainqueur de la semaine » (Monde infini, après le lundi 0h00) -->
+<div id="infiniteWinnerScreen" class="hidden duel-overlay">
+  <div class="card duel-card">
+    <div class="duel-title">🏆 Vainqueur de la semaine !</div>
+    <div class="infinite-choice-msg" id="infiniteWinnerMsg" style="text-align:left;white-space:normal;line-height:1.7;margin-top:10px;"></div>
+    <button class="btn" style="margin-top:16px;" onclick="window.closeInfiniteWinnerPopup()">✅ Bravo !</button>
   </div>
 </div>
 
