@@ -7145,22 +7145,54 @@ const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai 
 const FLASH_LOCK_HOURS = 3;
 const FLASH_XP_WIN = 100; // récompense pour la ligne finale trouvée (essai unique) : bien plus payant que la partie contre l'ordi, car un seul essai et 3h d'attente.
 
+// Indice humain affiché sous la grille : nombre de couleurs distinctes du code.
+function puzzleDistinctHint(secret){
+  const n = new Set(secret).size;
+  return n === 4
+    ? 'les 4 couleurs du code sont toutes différentes'
+    : 'le code contient ' + n + ' couleurs différentes';
+}
+
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
-// Le nombre de lignes nécessaires varie (souvent 3 à 5) : peu importe tant que
-// le puzzle reste résoluble par pure déduction.
-function generatePuzzleData(){
-  for(let attempt = 0; attempt < 300; attempt++){
-    const secret = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+// V2 « lisibilité humaine » : les lignes données sont SANS doublons et choisies
+// pour leur valeur d'information (on garde celle qui réduit le plus de candidats),
+// donc chaque étape de la déduction reste faisable de tête, sans énumération.
+//   - difficulty 'flash' (facile) : secret SANS doublons, 3-4 lignes, traîne ~224 → ~10 → 1.
+//   - difficulty 'daily' (costaud) : doublons possibles dans le secret, 4-5 lignes,
+//     traîne ~500 → ~60 → ~10 → 2 → 1, avec l'indice du nombre de couleurs pour guider.
+function generatePuzzleData(difficulty){
+  const easy = (difficulty === 'flash');
+  const distinct4 = () => {
+    const pool = [0,1,2,3,4,5,6,7];
+    for(let i = pool.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    return pool.slice(0, 4);
+  };
+  for(let attempt = 0; attempt < 60; attempt++){
+    const secret = easy ? distinct4() : [0,0,0,0].map(() => Math.floor(Math.random() * 8));
     let candidates = ALL_CODES_8;
     const lines = [];
     for(let i = 0; i < PUZZLE_MAX_LINES; i++){
-      const guess = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
-      const fb = feedbackFor(guess, secret, 8);
-      lines.push({ guess, black: fb.black, white: fb.white });
+      // Tirage de quelques candidates informatives (toujours 4 couleurs distinctes,
+      // plus lisibles pour un humain) : on garde la plus discriminante.
+      let best = null, bestCount = Infinity;
+      for(let t = 0; t < 5; t++){
+        const guess = distinct4();
+        const fb = feedbackFor(guess, secret, 8);
+        let count = 0;
+        for(let c = 0; c < candidates.length; c++){
+          const f = feedbackFor(guess, candidates[c], 8);
+          if(f.black === fb.black && f.white === fb.white) count++;
+        }
+        if(count < bestCount){ bestCount = count; best = { guess, fb }; }
+      }
+      lines.push({ guess: best.guess, black: best.fb.black, white: best.fb.white });
       candidates = candidates.filter(code => {
-        const f = feedbackFor(guess, code, 8);
-        return f.black === fb.black && f.white === fb.white;
+        const f = feedbackFor(best.guess, code, 8);
+        return f.black === best.fb.black && f.white === best.fb.white;
       });
       if(candidates.length === 1) break;
     }
@@ -7173,7 +7205,7 @@ function ensurePuzzle(dateKey){
   const puzzleRef = ref(db, `puzzleChallenge/${dateKey}`);
   return runTransaction(puzzleRef, (current) => {
     if(current !== null) return; // déjà généré aujourd'hui : on n'y touche pas
-    const data = generatePuzzleData();
+    const data = generatePuzzleData('daily');
     if(!data) return;
     return { secret: data.secret, lines: data.lines };
   }).then((result) => result.snapshot.val());
@@ -7251,7 +7283,7 @@ async function openPuzzleChallenge(){
 async function loadMyPuzzleProgress(){
   const snap = await get(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}`));
   const data = snap.val();
-  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai.`;
+  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(puzzleSecret)}.`;
 
   if(data && data.finished){
     puzzleFinished = true;
@@ -7426,7 +7458,8 @@ function updateFlashTileUI(){
 }
 
 // Grille Éclair en cours (sauvegardée sur l'appareil tant qu'on n'a pas répondu)
-function flashCurrentKey(){ return `bm_flash_current_${myPseudo}`; }
+// v2 : clé versionnée — les anciennes grilles (générateur dur v1) stockées en localStorage sont ignorées.
+function flashCurrentKey(){ return `bm_flash_current_v2_${myPseudo}`; }
 function loadFlashCurrent(){
   try {
     const raw = localStorage.getItem(flashCurrentKey());
@@ -7456,7 +7489,7 @@ async function openFlashPuzzle(){
   // Grille conservée : si on quitte sans répondre puis qu'on revient, c'est la MÊME grille.
   let data = loadFlashCurrent();
   if(!data){
-    data = generatePuzzleData();
+    data = generatePuzzleData('flash');
     if(!data){
       document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
       return;
@@ -7466,6 +7499,7 @@ async function openFlashPuzzle(){
   }
   flashSecret = data.secret;
   flashLines = data.lines;
+  document.getElementById('flashSub').textContent = `Une grille rien que pour toi : à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(flashSecret)}.`;
   flashFinished = false;
   flashGuess = [null,null,null,null];
   flashSelectedSlot = 0;
