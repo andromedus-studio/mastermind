@@ -2766,11 +2766,6 @@ function renderAdvBanner(){
   }
   // 🎯 Option A : le % du choix s'applique au gain de l'étage en cours
   if(advFloorPct) html += chip(advFloorPct > 0 ? 'rgba(140,255,170,.6)' : 'rgba(255,138,128,.6)', `🎯 ${advFloorPct > 0 ? '+' : ''}${advFloorPct}% gain d'étage`);
-  // 🚀 Bonus de sortie cumulable : actifs + en attente
-  const bActive = advExitBoostTargets.filter(t => t <= advRound).length;
-  const bPending = advExitBoostTargets.filter(t => t > advRound).length;
-  if(bActive) html += chip('rgba(255,215,0,.6)', `🚀 +${bActive * 25}% sortie`);
-  if(bPending) html += chip('', `🚀 +${bPending * 25}% en attente (dès l'étage ${Math.min(...advExitBoostTargets.filter(t => t > advRound))})`);
   el.innerHTML = html;
 }
 // Malus aléatoires (boutiques, annoncés avant le début du palier suivant)
@@ -3160,6 +3155,10 @@ const ADV_GREED_TRIES = { 1: 16, 2: 14, 3: 12, 4: 10 }; // option B (🟦 bleu :
 const ADV_GREED_PCT = { 1: 15, 2: 15, 3: 20, 4: 20 };  // % du boost bleu B selon l'étage visé (2→5)
 const ADV_TEMPS_BLUE = { 1: 5, 2: 5, 3: 10, 4: 10 };  // 🟦 % du boost bleu B du palier Temps (étages visés 7→10) — v3
 const ADV_PALIER_MULT = { 1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3, 6: 3.5 };  // v3 : pente douce du gain de base par palier (Saphir/5 coups ≈ 20/30/40/50/60/70 XP)
+// 🚪 Frais de sortie (anti-farm) : encaisser en boutique 1-2 coûte cher, la
+// profondeur paie (boutiques 4+ = bonus). Tuer la boucle « farm 1→10 ».
+const ADV_CASHOUT_MULT = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.15, 5: 1.25 };
+function advCashoutMult(){ const b = advRound / 5; return ADV_CASHOUT_MULT[b] !== undefined ? ADV_CASHOUT_MULT[b] : 1.25; } // boutiques ≥ 6 : ×1.25
 // Palier 3 « Challenge » — table des défis, indexée sur l'ÉTAGE VISÉ.
 // pct : % sur le gain d'étage (négatif = malus) · capMs : pendule du défi · tries : finir
 // avec N essais de moins (essais du défi, pas les totaux) · permTry : baisse
@@ -3477,14 +3476,13 @@ function showAdvChoices(){
     // 🟦 Le bonus IMMÉDIAT (boost de réserve) s'affiche en bleu, le reste en vert.
     const isBlue = c.bonus.indexOf('réserve (immédiat)') !== -1;
     const col = isBlue ? '#64c8ff' : '#8cffaa';
-    // 💛 Aperçu jaune du bénéfice concret de l'option.
-    let prev = '';
-    if(c.blue){
-      const nouv = Math.round(advReserve * (1 + c.blue / 100));
-      prev = ` <span style="color:#ffd700;">💛 réserve : ${advReserve} → ${nouv} XP</span>`;
-    } else if(c.pct !== undefined){
-      prev = ` <span style="color:#ffd700;">💛 gain estimé : +${advPreviewGain(c.pct)} XP</span>`;
-    }
+    // 💛 Aperçu jaune UNIFORME : pour CHAQUE option, l'XP qu'on aura À LA FIN de
+    // l'étage visé (boost bleu appliqué immédiatement + gain estimé de l'étage,
+    // hypothèse victoire en 5 coups). Même format partout.
+    const gainPct = c.pct !== undefined ? c.pct : 0;
+    const reserveDebut = c.blue ? Math.round(advReserve * (1 + c.blue / 100)) : advReserve;
+    const fin = reserveDebut + advPreviewGain(gainPct);
+    const prev = ` <span style="color:#ffd700;">💛 à la fin de l'étage : ${advReserve} → ${fin} XP</span>`;
     return `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
       <b style="color:${col};">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}${prev}
     </button>`;}).join('');
@@ -3538,18 +3536,8 @@ function advShopOffers(){
   if(p >= 3){
     offers.push({ id: 'angelring', icon: '😇', label: 'Anneau de l\'ange', desc: 'En cas de défaite : tu rejoues l\'étage perdu au lieu de tout perdre (pendule totale remise au début de l\'étage). Consommé à l\'usage, un seul à la fois.', costPct: 30 });
   }
-  // 🚀 Bonus de sortie +25% : de retour en boutique (15/25/35/45) — la cible est
-  // l'étage-charnière suivant, le bonus n'est actif qu'après l'avoir atteint.
-  // 🚀 Bonus de sortie +25% : vendu aux boutiques des étages 15, 25, 35, 45.
-  // La cible est l'étage-charnière suivant (20/30/40/50) : sortir en boutique
-  // APRÈS l'avoir atteint applique +25% cumulables sur l'encaissement.
-  if([15, 25, 35, 45].includes(advRound)){ // boutiques 15/25/35/45 SEULEMENT (pas la boutique 1) → cibles 20/30/40/50
-    const target = advRound + 5;
-    if(!advExitBoostTargets.includes(target)){
-      offers.push({ id: 'exitboost', icon: '🚀', label: `+25% à la sortie (dès l'étage ${target})`,
-        desc: `Sortir en boutique après l'étage ${target} encaisse ta réserve avec +25% (achat validé en atteignant l'étage). Cumulable avec les autres cibles.`, costPct: (advRound === 15 ? 20 : 25) });
-    }
-  }
+  // 🚀 Bonus de sortie +25% : RETIRÉ — remplacé par les frais/bonus de sortie
+  // automatiques selon la boutique (voir ADV_CASHOUT_MULT).
   // 🎲 Le gamble est proposé à toutes les boutiques (le sommet a été retiré :
   // continuer après n'importe quelle boutique est toujours possible).
   offers.push({ id: 'gamble', icon: '🎲', label: '+20% de réserve…', desc:'…mais malus aléatoire au prochain palier (annoncé avant de commencer). Ne s\'applique qu\'au prochain étage : partir aussitôt ne le valide pas.', costPct: 0, risky: true });
@@ -3575,11 +3563,10 @@ function showAdvShop(){
   }).join('');
   document.getElementById('advShopContinue').textContent = `▶️ Continuer l'aventure`;
   const cashBtn = document.getElementById('advShopCashOut');
-  // 🚀 Bonus de sortie acheté (cumulable) : le bouton « Sortir » affiche le % en clair.
-  const shopActiveBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
-  cashBtn.innerHTML = shopActiveBoosts
-    ? `🏦 Sortir et encaisser <b style="color:#ffd700;">+${shopActiveBoosts * 25}%</b> (${Math.floor(advReserve * mult * (1 + 0.25 * shopActiveBoosts))} XP)`
-    : `🏦 Sortir et encaisser (${Math.floor(advReserve * mult)} XP)`;
+  // 🚪 Frais de sortie anticipé / bonus de profondeur : affichés en clair sur le bouton.
+  const shopFee = advCashoutMult();
+  const feeNote = shopFee < 1 ? ` <span style="color:#ff8a80;">frais ×${shopFee}</span>` : shopFee > 1 ? ` <b style="color:#ffd700;">profondeur ×${shopFee}</b>` : '';
+  cashBtn.innerHTML = `🏦 Sortir et encaisser${feeNote} (${Math.round(advReserve * mult * shopFee)} XP)`;
   document.getElementById('advShop').classList.remove('hidden');
 }
 function advShopMultiplier(){
@@ -3611,7 +3598,6 @@ function advBuy(id){
     else if(id === 'time50') advPalierMs += Math.floor(advPalierMs * 0.5); // +50% du temps RESTANT
     else if(id === 'time3') advPalierMs += (advPalier() <= 3 ? 5 : 3) * 60000; // boutiques 2-3 : +5 min (v3)
     else if(id === 'angelring') advAngelRing = true; // 😇 rejoue l'étage perdu en cas de défaite
-    else if(id === 'exitboost'){ advExitBoostTargets.push(advRound + 5); } // 🚀 +25% encaissés après l'étage-charnière
   }
   if(window.testLog) window.testLog('advBuy', { achat: id, cout: cost, reserveApres: advReserve, essaisMax: advMaxTries === null ? -1 : advMaxTries }); // 🧪
   showAdvShop();
@@ -3737,21 +3723,21 @@ function advEnsureBoardVisible(){
 }
 function advShopCashOut(){
   document.getElementById('advShop').classList.add('hidden');
-  // Sortie immédiate : les achats « en attente » (gamble) ne s'appliquent PAS,
-  // et le bonus de sortie ne compte que s'il a été acheté puis validé par un étage.
+  // Sortie immédiate : les achats « en attente » (gamble) ne s'appliquent PAS.
   advShopPendingPct = 0;
   const mult = advShopMultiplier();
-  const activeBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
-  const pendingBoosts = advExitBoostTargets.filter(t => t > advRound).length;
-  const boostMult = 1 + 0.25 * activeBoosts; // 🚀 cumulable : +25% par achat validé
-  const banked = window.addXp(Math.floor(advReserve * mult * boostMult));
+  const feeMult = advCashoutMult(); // 🚪 frais de sortie anticipé (boutiques 1-2) ou bonus de profondeur (4+)
+  const banked = window.addXp(Math.round(advReserve * mult * feeMult));
   recordGameHistory({type: 'aventure', result: `sortie étage ${advRound}`, attempts: history.length, xp: banked});
-  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, boost: activeBoosts, boostPct: activeBoosts * 25, encaisse: banked }); // 🧪
+  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, feeMult: feeMult, encaisse: banked }); // 🧪
   advClearSavedRun(); // encaissement : la run est terminée
   // 🏦 Confirmation en POP-UP (plus de message éphémère en haut de page).
+  const feeTxt = feeMult < 1
+    ? `<b style="color:#ff8a80;">Frais de sortie anticipé : ×${feeMult}</b><br><span class="muted">Encaisser tôt coûte cher — va plus loin pour encaisser plein pot !</span><br><br>`
+    : feeMult > 1 ? `<b style="color:#ffd700;">Bonus de profondeur : ×${feeMult}</b><br><br>` : '';
   const cashMsg = `Tu sors de l'Aventure à l'étage <b>${advRound}</b>.<br><br>
-    <b style="color:#ffd700;">💰 +${banked} XP encaissés !</b>${activeBoosts ? ` <span style="color:#ffd700;">(+${activeBoosts * 25}% 🚀)</span>` : ''}<br><br>
-    <span class="muted">${pendingBoosts ? `${pendingBoosts} bonus 🚀 non validé${pendingBoosts > 1 ? 's' : ''} : actif seulement plus loin dans la tour.` : 'Bonne progression — à la prochaine run !'}</span>`;
+    ${feeTxt}<b style="color:#ffd700;">💰 +${banked} XP encaissés !</b><br><br>
+    <span class="muted">Bonne progression — à la prochaine run !</span>`;
   document.getElementById('advCashConfirmMsg').innerHTML = cashMsg;
   document.getElementById('advCashConfirm').classList.remove('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
@@ -7159,22 +7145,54 @@ const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai 
 const FLASH_LOCK_HOURS = 3;
 const FLASH_XP_WIN = 100; // récompense pour la ligne finale trouvée (essai unique) : bien plus payant que la partie contre l'ordi, car un seul essai et 3h d'attente.
 
+// Indice humain affiché sous la grille : nombre de couleurs distinctes du code.
+function puzzleDistinctHint(secret){
+  const n = new Set(secret).size;
+  return n === 4
+    ? 'les 4 couleurs du code sont toutes différentes'
+    : 'le code contient ' + n + ' couleurs différentes';
+}
+
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
-// Le nombre de lignes nécessaires varie (souvent 3 à 5) : peu importe tant que
-// le puzzle reste résoluble par pure déduction.
-function generatePuzzleData(){
-  for(let attempt = 0; attempt < 300; attempt++){
-    const secret = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+// V2 « lisibilité humaine » : les lignes données sont SANS doublons et choisies
+// pour leur valeur d'information (on garde celle qui réduit le plus de candidats),
+// donc chaque étape de la déduction reste faisable de tête, sans énumération.
+//   - difficulty 'flash' (facile) : secret SANS doublons, 3-4 lignes, traîne ~224 → ~10 → 1.
+//   - difficulty 'daily' (costaud) : doublons possibles dans le secret, 4-5 lignes,
+//     traîne ~500 → ~60 → ~10 → 2 → 1, avec l'indice du nombre de couleurs pour guider.
+function generatePuzzleData(difficulty){
+  const easy = (difficulty === 'flash');
+  const distinct4 = () => {
+    const pool = [0,1,2,3,4,5,6,7];
+    for(let i = pool.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+    }
+    return pool.slice(0, 4);
+  };
+  for(let attempt = 0; attempt < 60; attempt++){
+    const secret = easy ? distinct4() : [0,0,0,0].map(() => Math.floor(Math.random() * 8));
     let candidates = ALL_CODES_8;
     const lines = [];
     for(let i = 0; i < PUZZLE_MAX_LINES; i++){
-      const guess = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
-      const fb = feedbackFor(guess, secret, 8);
-      lines.push({ guess, black: fb.black, white: fb.white });
+      // Tirage de quelques candidates informatives (toujours 4 couleurs distinctes,
+      // plus lisibles pour un humain) : on garde la plus discriminante.
+      let best = null, bestCount = Infinity;
+      for(let t = 0; t < 5; t++){
+        const guess = distinct4();
+        const fb = feedbackFor(guess, secret, 8);
+        let count = 0;
+        for(let c = 0; c < candidates.length; c++){
+          const f = feedbackFor(guess, candidates[c], 8);
+          if(f.black === fb.black && f.white === fb.white) count++;
+        }
+        if(count < bestCount){ bestCount = count; best = { guess, fb }; }
+      }
+      lines.push({ guess: best.guess, black: best.fb.black, white: best.fb.white });
       candidates = candidates.filter(code => {
-        const f = feedbackFor(guess, code, 8);
-        return f.black === fb.black && f.white === fb.white;
+        const f = feedbackFor(best.guess, code, 8);
+        return f.black === best.fb.black && f.white === best.fb.white;
       });
       if(candidates.length === 1) break;
     }
@@ -7187,7 +7205,7 @@ function ensurePuzzle(dateKey){
   const puzzleRef = ref(db, `puzzleChallenge/${dateKey}`);
   return runTransaction(puzzleRef, (current) => {
     if(current !== null) return; // déjà généré aujourd'hui : on n'y touche pas
-    const data = generatePuzzleData();
+    const data = generatePuzzleData('daily');
     if(!data) return;
     return { secret: data.secret, lines: data.lines };
   }).then((result) => result.snapshot.val());
@@ -7265,7 +7283,7 @@ async function openPuzzleChallenge(){
 async function loadMyPuzzleProgress(){
   const snap = await get(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}`));
   const data = snap.val();
-  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai.`;
+  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(puzzleSecret)}.`;
 
   if(data && data.finished){
     puzzleFinished = true;
@@ -7440,7 +7458,8 @@ function updateFlashTileUI(){
 }
 
 // Grille Éclair en cours (sauvegardée sur l'appareil tant qu'on n'a pas répondu)
-function flashCurrentKey(){ return `bm_flash_current_${myPseudo}`; }
+// v2 : clé versionnée — les anciennes grilles (générateur dur v1) stockées en localStorage sont ignorées.
+function flashCurrentKey(){ return `bm_flash_current_v2_${myPseudo}`; }
 function loadFlashCurrent(){
   try {
     const raw = localStorage.getItem(flashCurrentKey());
@@ -7470,7 +7489,7 @@ async function openFlashPuzzle(){
   // Grille conservée : si on quitte sans répondre puis qu'on revient, c'est la MÊME grille.
   let data = loadFlashCurrent();
   if(!data){
-    data = generatePuzzleData();
+    data = generatePuzzleData('flash');
     if(!data){
       document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
       return;
@@ -7480,6 +7499,7 @@ async function openFlashPuzzle(){
   }
   flashSecret = data.secret;
   flashLines = data.lines;
+  document.getElementById('flashSub').textContent = `Une grille rien que pour toi : à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(flashSecret)}.`;
   flashFinished = false;
   flashGuess = [null,null,null,null];
   flashSelectedSlot = 0;
