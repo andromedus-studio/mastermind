@@ -2766,11 +2766,6 @@ function renderAdvBanner(){
   }
   // 🎯 Option A : le % du choix s'applique au gain de l'étage en cours
   if(advFloorPct) html += chip(advFloorPct > 0 ? 'rgba(140,255,170,.6)' : 'rgba(255,138,128,.6)', `🎯 ${advFloorPct > 0 ? '+' : ''}${advFloorPct}% gain d'étage`);
-  // 🚀 Bonus de sortie cumulable : actifs + en attente
-  const bActive = advExitBoostTargets.filter(t => t <= advRound).length;
-  const bPending = advExitBoostTargets.filter(t => t > advRound).length;
-  if(bActive) html += chip('rgba(255,215,0,.6)', `🚀 +${bActive * 25}% sortie`);
-  if(bPending) html += chip('', `🚀 +${bPending * 25}% en attente (dès l'étage ${Math.min(...advExitBoostTargets.filter(t => t > advRound))})`);
   el.innerHTML = html;
 }
 // Malus aléatoires (boutiques, annoncés avant le début du palier suivant)
@@ -3481,14 +3476,13 @@ function showAdvChoices(){
     // 🟦 Le bonus IMMÉDIAT (boost de réserve) s'affiche en bleu, le reste en vert.
     const isBlue = c.bonus.indexOf('réserve (immédiat)') !== -1;
     const col = isBlue ? '#64c8ff' : '#8cffaa';
-    // 💛 Aperçu jaune du bénéfice concret de l'option.
-    let prev = '';
-    if(c.blue){
-      const nouv = Math.round(advReserve * (1 + c.blue / 100));
-      prev = ` <span style="color:#ffd700;">💛 réserve : ${advReserve} → ${nouv} XP</span>`;
-    } else if(c.pct !== undefined){
-      prev = ` <span style="color:#ffd700;">💛 gain estimé : +${advPreviewGain(c.pct)} XP</span>`;
-    }
+    // 💛 Aperçu jaune UNIFORME : pour CHAQUE option, l'XP qu'on aura À LA FIN de
+    // l'étage visé (boost bleu appliqué immédiatement + gain estimé de l'étage,
+    // hypothèse victoire en 5 coups). Même format partout.
+    const gainPct = c.pct !== undefined ? c.pct : 0;
+    const reserveDebut = c.blue ? Math.round(advReserve * (1 + c.blue / 100)) : advReserve;
+    const fin = reserveDebut + advPreviewGain(gainPct);
+    const prev = ` <span style="color:#ffd700;">💛 à la fin de l'étage : ${advReserve} → ${fin} XP</span>`;
     return `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
       <b style="color:${col};">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}${prev}
     </button>`;}).join('');
@@ -3542,18 +3536,8 @@ function advShopOffers(){
   if(p >= 3){
     offers.push({ id: 'angelring', icon: '😇', label: 'Anneau de l\'ange', desc: 'En cas de défaite : tu rejoues l\'étage perdu au lieu de tout perdre (pendule totale remise au début de l\'étage). Consommé à l\'usage, un seul à la fois.', costPct: 30 });
   }
-  // 🚀 Bonus de sortie +25% : de retour en boutique (15/25/35/45) — la cible est
-  // l'étage-charnière suivant, le bonus n'est actif qu'après l'avoir atteint.
-  // 🚀 Bonus de sortie +25% : vendu aux boutiques des étages 15, 25, 35, 45.
-  // La cible est l'étage-charnière suivant (20/30/40/50) : sortir en boutique
-  // APRÈS l'avoir atteint applique +25% cumulables sur l'encaissement.
-  if([15, 25, 35, 45].includes(advRound)){ // boutiques 15/25/35/45 SEULEMENT (pas la boutique 1) → cibles 20/30/40/50
-    const target = advRound + 5;
-    if(!advExitBoostTargets.includes(target)){
-      offers.push({ id: 'exitboost', icon: '🚀', label: `+25% à la sortie (dès l'étage ${target})`,
-        desc: `Sortir en boutique après l'étage ${target} encaisse ta réserve avec +25% (achat validé en atteignant l'étage). Cumulable avec les autres cibles.`, costPct: (advRound === 15 ? 20 : 25) });
-    }
-  }
+  // 🚀 Bonus de sortie +25% : RETIRÉ — remplacé par les frais/bonus de sortie
+  // automatiques selon la boutique (voir ADV_CASHOUT_MULT).
   // 🎲 Le gamble est proposé à toutes les boutiques (le sommet a été retiré :
   // continuer après n'importe quelle boutique est toujours possible).
   offers.push({ id: 'gamble', icon: '🎲', label: '+20% de réserve…', desc:'…mais malus aléatoire au prochain palier (annoncé avant de commencer). Ne s\'applique qu\'au prochain étage : partir aussitôt ne le valide pas.', costPct: 0, risky: true });
@@ -3579,14 +3563,10 @@ function showAdvShop(){
   }).join('');
   document.getElementById('advShopContinue').textContent = `▶️ Continuer l'aventure`;
   const cashBtn = document.getElementById('advShopCashOut');
-  // 🚀 Bonus de sortie acheté (cumulable) : le bouton « Sortir » affiche le % en clair.
-  const shopActiveBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
-  // 🚪 Frais de sortie anticipé / bonus de profondeur : affiché en clair sur le bouton.
+  // 🚪 Frais de sortie anticipé / bonus de profondeur : affichés en clair sur le bouton.
   const shopFee = advCashoutMult();
   const feeNote = shopFee < 1 ? ` <span style="color:#ff8a80;">frais ×${shopFee}</span>` : shopFee > 1 ? ` <b style="color:#ffd700;">profondeur ×${shopFee}</b>` : '';
-  cashBtn.innerHTML = shopActiveBoosts
-    ? `🏦 Sortir et encaisser <b style="color:#ffd700;">+${shopActiveBoosts * 25}%</b>${feeNote} (${Math.round(advReserve * mult * (1 + 0.25 * shopActiveBoosts) * shopFee)} XP)`
-    : `🏦 Sortir et encaisser${feeNote} (${Math.round(advReserve * mult * shopFee)} XP)`;
+  cashBtn.innerHTML = `🏦 Sortir et encaisser${feeNote} (${Math.round(advReserve * mult * shopFee)} XP)`;
   document.getElementById('advShop').classList.remove('hidden');
 }
 function advShopMultiplier(){
@@ -3618,7 +3598,6 @@ function advBuy(id){
     else if(id === 'time50') advPalierMs += Math.floor(advPalierMs * 0.5); // +50% du temps RESTANT
     else if(id === 'time3') advPalierMs += (advPalier() <= 3 ? 5 : 3) * 60000; // boutiques 2-3 : +5 min (v3)
     else if(id === 'angelring') advAngelRing = true; // 😇 rejoue l'étage perdu en cas de défaite
-    else if(id === 'exitboost'){ advExitBoostTargets.push(advRound + 5); } // 🚀 +25% encaissés après l'étage-charnière
   }
   if(window.testLog) window.testLog('advBuy', { achat: id, cout: cost, reserveApres: advReserve, essaisMax: advMaxTries === null ? -1 : advMaxTries }); // 🧪
   showAdvShop();
@@ -3744,25 +3723,21 @@ function advEnsureBoardVisible(){
 }
 function advShopCashOut(){
   document.getElementById('advShop').classList.add('hidden');
-  // Sortie immédiate : les achats « en attente » (gamble) ne s'appliquent PAS,
-  // et le bonus de sortie ne compte que s'il a été acheté puis validé par un étage.
+  // Sortie immédiate : les achats « en attente » (gamble) ne s'appliquent PAS.
   advShopPendingPct = 0;
   const mult = advShopMultiplier();
-  const activeBoosts = advExitBoostTargets.filter(t => t <= advRound).length;
-  const pendingBoosts = advExitBoostTargets.filter(t => t > advRound).length;
-  const boostMult = 1 + 0.25 * activeBoosts; // 🚀 cumulable : +25% par achat validé
   const feeMult = advCashoutMult(); // 🚪 frais de sortie anticipé (boutiques 1-2) ou bonus de profondeur (4+)
-  const banked = window.addXp(Math.round(advReserve * mult * boostMult * feeMult));
+  const banked = window.addXp(Math.round(advReserve * mult * feeMult));
   recordGameHistory({type: 'aventure', result: `sortie étage ${advRound}`, attempts: history.length, xp: banked});
-  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, boost: activeBoosts, boostPct: activeBoosts * 25, feeMult: feeMult, encaisse: banked }); // 🧪
+  if(window.testLog) window.testLog('advCashOut', { type: 'sortie', etage: advRound, reserve: advReserve, feeMult: feeMult, encaisse: banked }); // 🧪
   advClearSavedRun(); // encaissement : la run est terminée
   // 🏦 Confirmation en POP-UP (plus de message éphémère en haut de page).
   const feeTxt = feeMult < 1
     ? `<b style="color:#ff8a80;">Frais de sortie anticipé : ×${feeMult}</b><br><span class="muted">Encaisser tôt coûte cher — va plus loin pour encaisser plein pot !</span><br><br>`
     : feeMult > 1 ? `<b style="color:#ffd700;">Bonus de profondeur : ×${feeMult}</b><br><br>` : '';
   const cashMsg = `Tu sors de l'Aventure à l'étage <b>${advRound}</b>.<br><br>
-    ${feeTxt}<b style="color:#ffd700;">💰 +${banked} XP encaissés !</b>${activeBoosts ? ` <span style="color:#ffd700;">(+${activeBoosts * 25}% 🚀)</span>` : ''}<br><br>
-    <span class="muted">${pendingBoosts ? `${pendingBoosts} bonus 🚀 non validé${pendingBoosts > 1 ? 's' : ''} : actif seulement plus loin dans la tour.` : 'Bonne progression — à la prochaine run !'}</span>`;
+    ${feeTxt}<b style="color:#ffd700;">💰 +${banked} XP encaissés !</b><br><br>
+    <span class="muted">Bonne progression — à la prochaine run !</span>`;
   document.getElementById('advCashConfirmMsg').innerHTML = cashMsg;
   document.getElementById('advCashConfirm').classList.remove('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
