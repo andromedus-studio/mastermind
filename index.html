@@ -4779,6 +4779,7 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     <div id="puzzleDoneArea" class="hidden">
       <div class="analysis-panel" id="puzzleDoneMessage" style="text-align:center;"></div>
       <div class="secret-reveal hidden" id="puzzleSecretReveal"></div>
+      <div class="analysis-panel hidden" id="puzzleAnalysisPanel" style="text-align:left;"></div>
     </div>
 
     <div class="online-players-title" style="margin-top:16px;">🏆 Qui a trouvé aujourd'hui</div>
@@ -4808,6 +4809,7 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     <div id="flashDoneArea" class="hidden">
       <div class="analysis-panel" id="flashDoneMessage" style="text-align:center;"></div>
       <div class="secret-reveal hidden" id="flashSecretReveal"></div>
+      <div class="analysis-panel hidden" id="flashAnalysisPanel" style="text-align:left;"></div>
     </div>
 
     <button class="btn secondary" onclick="closeFlashPuzzle()">Fermer</button>
@@ -7368,6 +7370,71 @@ function submitPuzzleGuess(){
   showPuzzleDoneState(finishedData);
 }
 
+// 🔎 Analyse de défaite : pourquoi la proposition était fausse.
+// Panneau pédagogique affiché quand on rate le puzzle du jour ou l'Éclair :
+//   1. la proposition du joueur avec son vrai feedback contre le code ;
+//   2. la (première) ligne donnée qu'elle contredit — c'est LA piste d'erreur ;
+//   3. la traîne de déduction (candidats restants après chaque ligne) et les
+//      derniers codes parmi lesquels il fallait départager.
+// Comme la grille isole toujours un candidat unique, une proposition fausse
+// contredit forcément au moins une ligne donnée.
+function puzzleDefeatAnalysisHTML(guess, secret, lines){
+  if(!guess || !secret || !lines || !lines.length) return '';
+  const pegsHTML = (code) => code.map(ci => window.pegHTML(ci, 'peg')).join('');
+  const fpegsHTML = (black, white) => {
+    const arr = [];
+    for(let i=0;i<black;i++) arr.push('<div class="fpeg black"></div>');
+    for(let i=0;i<white;i++) arr.push('<div class="fpeg white"></div>');
+    while(arr.length < 4) arr.push('<div class="fpeg none"></div>');
+    return `<div class="feedback-mini">${arr.join('')}</div>`;
+  };
+  const fbLabel = (black, white) => `${black} noir${black>1?'s':''} + ${white} blanc${white>1?'s':''}`;
+  const fbGuess = feedbackFor(guess, secret, 8);
+
+  // Première ligne donnée que la proposition contredit.
+  let contra = -1, contraFb = null;
+  for(let i=0;i<lines.length;i++){
+    const f = feedbackFor(lines[i].guess, guess, 8);
+    if(f.black !== lines[i].black || f.white !== lines[i].white){ contra = i; contraFb = f; break; }
+  }
+
+  // Traîne de déduction + derniers candidats encore possibles avant la conclusion.
+  let cands = ALL_CODES_8;
+  const trail = [];
+  let lastCands = []; // candidats restants à l'étape où il en restait encore plusieurs
+  for(const l of lines){
+    cands = cands.filter(code => {
+      const f = feedbackFor(l.guess, code, 8);
+      return f.black === l.black && f.white === l.white;
+    });
+    if(cands.length > 1) lastCands = cands.slice();
+    trail.push(cands.length);
+  }
+
+  const contraBlock = contra >= 0
+    ? `<div style="margin:10px 0 0;">❌ <b>Ta proposition contredisait la ligne ${contra+1}</b> :
+        cette ligne impose <b>${fbLabel(lines[contra].black, lines[contra].white)}</b>,
+        or ta combinaison n'aurait donné que <b>${fbLabel(contraFb.black, contraFb.white)}</b> dessus.
+        Reprends la ligne ${contra+1} : c'est là que le raisonnement a déraillé.</div>`
+    : `<div style="margin:10px 0 0;">✅ Ta proposition était cohérente avec toutes les lignes… mais ce n'était pas le bon code.</div>`;
+
+  const trailBlock = trail.length
+    ? `<div style="margin:10px 0 0;">🧠 <b>Déduction ligne par ligne</b> — codes encore possibles :
+        ${trail.join(' → ')}</div>`
+    : '';
+
+  const leurreBlock = lastCands.length > 1
+    ? `<div style="margin:10px 0 0;">⚖️ Avant la dernière ligne, il ne restait que ces ${lastCands.length} codes :
+        ${lastCands.map(code => `<div class="pegs" style="display:inline-flex;vertical-align:middle;margin:2px 6px 2px 0;">${pegsHTML(code)}</div>`).join('')}
+        — la dernière ligne servait justement à départager le bon.</div>`
+    : '';
+
+  return `<div class="a-title" style="text-align:left;">🔎 Analyse</div>
+    <div>Ta proposition : <div class="pegs" style="display:inline-flex;vertical-align:middle;margin:0 6px;">${pegsHTML(guess)}</div>
+    aurait donné <b>${fbLabel(fbGuess.black, fbGuess.white)}</b> contre le code.</div>
+    ${contraBlock}${trailBlock}${leurreBlock}`;
+}
+
 function showPuzzleDoneState(finishedData){
   document.getElementById('puzzlePlayArea').classList.add('hidden');
   document.getElementById('puzzleDoneArea').classList.remove('hidden');
@@ -7376,11 +7443,17 @@ function showPuzzleDoneState(finishedData){
     : `😔 Ce n'était pas le bon code. Reviens demain pour un nouveau puzzle.`;
   document.getElementById('puzzleDoneMessage').textContent = msg;
   const revealEl = document.getElementById('puzzleSecretReveal');
+  const analysisEl = document.getElementById('puzzleAnalysisPanel');
   if(!finishedData.solved && puzzleSecret){
     revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${puzzleSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
     revealEl.classList.remove('hidden');
+    if(analysisEl){
+      analysisEl.innerHTML = puzzleDefeatAnalysisHTML(finishedData.guess, puzzleSecret, puzzleLines);
+      analysisEl.classList.toggle('hidden', !finishedData.guess);
+    }
   } else {
     revealEl.classList.add('hidden');
+    if(analysisEl) analysisEl.classList.add('hidden');
   }
 }
 
@@ -7571,7 +7644,7 @@ function submitFlashGuess(){
   } else {
     recordGameHistory({type: 'flash', result: 'perdu', attempts: 1, xp: 0});
   }
-  showFlashDoneState({ solved, xp });
+  showFlashDoneState({ solved, xp, guess: guessSnapshot });
 }
 
 function showFlashDoneState(finishedData){
@@ -7582,11 +7655,17 @@ function showFlashDoneState(finishedData){
     : `😔 Ce n'était pas le bon code. Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`;
   document.getElementById('flashDoneMessage').textContent = msg;
   const revealEl = document.getElementById('flashSecretReveal');
+  const analysisEl = document.getElementById('flashAnalysisPanel');
   if(!finishedData.solved && flashSecret){
     revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${flashSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
     revealEl.classList.remove('hidden');
+    if(analysisEl){
+      analysisEl.innerHTML = puzzleDefeatAnalysisHTML(finishedData.guess, flashSecret, flashLines);
+      analysisEl.classList.toggle('hidden', !finishedData.guess);
+    }
   } else {
     revealEl.classList.add('hidden');
+    if(analysisEl) analysisEl.classList.add('hidden');
   }
 }
 
