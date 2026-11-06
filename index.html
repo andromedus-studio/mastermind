@@ -7388,7 +7388,11 @@ function puzzleDefeatAnalysisHTML(guess, secret, lines){
     while(arr.length < 4) arr.push('<div class="fpeg none"></div>');
     return `<div class="feedback-mini">${arr.join('')}</div>`;
   };
-  const fbLabel = (black, white) => `${black} noir${black>1?'s':''} + ${white} blanc${white>1?'s':''}`;
+  const fbLabel = (black, white) => `${black} rouge${black>1?'s':''} + ${white} blanc${white>1?'s':''}`;
+  // Ligne de jeu affichée comme sur le plateau (numéro + pions + feedback) : sert
+  // pour la proposition du joueur, les lignes du puzzle et les codes restants.
+  const rowHTML = (code, black, white, num) =>
+    `<div class="row"><span class="num">${num}</span><div class="pegs">${pegsHTML(code)}</div>${fpegsHTML(black, white)}</div>`;
   const fbGuess = feedbackFor(guess, secret, 8);
 
   // Première ligne donnée que la proposition contredit.
@@ -7423,16 +7427,25 @@ function puzzleDefeatAnalysisHTML(guess, secret, lines){
         ${trail.join(' → ')}</div>`
     : '';
 
+  // Rappel des lignes du puzzle, pour comparer directement avec l'analyse.
+  const linesBlock = `<div style="margin:12px 0 0;">📋 <b>Les lignes du puzzle</b> :
+    <div class="history" style="max-height:none;margin-bottom:0;">
+      ${lines.map((l, i) => rowHTML(l.guess, l.black, l.white, i+1)).join('')}
+    </div></div>`;
+
   const leurreBlock = lastCands.length > 1
-    ? `<div style="margin:10px 0 0;">⚖️ Avant la dernière ligne, il ne restait que ces ${lastCands.length} codes :
-        ${lastCands.map(code => `<div class="pegs" style="display:inline-flex;vertical-align:middle;margin:2px 6px 2px 0;">${pegsHTML(code)}</div>`).join('')}
+    ? `<div style="margin:12px 0 0;">⚖️ Avant la dernière ligne, il ne restait que ces ${lastCands.length} codes :
+        <div class="history" style="max-height:none;margin-bottom:0;">
+          ${lastCands.map((code, i) => rowHTML(code, null, null, i+1)).join('')}
+        </div>
         — la dernière ligne servait justement à départager le bon.</div>`
     : '';
 
   return `<div class="a-title" style="text-align:left;">🔎 Analyse</div>
-    <div>Ta proposition : <div class="pegs" style="display:inline-flex;vertical-align:middle;margin:0 6px;">${pegsHTML(guess)}</div>
-    aurait donné <b>${fbLabel(fbGuess.black, fbGuess.white)}</b> contre le code.</div>
-    ${contraBlock}${trailBlock}${leurreBlock}`;
+    <div>Ta proposition :
+      <div class="history" style="max-height:none;margin:6px 0 0;">${rowHTML(guess, fbGuess.black, fbGuess.white, '👉')}</div>
+      aurait donné <b>${fbLabel(fbGuess.black, fbGuess.white)}</b> contre le code.</div>
+    ${contraBlock}${linesBlock}${trailBlock}${leurreBlock}`;
 }
 
 function showPuzzleDoneState(finishedData){
