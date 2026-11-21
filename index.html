@@ -901,7 +901,7 @@
     animation: winPulse 0.6s ease;
   }
   .infinite-choice-msg { font-size: 13px; color: var(--ink-dim); margin-top: 4px; }
-  /* Mode Aventure — thèmes visuels par palier : cadre orangé (Les Limites), argenté (Le Temps) */
+  /* Tour Chromatique — thèmes visuels par palier : cadre orangé (Les Limites), argenté (Le Temps) */
   body.adv-palier1 .bg-photo {
     background-image: url('images/aventure-palier1.png');
     background-size: cover; background-position: center center; background-repeat: no-repeat;
@@ -1961,14 +1961,14 @@
         <span class="small" id="puzzleTileSmall">Des lignes déjà jouées par l'ordi, à toi de trouver le code en un seul essai. Même puzzle pour tout le monde.</span>
       </button>
       <button class="mode-btn" id="aventureTile" onclick="tryStartAdventure()">
-        <span class="big">🗺️ Mode Aventure <span style="font-size:13px;background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.4);color:#ffd700;border-radius:10px;padding:2px 8px;vertical-align:middle;">🔒 Bientôt</span></span>
+        <span class="big">🗺️ Tour Chromatique <span style="font-size:13px;background:rgba(255,215,0,.15);border:1px solid rgba(255,215,0,.4);color:#ffd700;border-radius:10px;padding:2px 8px;vertical-align:middle;">🔒 Bientôt</span></span>
         <span class="small">Paliers de 5 étages à thème : « Les Limites » puis « Le Temps ». Code toujours à 4 couleurs distinctes. Chaque étage gagné, un choix : XP en réserve contre contrainte, ou tranquillité contre XP. Boutique tous les 5 étages… Le mode arrive bientôt !</span>
       </button>
-      <!-- Pop-up « Reprendre l'Aventure » : s'ouvre au clic sur la tuile Aventure
+      <!-- Pop-up « Reprendre la Tour » : s'ouvre au clic sur la tuile Aventure
          si une sauvegarde de run existe (sauvegarde faite en boutique). -->
       <div id="advResumePopup" class="hidden duel-overlay" onclick="if(event.target === this) window.advHideResumePopup && window.advHideResumePopup()">
         <div class="card duel-card">
-          <div class="duel-title">🗺️ Reprendre l'Aventure</div>
+          <div class="duel-title">🗺️ Reprendre la Tour</div>
           <p class="duel-sub" id="advResumeIntro">Une progression sauvegardée existe — la voici :</p>
           <div style="text-align:center;margin:6px 0 2px;">
             <div style="font-size:12px;color:var(--ink-dim);letter-spacing:2px;">ÉTAGE ATTEINT</div>
@@ -2088,7 +2088,7 @@
       <div class="infinite-choice hidden" id="advCashConfirm">
         <div class="infinite-choice-panel">
           <div class="infinite-choice-label">ENCAISSEMENT</div>
-          <div class="infinite-choice-round" style="font-size:20px;letter-spacing:.08em;">🏦 Sortie de l'Aventure</div>
+          <div class="infinite-choice-round" style="font-size:20px;letter-spacing:.08em;">🏦 Sortie de la Tour</div>
           <div class="infinite-choice-msg" id="advCashConfirmMsg" style="text-align:left;white-space:normal;line-height:1.7;margin-top:10px;"></div>
           <button class="btn" style="margin-top:16px;" onclick="document.getElementById('advCashConfirm').classList.add('hidden')">✅ OK</button>
         </div>
@@ -2102,7 +2102,7 @@
           <div class="infinite-choice-msg" id="advShopMsg"></div>
           <div id="advShopItems" style="display:flex;flex-direction:column;gap:8px;margin-top:14px;"></div>
           <div style="display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap;">
-            <button class="btn" id="advShopContinue" onclick="advShopContinue()">▶️ Continuer l'aventure</button>
+            <button class="btn" id="advShopContinue" onclick="advShopContinue()">▶️ Continuer la Tour</button>
             <button class="btn secondary" id="advShopCashOut" onclick="advShopCashOut()">🏦 Sortir et encaisser</button>
           </div>
         </div>
@@ -2486,7 +2486,7 @@ function infiniteTimeout(){
   document.getElementById('userInputArea').classList.add('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
   sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
-  recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu (temps)', attempts: history.length, xp: 0});
+  recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu (temps)', attempts: history.length, xp: 0, numColors: NB_COULEURS});
   endInfiniteRun();
 }
 function endInfiniteRun(){
@@ -2528,7 +2528,7 @@ function infiniteCashOut(){
   endInfiniteRun();
 }
 
-// --- Mode Aventure — design officiel (voir canvas "aventure-progression") ---
+// --- Tour Chromatique — design officiel (voir canvas "aventure-progression") ---
 // Paliers de 5 étages à thème : 1 "Les Limites" (essais), 2 "Le Temps" (horloge
 // de palier 20 min). Bonus de palier : code secret toujours 4 couleurs distinctes.
 // Options après chaque étage ; boutique = point de sauvegarde ; sortie ×2 dès
@@ -2820,7 +2820,7 @@ function advApplyPalierStart(){
   // Annonce du palier : fenêtre d'intro avec titre, thème, règles.
   if(advPalier() === 1 && advRound === 1){
     advIntroShownRound = 1;
-    showAdvIntro('LES LIMITES', `Bienvenue dans la <b>tour de l'Aventure</b> ! 🗺️<br><br>
+    showAdvIntro('LES LIMITES', `Bienvenue dans la <b>Tour Chromatique</b> ! 🗺️<br><br>
       <b>Le principe :</b> une suite d'étages à franchir. Chaque étage gagné te propose un choix : <b>plus d'XP en réserve</b> contre une contrainte, ou la tranquillité contre une partie de ta réserve. Tes choix construisent ta fortune… ou la fondent.<br><br>
       <b>Bonus de palier :</b> le code secret contient toujours <b>4 couleurs différentes</b> — pas de doublons pour l'instant !<br><br>
       <b>⚠️ Attention :</b> si tu perds <b>un seul</b> puzzle, tu perds <b>tout</b> — l'étage en cours et toute ta réserve. Tes XP ne sont <b>sauvegardées qu'en boutique</b> (tous les 5 étages) : là, tu peux <b>sortir et encaisser</b> ta réserve, ou continuer plus loin. Les étages 1 à 5 se jouent <b>sans limite de temps ni d'essais</b> <i>(sauf avec les malus sélectionnés en boutique)</i>.<br><br>
@@ -2837,7 +2837,7 @@ function advApplyPalierStart(){
     showAdvIntro('LE TEMPS', `Nouveau palier : <b>Le Temps</b>. ⏱️<br><br>
       Tu as <b>20 minutes</b> pour franchir les étages 6 à 10. L'horloge défile <b>pendant chaque manche</b> — elle est en pause pendant les choix et la boutique.<br><br>
       <b>Bonus de palier :</b> toujours <b>4 couleurs différentes</b> dans le code.${warn}<br><br>
-      <b>Rappel :</b> temps écoulé = aventure terminée (consolation 10% + assurances). En boutique, tu pourras racheter du temps… pour l'instant.`);
+      <b>Rappel :</b> temps écoulé = tour terminée (consolation 10% + assurances). En boutique, tu pourras racheter du temps… pour l'instant.`);
     return;
   }
   if(advPalier() === 3 && advRound === 11){
@@ -2850,7 +2850,7 @@ function advApplyPalierStart(){
     const warn = advMalus ? `<br><br>⚠️ <b>Malus actif :</b> ${advMalus.label} — ${advMalus.desc}` : '';
     showAdvIntro('CHALLENGE', `Nouveau palier : <b>Challenge</b>. 🏆<br><br>
       Ta pendule totale devient <b>ton temps définitif</b> (${advFormatClock(advPalierMs)} restant) : elle continue de défiler, mais <b>tu ne pourras plus la recharger qu'en boutique</b>.<br><br>
-      Chaque étage te proposera un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : aventure terminée !</b>${warn}<br><br>
+      Chaque étage te proposera un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : tour terminée !</b>${warn}<br><br>
       Les défis n'entament pas tes essais totaux : ose, vise le bonus, mais rate et tu perds tout.`);
     return;
   }
@@ -2943,7 +2943,7 @@ function advRingReplay(){
   setStatus(`😇 L'anneau de l'ange s'est brillé : l'étage ${advRound} est rejoué ! Réserve intacte (${advReserve} XP).`, '');
 }
 window.advRingReplay = advRingReplay;
-// --- Mode Aventure verrouillé (teasing) : accessible seulement via une commande
+// --- Tour Chromatique verrouillé (teasing) : accessible seulement via une commande
 // clavier spéciale. Taper "aventure" ouvre l'accès pour cette session (retaper le
 // masque). Pour l'admin/testeur : le mode reste jouable, les autres voient "🔒 Bientôt". ---
 let advUnlocked = false;
@@ -2959,7 +2959,7 @@ async function tryStartAdventure(){
     }
     startAdventure();
   } else {
-    setStatus('🔒 Le Mode Aventure arrive bientôt ! Reviens plus tard pour la grande ouverture… 🗺️', '');
+    setStatus('🔒 Le Tour Chromatique arrive bientôt ! Reviens plus tard pour la grande ouverture… 🗺️', '');
   }
 }
 document.addEventListener('keydown', (e) => {
@@ -2975,7 +2975,7 @@ document.addEventListener('keydown', (e) => {
         const badge = tile.querySelector('span span');
         if(badge) badge.textContent = advUnlocked ? '🔓 Accès test' : '🔒 Bientôt';
       }
-      setStatus(advUnlocked ? '🔓 Mode Aventure déverrouillé (accès test).' : '🔒 Mode Aventure reverrouillé.', '');
+      setStatus(advUnlocked ? '🔓 Tour Chromatique déverrouillé (accès test).' : '🔒 Tour Chromatique reverrouillé.', '');
       advUnlockBuffer = '';
       if(window.refreshAdvResumeTile) window.refreshAdvResumeTile();
     }
@@ -3021,7 +3021,7 @@ function endAdvRun(){
 }
 // --- 🔐 Sauvegarde de la run (point de sauvegarde : chaque boutique) ---
 // État sérialisé dans players/<pseudo>/adventureSave. Le joueur peut quitter
-// le jeu et reprendre depuis le menu via le bouton « Reprendre l'Aventure ».
+// le jeu et reprendre depuis le menu via le bouton « Reprendre la Tour ».
 function advSaveRun(){
   if(!advActive || !window.advSaveRunFirebase) return;
   window.advSaveRunFirebase({
@@ -3044,7 +3044,7 @@ function advClearSavedRun(){
 async function resumeAdventure(){
   if(!window.advLoadSaveFirebase){ setStatus('Sauvegarde indisponible pour le moment.', ''); return; }
   const s = await window.advLoadSaveFirebase();
-  if(!s || !Number(s.round)){ setStatus('Aucune aventure sauvegardée à reprendre.', ''); return; }
+  if(!s || !Number(s.round)){ setStatus('Aucune tour sauvegardée à reprendre.', ''); return; }
   trainingMode = false; analysisMode = false;
   // Réinitialisation complète (comme startAdventure) puis restauration de la sauvegarde.
   advActive = true; advPendingXp = 0; advChallenge = null; advChallengeStart = 0; advChallengeTries = null;
@@ -3091,7 +3091,7 @@ async function resumeAdventure(){
   const st = document.getElementById('status');
   if(st) st.textContent = '';
   showAdvShop();
-  setStatus(`↩️ Aventure reprise à l'étage ${advRound} ! Réserve : ${advReserve} XP. La boutique est rouverte — achète ou continue !`, '');
+  setStatus(`↩️ Tour reprise à l'étage ${advRound} ! Réserve : ${advReserve} XP. La boutique est rouverte — achète ou continue !`, '');
   if(window.testLog) window.testLog('advReprise', { etage: advRound, reserve: advReserve }); // 🧪
 }
 window.resumeAdventure = resumeAdventure;
@@ -3100,7 +3100,7 @@ window.resumeAdventure = resumeAdventure;
 // endroits (savePseudoLocally, resetToMenu, load) : elle ne fait plus rien.
 async function refreshAdvResumeTile(){ /* no-op : pop-up affichée au clic sur la tuile Aventure */ }
 window.refreshAdvResumeTile = refreshAdvResumeTile;
-// --- Pop-up « Reprendre l'Aventure » (étage, réserve, temps, essais, bonus, malus) ---
+// --- Pop-up « Reprendre la Tour » (étage, réserve, temps, essais, bonus, malus) ---
 function advHideResumePopup(){
   const p = document.getElementById('advResumePopup');
   if(p) p.classList.add('hidden');
@@ -3511,7 +3511,7 @@ function advDefeat(reason){
   showSecretReveal(secretCode);
   // 🌫️ Défaite dans Le Brouillard : tout l'historique est révélé avant de conclure.
   if(advBrouillard){ advBrouillardReveal = true; renderHistory(); }
-  setStatus(`💀 Aventure terminée à l'étage ${advRound} (${reason}) ! Tu repars avec ${goPct}% de ta réserve : ${awarded} XP. Le code était : ${secretLisible}.`, '');
+  setStatus(`💀 Tour terminée à l'étage ${advRound} (${reason}) ! Tu repars avec ${goPct}% de ta réserve : ${awarded} XP. Le code était : ${secretLisible}.`, '');
   document.getElementById('userInputArea').classList.add('hidden');
   document.getElementById('replayBtn').classList.remove('hidden');
   sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
@@ -3561,7 +3561,7 @@ function showAdvShop(){
       <b style="color:#ffd700;">${o.icon} ${o.label}</b> ${o.risky ? (bought ? '— ✅ déjà acheté' : '') : `— <b>${cost} XP</b> (${o.costPct}%)${bought ? ' ✅ déjà acheté' : ''}`}<br><span style="font-size:11px;">${o.desc}</span>
     </button>`;
   }).join('');
-  document.getElementById('advShopContinue').textContent = `▶️ Continuer l'aventure`;
+  document.getElementById('advShopContinue').textContent = `▶️ Continuer la Tour`;
   const cashBtn = document.getElementById('advShopCashOut');
   // 🚪 Frais de sortie anticipé / bonus de profondeur : affichés en clair sur le bouton.
   const shopFee = advCashoutMult();
@@ -3629,7 +3629,7 @@ function advShopContinue(){
       • Pendule totale : <b>${advFormatClock(advPalierMs)}</b><br>
       • Assurances : <b>${advInsuranceCount}</b> (${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% récupérés en cas de défaite)<br>${warn}<br><br>
       Ta pendule totale devient <b>ton temps définitif</b> : elle défile à chaque manche, mais <b>tu ne pourras la recharger qu'en boutique</b>.<br><br>
-      L'<b>étage 11</b> est une <b>manche classique</b> d'échauffement, avec tes essais et le temps qui défile. Ensuite, les étages 12 à 14 te proposeront chacun un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : aventure terminée !</b> L'étage 15 sera une dernière ligne droite sans défi, vers la boutique 3.<br><br>
+      L'<b>étage 11</b> est une <b>manche classique</b> d'échauffement, avec tes essais et le temps qui défile. Ensuite, les étages 12 à 14 te proposeront chacun un <b>défi</b> — vitesse ou essais — sur une <b>pendule rouge séparée</b>. Défi réussi : gros bonus de réserve. <b>Défi raté : tour terminée !</b> L'étage 15 sera une dernière ligne droite sans défi, vers la boutique 3.<br><br>
       Les défis n'entament pas tes essais totaux : ose, vise le bonus, mais rate et tu perds tout.`);
     renderAdvBanner();
     return;
@@ -3735,7 +3735,7 @@ function advShopCashOut(){
   const feeTxt = feeMult < 1
     ? `<b style="color:#ff8a80;">Frais de sortie anticipé : ×${feeMult}</b><br><span class="muted">Encaisser tôt coûte cher — va plus loin pour encaisser plein pot !</span><br><br>`
     : feeMult > 1 ? `<b style="color:#ffd700;">Bonus de profondeur : ×${feeMult}</b><br><br>` : '';
-  const cashMsg = `Tu sors de l'Aventure à l'étage <b>${advRound}</b>.<br><br>
+  const cashMsg = `Tu sors de la Tour à l'étage <b>${advRound}</b>.<br><br>
     ${feeTxt}<b style="color:#ffd700;">💰 +${banked} XP encaissés !</b><br><br>
     <span class="muted">Bonne progression — à la prochaine run !</span>`;
   document.getElementById('advCashConfirmMsg').innerHTML = cashMsg;
@@ -3869,7 +3869,7 @@ function serieMindCashOut(){
   const wonXp = serieMindReserve;
   document.getElementById('serieMindChoice').classList.add('hidden');
   const awardedWonXp = window.addXp(wonXp);
-  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'gagné', attempts: history.length, xp: awardedWonXp});
+  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'gagné', attempts: history.length, xp: awardedWonXp, numColors: NB_COULEURS});
   setStatus(`💰 Tu repars avec ${awardedWonXp} XP !`, 'win');
   serieMindActive = false;
   serieMindRound = 1;
@@ -3907,7 +3907,7 @@ function serieMindLose(){
   document.getElementById('userInputArea').classList.add('hidden');
   sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
   window.addXp(0);
-  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'perdu', attempts: history.length, xp: 0});
+  recordGameHistory({type: 'ordi', sub: 'seriemind', result: 'perdu', attempts: history.length, xp: 0, numColors: NB_COULEURS});
   serieMindActive = false;
   serieMindRound = 1;
   serieMindReserve = 0;
@@ -4186,7 +4186,7 @@ function askModeChange(){
   if(!g.active){ resetToMenu(); return; }
   let msg = 'Une <b>partie est en cours</b> ! Si tu changes de mode maintenant, elle sera <b>perdue</b>.';
   if(advActive){
-    msg += `<br><br>🗺️ <b>Mode Aventure</b> : tu es à l'étage <b>${advRound}</b> avec <b>${advReserve} XP</b> en réserve${advAngelRing ? ' et l\'anneau de l\'ange 😇' : ''}.<br><br><b style="color:#ff8a80;">⚠️ La sortie est DÉFINITIVE :</b> la run sera <b>terminée</b> et ta réserve non encaissée (<b>${advReserve} XP</b>) sera <b>PERDUE</b>. Impossible de revenir à la boutique précédente — seule la fermeture de l'onglet garde une sauvegarde passive.`;
+    msg += `<br><br>🗺️ <b>Tour Chromatique</b> : tu es à l'étage <b>${advRound}</b> avec <b>${advReserve} XP</b> en réserve${advAngelRing ? ' et l\'anneau de l\'ange 😇' : ''}.<br><br><b style="color:#ff8a80;">⚠️ La sortie est DÉFINITIVE :</b> la run sera <b>terminée</b> et ta réserve non encaissée (<b>${advReserve} XP</b>) sera <b>PERDUE</b>. Impossible de revenir à la boutique précédente — seule la fermeture de l'onglet garde une sauvegarde passive.`;
   } else if(infiniteActive){
     msg += `<br><br>♾️ <b>Série infinie</b> : ta série en cours (<b>${infiniteStreak}</b> manche${infiniteStreak > 1 ? 's' : ''}) sera interrompue.`;
   } else if(serieMindActive){
@@ -4249,7 +4249,7 @@ function resetToMenu(){
   document.getElementById('serieMindChoice').classList.add('hidden');
   renderSerieMindBanner();
   renderAttemptsPicker();
-  if(window.refreshAdvResumeTile) window.refreshAdvResumeTile(); // ↩️ bouton « Reprendre l'Aventure » (si sauvegarde)
+  if(window.refreshAdvResumeTile) window.refreshAdvResumeTile(); // ↩️ bouton « Reprendre la Tour » (si sauvegarde)
   renderSessionHistory();
   mode = null;
 }
@@ -4466,7 +4466,7 @@ function submitUserGuess(){
       stopInfiniteClock();
       const wonXpInf = window.xpForAttempts(history.length) + rankWinBonus();
       const awardedWonXp = window.addXp(wonXpInf);
-      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'gagné', attempts: history.length, xp: awardedWonXp});
+      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'gagné', attempts: history.length, xp: awardedWonXp, numColors: NB_COULEURS});
       if(window.infiniteReportStreak) window.infiniteReportStreak(infiniteStreak);
       sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: false});
       if(infiniteStreak >= 5) document.body.classList.add('infinite-bg2'); // nouveau fond dès la fin de la 5e manche
@@ -4488,7 +4488,7 @@ function submitUserGuess(){
     document.getElementById('replayBtn').classList.remove('hidden');
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, training: trainingMode});
     if(!trainingMode){
-      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'gagné', attempts: history.length, xp: awardedWonXp});
+      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'gagné', attempts: history.length, xp: awardedWonXp, numColors: NB_COULEURS});
     }
     launchConfetti();
     return;
@@ -4567,7 +4567,7 @@ function submitUserGuess(){
       document.getElementById('userInputArea').classList.add('hidden');
       document.getElementById('replayBtn').classList.remove('hidden');
       sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: false});
-      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu', attempts: history.length, xp: 0});
+      recordGameHistory({type: 'ordi', sub: 'infinite', result: 'perdu', attempts: history.length, xp: 0, numColors: NB_COULEURS});
       endInfiniteRun();
       return;
     }
@@ -4579,7 +4579,7 @@ function submitUserGuess(){
     sessionScores.push({mode: 'userGuesses', numColors: NB_COULEURS, attempts: history.length, lost: true, training: trainingMode});
     if(!trainingMode){
       window.addXp(lostXp);
-      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'perdu', attempts: history.length, xp: lostXp});
+      recordGameHistory({type: 'ordi', sub: 'vsordi', result: 'perdu', attempts: history.length, xp: lostXp, numColors: NB_COULEURS});
     }
     return;
   }
@@ -4779,7 +4779,6 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     <div id="puzzleDoneArea" class="hidden">
       <div class="analysis-panel" id="puzzleDoneMessage" style="text-align:center;"></div>
       <div class="secret-reveal hidden" id="puzzleSecretReveal"></div>
-      <div class="analysis-panel hidden" id="puzzleAnalysisPanel" style="text-align:left;"></div>
     </div>
 
     <div class="online-players-title" style="margin-top:16px;">🏆 Qui a trouvé aujourd'hui</div>
@@ -4809,7 +4808,6 @@ function renderAnalysis(guessSnapshot, candidatesBeforeMove, fb){
     <div id="flashDoneArea" class="hidden">
       <div class="analysis-panel" id="flashDoneMessage" style="text-align:center;"></div>
       <div class="secret-reveal hidden" id="flashSecretReveal"></div>
-      <div class="analysis-panel hidden" id="flashAnalysisPanel" style="text-align:left;"></div>
     </div>
 
     <button class="btn secondary" onclick="closeFlashPuzzle()">Fermer</button>
@@ -5466,7 +5464,7 @@ window.addEventListener('load', () => {
     document.getElementById('menu').classList.remove('hidden');
     renderMyBanner();
     renderSpecialXpEvent();
-    if(window.refreshAdvResumeTile) window.refreshAdvResumeTile(); // ↩️ bouton « Reprendre l'Aventure »
+    if(window.refreshAdvResumeTile) window.refreshAdvResumeTile(); // ↩️ bouton « Reprendre la Tour »
   } else {
     pseudoScreenPurpose = 'startup';
     showPseudoScreen();
@@ -5784,7 +5782,7 @@ function setupLiveConfig(){
     renderAnnouncement();
   }, () => {});
   // 🧪 Mode test piloté depuis l'admin (config/advTest) :
-  // 1) déverrouille le Mode Aventure pour les testeurs (badge « Accès test »),
+  // 1) déverrouille le Tour Chromatique pour les testeurs (badge « Accès test »),
   // 2) journalise chaque gain d'XP et chaque événement de l'Aventure en détail
   //    dans players/<pseudo>/testLog (consultable dans la fiche joueur de l'admin).
   onValue(ref(db, 'config/advTest'), (snap) => {
@@ -6142,9 +6140,14 @@ function isGoldenChallengeToday(dateKey){
 const DAILY_QUEST_DEFS = [
   { id: 'win_1_duel', scope: 'daily', desc: 'Gagne 1 duel en ligne', target: 1, xp: 20, matches: e => e.type === 'duel' && e.result === 'gagné' },
   { id: 'solve_daily', scope: 'daily', desc: 'Réussis le défi du jour', target: 1, xp: 20, matches: e => e.type === 'daily' && e.result === 'gagné' },
-  { id: 'play_3_games', scope: 'daily', desc: 'Termine 3 parties (tous modes, hors abandon)', target: 3, xp: 15, matches: e => e.result !== 'abandon' },
-  { id: 'find_fast', scope: 'daily', desc: 'Trouve un code en 5 essais ou moins (mode ordi)', target: 1, xp: 25, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'play_3_games', scope: 'daily', desc: 'Termine 10 parties (tous modes, hors abandon)', target: 10, xp: 15, matches: e => e.result !== 'abandon' },
+  { id: 'find_fast', scope: 'daily', desc: 'Trouve un code en 6 essais ou moins (mode ordi, 8 couleurs)', target: 1, xp: 25, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 && e.attempts <= 6 },
   { id: 'play_2_duels', scope: 'daily', desc: 'Va au bout de 2 duels (gagnés ou perdus)', target: 2, xp: 15, matches: e => e.type === 'duel' && e.result !== 'abandon' },
+  { id: 'puzzle_gagne', scope: 'daily', desc: 'Réussis le puzzle du jour', target: 1, xp: 20, matches: e => e.type === 'puzzle' && e.result === 'gagné' },
+  { id: 'flash_gagne', scope: 'daily', desc: 'Réussis un défi Flash', target: 1, xp: 15, matches: e => e.type === 'flash' && e.result === 'gagné' },
+  { id: 'ordi_2_wins', scope: 'daily', desc: 'Gagne 2 parties contre l\'ordinateur (8 couleurs)', target: 2, xp: 20, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 },
+  { id: 'streak_2_ordi', scope: 'daily', desc: 'Gagne 2 parties de suite contre l\'ordinateur (8 couleurs)', target: 1, xp: 25, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 && e.streak === 2 },
+  { id: 'adv_cashout', scope: 'daily', desc: 'Tour Chromatique : encaisse à la boutique 1 fois', target: 1, xp: 15, matches: e => e.type === 'aventure' && e.result.startsWith('sortie étage') },
 ];
 // Quêtes hebdomadaires : volontairement longues, impossibles à boucler en une seule
 // journée (soit par le volume demandé, soit parce qu'elles reposent sur le défi du
@@ -6153,19 +6156,34 @@ const WEEKLY_QUEST_DEFS = [
   { id: 'win_15_duels_week', scope: 'weekly', desc: 'Gagne 15 duels cette semaine', target: 15, xp: 150, matches: e => e.type === 'duel' && e.result === 'gagné' },
   { id: 'play_40_games_week', scope: 'weekly', desc: 'Termine 40 parties cette semaine', target: 40, xp: 120, matches: e => e.result !== 'abandon' },
   { id: 'solve_daily_5x_week', scope: 'weekly', desc: 'Réussis le défi du jour 5 jours différents', target: 5, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' },
-  { id: 'find_fast_15x_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins, 15 fois', target: 15, xp: 110, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'find_fast_15x_week', scope: 'weekly', desc: 'Trouve un code en 7 essais ou moins, 15 fois (8 couleurs)', target: 15, xp: 110, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 && e.attempts <= 7 },
   { id: 'play_6_days_week', scope: 'weekly', desc: 'Joue au moins une partie sur 6 jours différents', target: 6, xp: 140, distinctDays: true, matches: e => e.result !== 'abandon' },
   { id: 'win_duels_5_days_week', scope: 'weekly', desc: 'Gagne un duel sur 5 jours différents', target: 5, xp: 150, distinctDays: true, matches: e => e.type === 'duel' && e.result === 'gagné' },
-  { id: 'perfect_daily_3x_week', scope: 'weekly', desc: 'Réussis le défi du jour en 6 essais ou moins, 3 fois', target: 3, xp: 170, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 6 },
+  { id: 'perfect_daily_3x_week', scope: 'weekly', desc: 'Réussis le défi du jour en 7 essais ou moins, 3 fois', target: 3, xp: 170, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 7 },
   { id: 'duels_25_week', scope: 'weekly', desc: 'Va au bout de 25 duels (gagnés ou perdus)', target: 25, xp: 130, matches: e => e.type === 'duel' && e.result !== 'abandon' },
-  { id: 'ordi_30_wins_week', scope: 'weekly', desc: 'Gagne 30 parties contre l\'ordinateur', target: 30, xp: 140, matches: e => e.type === 'ordi' && e.result === 'gagné' },
-  { id: 'flawless_3x_week', scope: 'weekly', desc: 'Trouve un code en 3 essais ou moins, 5 fois', target: 5, xp: 180, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 3 },
-  { id: 'xp_500_week', scope: 'weekly', desc: 'Accumule 500 XP de parties cette semaine', target: 500, xp: 200, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
-  { id: 'xp_1000_week', scope: 'weekly', desc: 'Accumule 1000 XP de parties cette semaine', target: 1000, xp: 300, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
+  { id: 'ordi_30_wins_week', scope: 'weekly', desc: 'Gagne 30 parties contre l\'ordinateur (8 couleurs)', target: 30, xp: 140, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 },
+  { id: 'flawless_3x_week', scope: 'weekly', desc: 'Trouve un code en 6 essais ou moins, 5 fois (8 couleurs)', target: 5, xp: 180, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 && e.attempts <= 6 },
+  // Objectif dynamique : xp_500_week = le palier du rang actuel (100 %), xp_1000_week = le double (200 %).
+  // Exemple : niveau 19 -> il faut 950 XP pour le niveau 20 -> 100 % = 950, 200 % = 1900.
+  { id: 'xp_palier_1', scope: 'weekly', desc: "Accumule l'XP d'un palier de niveau en parties cette semaine (100 % de ton palier actuel)", targetPct: 1, xp: 200, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
+  { id: 'xp_palier_2', scope: 'weekly', desc: "Accumule le double du palier de ton niveau en parties cette semaine (200 % de ton palier actuel)", targetPct: 2, xp: 300, amountFrom: e => Math.round((e.xp || 0) / (e.xpMult || 1)), matches: e => (e.xp || 0) > 0 },
   { id: 'daily_all_week', scope: 'weekly', desc: 'Participe au défi du jour les 7 jours de la semaine', target: 7, xp: 250, distinctDays: true, matches: e => e.type === 'daily' },
-  { id: 'daily_fast_10_week', scope: 'weekly', desc: 'Réussis le défi du jour en 10 essais ou moins, 4 fois', target: 4, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 10 },
-  { id: 'ordi_fast_days_week', scope: 'weekly', desc: 'Trouve un code en 5 essais ou moins sur 4 jours différents', target: 4, xp: 150, distinctDays: true, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.attempts <= 5 },
+  { id: 'daily_fast_10_week', scope: 'weekly', desc: 'Réussis le défi du jour en 8 essais ou moins, 4 fois', target: 4, xp: 160, matches: e => e.type === 'daily' && e.result === 'gagné' && e.attempts <= 8 },
+  { id: 'ordi_fast_days_week', scope: 'weekly', desc: 'Trouve un code en 6 essais ou moins sur 4 jours différents (8 couleurs)', target: 4, xp: 150, distinctDays: true, matches: e => e.type === 'ordi' && e.result === 'gagné' && e.numColors === 8 && e.attempts <= 6 },
 ];
+
+// Objectif d'une quête : soit l'objectif fixe, soit un % du palier de niveau actuel
+// (xp pour passer au niveau suivant, ex. niveau 19 -> 950 XP pour le niveau 20).
+// La cible est FIGÉE au premier pas de la semaine (frozenTarget dans Firebase),
+// puis recalculée chaque lundi (nouveau periodKey -> nouveau nœud).
+function questTargetOf(q, progress){
+  if(q.targetPct){
+    if(progress && progress.frozenTarget) return progress.frozenTarget;
+    return Math.max(1, Math.round(xpForLevel(plvl(myPseudo).level) * q.targetPct));
+  }
+  return q.target;
+}
+window.questTargetOf = questTargetOf;
 
 function getActiveDailyQuests(dateKey){
   return pickN(DAILY_QUEST_DEFS, dateKey, 3);
@@ -6181,6 +6199,10 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
   const bumpResult = await runTransaction(ref(db, path), (current) => {
     const cur = current || { progress: 0, claimed: false };
     if(cur.claimed) return cur;
+    if(q.targetPct && !cur.frozenTarget){
+      // Cible figée : au premier pas de la semaine, on mémorise le palier du rang actuel.
+      cur.frozenTarget = questTargetOf(q);
+    }
     if(q.distinctDays){
       // Une seule progression par journée : on mémorise les jours déjà comptés.
       cur.days = cur.days || {};
@@ -6193,7 +6215,7 @@ async function bumpOneQuest(scope, periodKey, q, dateKey, entry){
     return cur;
   });
   const val = bumpResult.snapshot.val();
-  if(val && !val.claimed && val.progress >= q.target){
+  if(val && !val.claimed && val.progress >= questTargetOf(q, val)){
     const claimResult = await runTransaction(ref(db, path), (current) => {
       if(!current || current.claimed) return current;
       current.claimed = true;
@@ -6253,14 +6275,15 @@ async function openQuestsPanel(){
     ${quests.map(q => {
       const p = progress[q.id] || { progress: 0, claimed: false };
       const done = !!p.claimed;
-      const pct = Math.min(100, Math.round((p.progress / q.target) * 100));
+      const target = questTargetOf(q, p);
+      const pct = Math.min(100, Math.round((p.progress / target) * 100));
       return `<div class="quest-row${done ? ' quest-done' : ''}">
         <div class="quest-row-top">
           <span class="quest-desc">${done ? '✅' : '🎯'} ${escapeHtml(q.desc)}</span>
           <span class="quest-xp">+${questRewardXp(q)} XP</span>
         </div>
         <div class="quest-progress-track"><div class="quest-progress-fill" style="width:${pct}%"></div></div>
-        <div class="quest-progress-label">${Math.min(p.progress, q.target)} / ${q.target}</div>
+        <div class="quest-progress-label">${Math.min(p.progress, target)} / ${target}</div>
       </div>`;
     }).join('')}
   `;
@@ -6277,6 +6300,18 @@ window.closeQuestsPanel = closeQuestsPanel;
 // --- Historique de parties (30 dernières, par compte) ---
 function recordGameHistory(entry){
   if(!myPseudo) return;
+  // Streak de victoires contre l'ordi (pour le défi « 2 parties de suite ») :
+  // compteur local (losses reset), attaché à l'entrée type 'ordi'.
+  if(entry.type === 'ordi'){
+    const k = 'bm_ordiStreak';
+    if(entry.result === 'gagné'){
+      const s = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1;
+      localStorage.setItem(k, String(s));
+      entry = {...entry, streak: s};
+    } else {
+      localStorage.setItem(k, '0');
+    }
+  }
   // Mémorise le multiplicateur d'événement appliqué (pour que les quêtes d'XP comptent l'XP de base).
   if(entry.type !== 'quest' && entry.xp > 0){
     const evMult = getActiveXpMultiplier();
@@ -6374,7 +6409,7 @@ function gameHistoryLabel(entry){
   else if(entry.type === 'puzzle') typeLabel = '🧩 Puzzle du jour';
   else if(entry.type === 'flash') typeLabel = '⚡ Puzzle Éclair';
   else if(entry.type === 'quest') typeLabel = '🎯 Quête';
-  else if(entry.type === 'aventure') typeLabel = '🗺️ Aventure';
+  else if(entry.type === 'aventure') typeLabel = '🗺️ Tour Chromatique';
   else if(entry.type === 'ordi') typeLabel = ORDI_SUB_LABELS[entry.sub] || '🧠 Solo';
   else typeLabel = '🧠 Solo';
   let resultLabel;
@@ -7147,54 +7182,30 @@ const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai 
 const FLASH_LOCK_HOURS = 3;
 const FLASH_XP_WIN = 100; // récompense pour la ligne finale trouvée (essai unique) : bien plus payant que la partie contre l'ordi, car un seul essai et 3h d'attente.
 
-// Indice humain affiché sous la grille : nombre de couleurs distinctes du code.
-function puzzleDistinctHint(secret){
-  const n = new Set(secret).size;
-  return n === 4
-    ? 'les 4 couleurs du code sont toutes différentes'
-    : 'le code contient ' + n + ' couleurs différentes';
-}
-
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
-// V2 « lisibilité humaine » : les lignes données sont SANS doublons et choisies
-// pour leur valeur d'information (on garde celle qui réduit le plus de candidats),
-// donc chaque étape de la déduction reste faisable de tête, sans énumération.
-//   - difficulty 'flash' (facile) : secret SANS doublons, 3-4 lignes, traîne ~224 → ~10 → 1.
-//   - difficulty 'daily' (costaud) : doublons possibles dans le secret, 4-5 lignes,
-//     traîne ~500 → ~60 → ~10 → 2 → 1, avec l'indice du nombre de couleurs pour guider.
-function generatePuzzleData(difficulty){
-  const easy = (difficulty === 'flash');
-  const distinct4 = () => {
-    const pool = [0,1,2,3,4,5,6,7];
-    for(let i = pool.length - 1; i > 0; i--){
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
-    }
-    return pool.slice(0, 4);
-  };
-  for(let attempt = 0; attempt < 60; attempt++){
-    const secret = easy ? distinct4() : [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+// Le nombre de lignes nécessaires varie (souvent 3 à 5) : peu importe tant que
+// le puzzle reste résoluble par pure déduction.
+function generatePuzzleData(){
+  for(let attempt = 0; attempt < 300; attempt++){
+    const secret = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
     let candidates = ALL_CODES_8;
     const lines = [];
     for(let i = 0; i < PUZZLE_MAX_LINES; i++){
-      // Tirage de quelques candidates informatives (toujours 4 couleurs distinctes,
-      // plus lisibles pour un humain) : on garde la plus discriminante.
-      let best = null, bestCount = Infinity;
-      for(let t = 0; t < 5; t++){
-        const guess = distinct4();
-        const fb = feedbackFor(guess, secret, 8);
-        let count = 0;
-        for(let c = 0; c < candidates.length; c++){
-          const f = feedbackFor(guess, candidates[c], 8);
-          if(f.black === fb.black && f.white === fb.white) count++;
-        }
-        if(count < bestCount){ bestCount = count; best = { guess, fb }; }
-      }
-      lines.push({ guess: best.guess, black: best.fb.black, white: best.fb.white });
+      // 🚧 Pare-feu : une ligne affichée ne doit JAMAIS être le code (4 bien placés),
+      // sinon la solution est donnée en clair dans les essais du haut.
+      let guess;
+      let fb;
+      let guard = 0;
+      do {
+        guess = [0,0,0,0].map(() => Math.floor(Math.random() * 8));
+        fb = feedbackFor(guess, secret, 8);
+      } while(fb.black === 4 && guard++ < 50);
+      if(fb.black === 4) { i--; continue; } // improbable : on saute cette ligne
+      lines.push({ guess, black: fb.black, white: fb.white });
       candidates = candidates.filter(code => {
-        const f = feedbackFor(best.guess, code, 8);
-        return f.black === best.fb.black && f.white === best.fb.white;
+        const f = feedbackFor(guess, code, 8);
+        return f.black === fb.black && f.white === fb.white;
       });
       if(candidates.length === 1) break;
     }
@@ -7207,7 +7218,7 @@ function ensurePuzzle(dateKey){
   const puzzleRef = ref(db, `puzzleChallenge/${dateKey}`);
   return runTransaction(puzzleRef, (current) => {
     if(current !== null) return; // déjà généré aujourd'hui : on n'y touche pas
-    const data = generatePuzzleData('daily');
+    const data = generatePuzzleData();
     if(!data) return;
     return { secret: data.secret, lines: data.lines };
   }).then((result) => result.snapshot.val());
@@ -7285,7 +7296,7 @@ async function openPuzzleChallenge(){
 async function loadMyPuzzleProgress(){
   const snap = await get(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}`));
   const data = snap.val();
-  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(puzzleSecret)}.`;
+  document.getElementById('puzzleSub').textContent = `Même grille pour tout le monde aujourd'hui. ${puzzleLines.length} ligne(s) déjà jouées, à toi de trouver le code en un seul essai.`;
 
   if(data && data.finished){
     puzzleFinished = true;
@@ -7370,84 +7381,6 @@ function submitPuzzleGuess(){
   showPuzzleDoneState(finishedData);
 }
 
-// 🔎 Analyse de défaite : pourquoi la proposition était fausse.
-// Panneau pédagogique affiché quand on rate le puzzle du jour ou l'Éclair :
-//   1. la proposition du joueur avec son vrai feedback contre le code ;
-//   2. la (première) ligne donnée qu'elle contredit — c'est LA piste d'erreur ;
-//   3. la traîne de déduction (candidats restants après chaque ligne) et les
-//      derniers codes parmi lesquels il fallait départager.
-// Comme la grille isole toujours un candidat unique, une proposition fausse
-// contredit forcément au moins une ligne donnée.
-function puzzleDefeatAnalysisHTML(guess, secret, lines){
-  if(!guess || !secret || !lines || !lines.length) return '';
-  const pegsHTML = (code) => code.map(ci => window.pegHTML(ci, 'peg')).join('');
-  const fpegsHTML = (black, white) => {
-    const arr = [];
-    for(let i=0;i<black;i++) arr.push('<div class="fpeg black"></div>');
-    for(let i=0;i<white;i++) arr.push('<div class="fpeg white"></div>');
-    while(arr.length < 4) arr.push('<div class="fpeg none"></div>');
-    return `<div class="feedback-mini">${arr.join('')}</div>`;
-  };
-  const fbLabel = (black, white) => `${black} rouge${black>1?'s':''} + ${white} blanc${white>1?'s':''}`;
-  // Ligne de jeu affichée comme sur le plateau (numéro + pions + feedback) : sert
-  // pour la proposition du joueur, les lignes du puzzle et les codes restants.
-  const rowHTML = (code, black, white, num) =>
-    `<div class="row"><span class="num">${num}</span><div class="pegs">${pegsHTML(code)}</div>${fpegsHTML(black, white)}</div>`;
-  const fbGuess = feedbackFor(guess, secret, 8);
-
-  // Première ligne donnée que la proposition contredit.
-  let contra = -1, contraFb = null;
-  for(let i=0;i<lines.length;i++){
-    const f = feedbackFor(lines[i].guess, guess, 8);
-    if(f.black !== lines[i].black || f.white !== lines[i].white){ contra = i; contraFb = f; break; }
-  }
-
-  // Traîne de déduction + derniers candidats encore possibles avant la conclusion.
-  let cands = ALL_CODES_8;
-  const trail = [];
-  let lastCands = []; // candidats restants à l'étape où il en restait encore plusieurs
-  for(const l of lines){
-    cands = cands.filter(code => {
-      const f = feedbackFor(l.guess, code, 8);
-      return f.black === l.black && f.white === l.white;
-    });
-    if(cands.length > 1) lastCands = cands.slice();
-    trail.push(cands.length);
-  }
-
-  const contraBlock = contra >= 0
-    ? `<div style="margin:10px 0 0;">❌ <b>Ta proposition contredisait la ligne ${contra+1}</b> :
-        cette ligne impose <b>${fbLabel(lines[contra].black, lines[contra].white)}</b>,
-        or ta combinaison n'aurait donné que <b>${fbLabel(contraFb.black, contraFb.white)}</b> dessus.
-        Reprends la ligne ${contra+1} : c'est là que le raisonnement a déraillé.</div>`
-    : `<div style="margin:10px 0 0;">✅ Ta proposition était cohérente avec toutes les lignes… mais ce n'était pas le bon code.</div>`;
-
-  const trailBlock = trail.length
-    ? `<div style="margin:10px 0 0;">🧠 <b>Déduction ligne par ligne</b> — codes encore possibles :
-        ${trail.join(' → ')}</div>`
-    : '';
-
-  // Rappel des lignes du puzzle, pour comparer directement avec l'analyse.
-  const linesBlock = `<div style="margin:12px 0 0;">📋 <b>Les lignes du puzzle</b> :
-    <div class="history" style="max-height:none;margin-bottom:0;">
-      ${lines.map((l, i) => rowHTML(l.guess, l.black, l.white, i+1)).join('')}
-    </div></div>`;
-
-  const leurreBlock = lastCands.length > 1
-    ? `<div style="margin:12px 0 0;">⚖️ Avant la dernière ligne, il ne restait que ces ${lastCands.length} codes :
-        <div class="history" style="max-height:none;margin-bottom:0;">
-          ${lastCands.map((code, i) => rowHTML(code, null, null, i+1)).join('')}
-        </div>
-        — la dernière ligne servait justement à départager le bon.</div>`
-    : '';
-
-  return `<div class="a-title" style="text-align:left;">🔎 Analyse</div>
-    <div>Ta proposition :
-      <div class="history" style="max-height:none;margin:6px 0 0;">${rowHTML(guess, fbGuess.black, fbGuess.white, '👉')}</div>
-      aurait donné <b>${fbLabel(fbGuess.black, fbGuess.white)}</b> contre le code.</div>
-    ${contraBlock}${linesBlock}${trailBlock}${leurreBlock}`;
-}
-
 function showPuzzleDoneState(finishedData){
   document.getElementById('puzzlePlayArea').classList.add('hidden');
   document.getElementById('puzzleDoneArea').classList.remove('hidden');
@@ -7456,17 +7389,11 @@ function showPuzzleDoneState(finishedData){
     : `😔 Ce n'était pas le bon code. Reviens demain pour un nouveau puzzle.`;
   document.getElementById('puzzleDoneMessage').textContent = msg;
   const revealEl = document.getElementById('puzzleSecretReveal');
-  const analysisEl = document.getElementById('puzzleAnalysisPanel');
   if(!finishedData.solved && puzzleSecret){
     revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${puzzleSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
     revealEl.classList.remove('hidden');
-    if(analysisEl){
-      analysisEl.innerHTML = puzzleDefeatAnalysisHTML(finishedData.guess, puzzleSecret, puzzleLines);
-      analysisEl.classList.toggle('hidden', !finishedData.guess);
-    }
   } else {
     revealEl.classList.add('hidden');
-    if(analysisEl) analysisEl.classList.add('hidden');
   }
 }
 
@@ -7544,8 +7471,7 @@ function updateFlashTileUI(){
 }
 
 // Grille Éclair en cours (sauvegardée sur l'appareil tant qu'on n'a pas répondu)
-// v2 : clé versionnée — les anciennes grilles (générateur dur v1) stockées en localStorage sont ignorées.
-function flashCurrentKey(){ return `bm_flash_current_v2_${myPseudo}`; }
+function flashCurrentKey(){ return `bm_flash_current_${myPseudo}`; }
 function loadFlashCurrent(){
   try {
     const raw = localStorage.getItem(flashCurrentKey());
@@ -7575,7 +7501,7 @@ async function openFlashPuzzle(){
   // Grille conservée : si on quitte sans répondre puis qu'on revient, c'est la MÊME grille.
   let data = loadFlashCurrent();
   if(!data){
-    data = generatePuzzleData('flash');
+    data = generatePuzzleData();
     if(!data){
       document.getElementById('flashSub').textContent = "Impossible de générer la grille, réessaie plus tard.";
       return;
@@ -7585,7 +7511,6 @@ async function openFlashPuzzle(){
   }
   flashSecret = data.secret;
   flashLines = data.lines;
-  document.getElementById('flashSub').textContent = `Une grille rien que pour toi : à toi de trouver le code en un seul essai. 🔍 Indice : ${puzzleDistinctHint(flashSecret)}.`;
   flashFinished = false;
   flashGuess = [null,null,null,null];
   flashSelectedSlot = 0;
@@ -7657,7 +7582,7 @@ function submitFlashGuess(){
   } else {
     recordGameHistory({type: 'flash', result: 'perdu', attempts: 1, xp: 0});
   }
-  showFlashDoneState({ solved, xp, guess: guessSnapshot });
+  showFlashDoneState({ solved, xp });
 }
 
 function showFlashDoneState(finishedData){
@@ -7668,17 +7593,11 @@ function showFlashDoneState(finishedData){
     : `😔 Ce n'était pas le bon code. Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`;
   document.getElementById('flashDoneMessage').textContent = msg;
   const revealEl = document.getElementById('flashSecretReveal');
-  const analysisEl = document.getElementById('flashAnalysisPanel');
   if(!finishedData.solved && flashSecret){
     revealEl.innerHTML = `<span class="secret-reveal-label">Le code était :</span><div class="pegs">${flashSecret.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>`;
     revealEl.classList.remove('hidden');
-    if(analysisEl){
-      analysisEl.innerHTML = puzzleDefeatAnalysisHTML(finishedData.guess, flashSecret, flashLines);
-      analysisEl.classList.toggle('hidden', !finishedData.guess);
-    }
   } else {
     revealEl.classList.add('hidden');
-    if(analysisEl) analysisEl.classList.add('hidden');
   }
 }
 

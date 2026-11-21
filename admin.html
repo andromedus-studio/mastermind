@@ -94,11 +94,14 @@
         <thead>
           <tr>
             <th data-k="pseudo">Pseudo</th>
-            <th data-k="level" class="num">Niv</th>
-            <th data-k="xp" class="num">XP</th>
+            <th data-k="effLevel" class="num" title="Niveau affiché dans le jeu (après prestige)">Niv</th>
+            <th data-k="xp" class="num" title="XP totale (tous prestiges confondus)">XP</th>
+            <th data-k="prestige" class="num" title="Étoiles de prestige">⭐</th>
             <th data-k="games" class="num">Parties</th>
             <th data-k="wins" class="num">V</th>
             <th data-k="losses" class="num">D</th>
+            <th data-k="abandons" class="num" title="Parties quittées en cours">Ab.</th>
+            <th data-k="infiniteBest" class="num" title="Meilleure série Monde infinie (semaine en cours)">Série ∞</th>
             <th data-k="rate" class="num">% V</th>
             <th data-k="status">Statut</th>
             <th data-k="seen">Derni&#232;re activit&#233;</th>
@@ -255,13 +258,20 @@ function buildRows(){
     const acc = owner && owner.uid && owner.uid !== 'reserved' ? DATA.accounts[owner.uid] : null;
     const st = pl.stats || {};
     const xp = typeof pl.xp === 'number' ? pl.xp : 0;
-    const level = levelFromXp(xp);
+    // Prestige : le niveau affiché dans le jeu part de l'XP GAGNÉE depuis le prestige.
+    const pr = st.prestige || { count: 0 };
+    const prCount = Number(pr.count) || 0;
+    const effXp = prCount ? Math.max(0, xp - (Number(pr.baseXp) || 0)) : xp;
+    const effLevel = levelFromXp(effXp);
+    const level = effLevel;
     const games = st.games || 0, wins = st.wins || 0, losses = st.losses || 0;
     let status = 'none';
     if(owner && owner.reserved) status = 'reserved';
     else if(owner) status = (acc && acc.google) ? 'google' : 'guest';
     return {
-      pseudo: p, xp, level, tier: tierOf(level), games, wins, losses,
+      pseudo: p, xp, effXp, level, effLevel, prestige: prCount, prestigeData: pr,
+      tier: tierOf(effLevel), games, wins, losses, abandons: st.abandons || 0,
+      infiniteBest: (st.infiniteWeek && st.infiniteBest) || 0, infiniteWeek: st.infiniteWeek || '',
       rate: (wins + losses) ? Math.round(100 * wins / (wins + losses)) : -1,
       status, owner, acc, stats: st, hasPlayer: !!DATA.players[p],
       seen: (acc && acc.seen) || st.lastPlayed || 0
@@ -302,12 +312,15 @@ function render(){
     const [lab, cls] = STATUS_LABEL[r.status];
     return `<tr class="row" data-p="${esc(r.pseudo)}">
       <td>${TIER_ICONS[r.tier]} <b>${esc(r.pseudo)}</b></td>
-      <td class="num">${r.level}</td><td class="num">${r.xp}</td>
+      <td class="num">${r.effLevel}</td><td class="num">${r.xp}</td>
+      <td class="num">${r.prestige ? '⭐' + r.prestige : '—'}</td>
       <td class="num">${r.games}</td><td class="num">${r.wins}</td><td class="num">${r.losses}</td>
+      <td class="num">${r.abandons}</td>
+      <td class="num">${r.infiniteBest || '—'}</td>
       <td class="num">${r.rate < 0 ? '\u2014' : r.rate + ' %'}</td>
       <td><span class="pill ${cls}">${lab}</span></td>
       <td class="muted">${fmtDate(r.seen)}</td></tr>`;
-  }).join('') || `<tr><td colspan="9" class="muted">Aucun joueur.</td></tr>`;
+  }).join('') || `<tr><td colspan="12" class="muted">Aucun joueur.</td></tr>`;
   $('footnote').textContent = 'Les compteurs de parties d\u00e9marrent \u00e0 la date \u00ab depuis \u00bb de chaque joueur (mise \u00e0 jour du jeu) ; l\'historique d\u00e9taill\u00e9 est limit\u00e9 \u00e0 30 parties.';
   document.querySelectorAll('#rows tr.row').forEach(tr => tr.onclick = () => openDetail(tr.dataset.p));
 }
@@ -334,10 +347,28 @@ function openDetail(pseudo){
   const histRows = hist.map(h => `<tr><td>${fmtDate(h.at)}</td><td>${esc(MODE_LABELS[h.sub] || MODE_LABELS[h.type] || h.type)}${h.opponent ? ' vs ' + esc(h.opponent) : ''}</td><td>${esc(h.result || '')}</td><td class="num">${h.xp || 0}</td></tr>`).join('')
     || `<tr><td colspan="4" class="muted">Aucune partie.</td></tr>`;
   // \ud83e\uddec\ufe0f Journal de test XP : entr\u00e9es players/<pseudo>/testLog (mode test uniquement).
-  const tlog = Object.values((DATA.players[pseudo] || {}).testLog || {}).sort((a, b) => b.at - a.at).slice(0, 50);
-  const testRows = tlog.map(e => `<tr><td>${fmtDate(e.at)}</td><td>${esc(TEST_KINDS[e.kind] || e.kind)}</td><td style="font-size:11px;">${esc(testEntryText(e))}</td></tr>`).join('')
+  const tlog = Object.values((DATA.players[pseudo] || {}).testLog || {}).sort((a, b) => b.at - a.at).slice(0, 50);  const testRows = tlog.map(e => `<tr><td>${fmtDate(e.at)}</td><td>${esc(TEST_KINDS[e.kind] || e.kind)}</td><td style="font-size:11px;">${esc(testEntryText(e))}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">Aucune entr\u00e9e (mode test inactif ou rien \u00e0 signaler).</td></tr>';
   const [lab] = STATUS_LABEL[r.status];
+  // ⭐ Prestige : niveau affiché = XP gagnée DEPUIS le prestige (comme dans le jeu).
+  const prd = r.prestigeData || {};
+  const prTxt = r.prestige ? `⭐ ${r.prestige} — base XP ${prd.baseXp || 0} (le ${fmtDate(prd.at)})` : '—';
+  // 🗺️ Sauvegarde Aventure (tour en cours) : étage + réserve.
+  const advSave = (DATA.players[pseudo] || {}).adventureSave || null;
+  const advSaveTxt = (advSave && Number(advSave.round)) ? `étage ${advSave.round} · réserve ${advSave.reserve || 0} XP` : '—';
+  // 🎯 Quêtes : dernier nœud daily + weekly avec progression / réclamées.
+  const qNode = (DATA.players[pseudo] || {}).quests || {};
+  const qDay = Object.keys(qNode.daily || {}).sort().pop();
+  const qWeek = Object.keys(qNode.weekly || {}).sort().pop();
+  const questRows = (list, label) => (list || []).map(q => {
+    const done = q.claimed ? '<span class="pill ok">✅ réclamée</span>' : `<span class="pill warn">${q.progress || 0} / ${q.frozenTarget || '?'}</span>`;
+    return `<tr><td>${label}</td><td>${fmtDate(q.claimedAt || q.at)}</td><td>${done}</td></tr>`;
+  }).join('');
+  const dailyList = (qDay && Object.values(qNode.daily[qDay] || {})) || [];
+  const weeklyList = (qWeek && Object.values(qNode.weekly[qWeek] || {})) || [];
+  const questBlock = (questRows(dailyList, ' quotidienne') + questRows(weeklyList, ' hebdomadaire'))
+    ? `<h3>🎯 Quêtes (dernier nœud)</h3><table class="mini"><thead><tr><th>Période</th><th>Date</th><th>Progression</th></tr></thead><tbody>${questRows(dailyList, 'quotidienne ' + (qDay || '')) + questRows(weeklyList, 'hebdo ' + (qWeek || ''))}</tbody></table>`
+    : '<h3>🎯 Quêtes</h3><p class="muted" style="font-size:11px;">Aucune progression de quête enregistrée.</p>';
   const canRelease = !!r.owner;
   const canReserve = !r.owner;
   $('modal').innerHTML = `
@@ -346,13 +377,17 @@ function openDetail(pseudo){
       <button id="mClose">\u2715</button>
     </div>
     <div class="kv">
-      <div>Niveau / XP</div><div>Niv ${r.level} \u00b7 ${r.xp} XP</div>
+      <div>Niveau (jeu) / XP</div><div>Niv ${r.effLevel} \u00b7 ${r.xp} XP totaux${r.prestige ? ` \u00b7 ${r.effXp} XP de niveau apr\u00e8s \u2b50${r.prestige}` : ''}</div>
+      <div>Rang</div><div>${TIER_ICONS[r.tier]} ${TIER_NAMES[r.tier]}</div>
+      <div>Prestige</div><div>${prTxt}</div>
       <div>Statut</div><div>${lab}</div>
       <div>Compte cr\u00e9\u00e9</div><div>${fmtDate(r.owner && r.owner.at)}</div>
       <div>Derni\u00e8re activit\u00e9</div><div>${fmtDate(r.seen)}</div>
       <div>Code de secours</div><div>${hasRecoveryCode(r.owner) ? '\u2705 g\u00e9n\u00e9r\u00e9' : '\u2014'}</div>
-      <div>Parties</div><div>${r.games} (V ${r.wins} \u00b7 D ${r.losses} \u00b7 abandons ${st.abandons || 0})</div>
+      <div>Parties</div><div>${r.games} (V ${r.wins} \u00b7 D ${r.losses} \u00b7 abandons ${r.abandons}${r.games ? ` \u00b7 ${Math.round(100 * r.abandons / r.games)} %` : ''})</div>
+      <div>S\u00e9rie infinie</div><div>${r.infiniteBest ? `\u221e ${r.infiniteBest} (semaine du ${r.infiniteWeek})` : '\u2014'}</div>
       <div>XP gagn\u00e9e (stats)</div><div>${st.xpGained || 0}${st.since ? ' \u00b7 depuis le ' + fmtDate(st.since) : ''}</div>
+      <div>Sauvegarde Aventure</div><div>${advSaveTxt}</div>
     </div>
     <div class="actions">
       <button id="aRename">\u270f\ufe0f Renommer</button>
@@ -365,6 +400,7 @@ function openDetail(pseudo){
     <table class="mini"><thead><tr><th>Mode</th><th class="num">Parties</th><th class="num">V</th><th class="num">D</th><th class="num">Abandons</th></tr></thead><tbody>${modeRows}</tbody></table>
     <h3>Derni\u00e8res parties</h3>
     <table class="mini"><thead><tr><th>Date</th><th>Mode</th><th>R\u00e9sultat</th><th class="num">XP</th></tr></thead><tbody>${histRows}</tbody></table>
+    ${questBlock}
     <h3>\ud83e\uddec\ufe0f Journal de test XP (Aventure)</h3>
     <p class="muted" style="font-size:11px;">Enregistr\u00e9 seulement quand le mode test est actif \u2014 chaque gain d'XP et chaque \u00e9v\u00e9nement de l'Aventure, dans le d\u00e9tail.</p>
     <table class="mini"><thead><tr><th>Date</th><th>\u00c9v\u00e9nement</th><th>D\u00e9tail</th></tr></thead><tbody>${testRows}</tbody></table>
