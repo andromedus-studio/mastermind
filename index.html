@@ -1570,6 +1570,62 @@
     box-shadow: none !important;
   }
   .player-banner-img, .player-banner-video { display: block; width: 100%; height: auto; }
+
+  /* ═══ GTA VI — thème Vice City : néons rose / cyan / orangé, fond affiche ═══ */
+  .gta6-toggle {
+    position: fixed; top: 114px; right: 8px; z-index: 1000;
+    height: 32px; padding: 0 14px; border-radius: 18px; cursor: pointer;
+    font: 800 13px/1 system-ui, sans-serif; letter-spacing: 1.5px; color: #fff;
+    background: linear-gradient(135deg, #ff3ea5 0%, #ff8a3d 55%, #ffd24a 100%);
+    border: 1.5px solid rgba(255,255,255,0.55);
+    box-shadow: 0 0 10px rgba(255,62,165,0.55), 0 4px 14px rgba(0,0,0,0.4);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.45);
+  }
+  .gta6-toggle:not(.on) { filter: saturate(0.75) brightness(0.9); }
+  .gta6-toggle.on { box-shadow: 0 0 6px #00e5ff, 0 0 16px rgba(0,229,255,0.7), 0 0 22px rgba(255,62,165,0.7); }
+  .gta6-toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+    background: rgba(20,8,40,0.92); color: #fff; border: 1px solid #ff3ea5; border-radius: 12px;
+    padding: 10px 16px; font-size: 13px; z-index: 5000; opacity: 0; pointer-events: none;
+    transition: opacity .25s, transform .25s; max-width: 90vw; text-align: center;
+  }
+  .gta6-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  body.theme-gta6 { --accent: #ff3ea5; --accent-soft: rgba(255,62,165,0.35); }
+  /* Affiche entière, sans zoom ni flou : on la voit en entier (bandes sombres si le format diffère). */
+  body.theme-gta6 .bg-photo {
+    inset: 0; transform: none; filter: none;
+    background-size: contain; background-repeat: no-repeat; background-position: center top;
+    background-color: #12041f;
+  }
+  body.theme-gta6 .bg-overlay {
+    background: linear-gradient(180deg, rgba(40,6,60,0.10) 0%, rgba(20,6,40,0.20) 55%, rgba(10,4,24,0.45) 100%);
+  }
+  body.theme-gta6 .logo { filter: drop-shadow(0 0 10px rgba(255,62,165,0.45)) drop-shadow(0 0 18px rgba(0,229,255,0.25)) drop-shadow(0 6px 16px rgba(0,0,0,0.5)); }
+  body.theme-gta6 .card {
+    position: relative;
+    background: rgba(28,12,50,0.84);
+    backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px);
+    border: 1.5px solid #ff3ea5;
+    box-shadow: 0 0 0 1px rgba(255,62,165,0.30), 0 0 8px rgba(255,62,165,0.75), 0 0 24px rgba(0,229,255,0.35), inset 0 0 10px rgba(255,138,61,0.18), 0 10px 30px rgba(0,0,0,0.38);
+    animation: gta6Neon 3.2s ease-in-out infinite;
+  }
+  @keyframes gta6Neon {
+    0%, 100% { border-color: #ff3ea5; box-shadow: 0 0 0 1px rgba(255,62,165,0.30), 0 0 8px rgba(255,62,165,0.75), 0 0 24px rgba(255,62,165,0.40), inset 0 0 10px rgba(255,138,61,0.18), 0 10px 30px rgba(0,0,0,0.38); }
+    50% { border-color: #00e5ff; box-shadow: 0 0 0 1px rgba(0,229,255,0.30), 0 0 10px rgba(0,229,255,0.80), 0 0 28px rgba(0,229,255,0.45), inset 0 0 12px rgba(0,229,255,0.18), 0 10px 30px rgba(0,0,0,0.38); }
+  }
+  @media (prefers-reduced-motion: reduce) { body.theme-gta6 .card { animation: none; } }
+
+  .pseudo-frame-gta6 { border-color: #ff3ea5; color: #ffb0dc; box-shadow: 0 0 7px rgba(255,62,165,0.5), 0 0 10px rgba(0,229,255,0.3); }
+  .player-banner-tier-gta6,
+  .player-banner-tier-gta6 .player-banner-frame {
+    background: none !important; border: none !important; outline: none !important;
+    box-shadow: none !important; backdrop-filter: none !important;
+  }
+  .player-banner-tier-gta6 .player-banner-video,
+  .player-banner-tier-gta6 .player-banner-img { background: transparent !important; mix-blend-mode: normal !important; filter: none !important; opacity: 1 !important; }
+  .player-banner-tier-gta6 .player-banner-frame::before,
+  .player-banner-tier-gta6 .player-banner-frame::after { display: none !important; }
   /* Barres de défilement invisibles partout (le défilement tactile/roulette reste fonctionnel) */
   .duel-card, .banner-players-list, .online-players-list, .rank-info-scroll, .history {
     scrollbar-width: none;      /* Firefox */
@@ -1903,6 +1959,7 @@
 <div class="bg-overlay"></div>
 
 <button class="sound-toggle info-toggle" id="ranksInfoBtn" onclick="openRanksInfo()" title="Rangs et avantages" aria-label="Rangs et avantages">ℹ️</button>
+<button class="gta6-toggle" id="gta6Btn" onclick="toggleGta6()" title="Thème GTA VI (visible de tous)" aria-pressed="false">GTA VI</button>
 <audio id="bgMusic" loop preload="auto"><source src="audio/music-main.mp3" type="audio/mpeg"></audio>
 <div class="app">
   <div class="logo-secret-hit"><img class="logo" src="images/logo.png" alt="BrainMind">
@@ -5546,6 +5603,11 @@ function levelFromXp(totalXp){
 // (xp - baseXp) : le joueur repart au niveau 1, mais son XP totale (affichée dans
 // la bannière et les classements) est conservée.
 let playerPrestigeCache = {};
+// ── Thème GTA VI (Vice City) : choisi par le joueur, visible de tous via players/<pseudo>/gta6 ──
+let playerGta6Cache = {};
+let myGta6 = false; try{ myGta6 = localStorage.getItem('brainmind_gta6') === '1'; }catch(e){}
+let myGta6SyncBlocked = false, gta6Writing = false, gta6Initialized = false;
+function gta6On(pseudo){ if(!pseudo) return false; if(pseudo === myPseudo) return myGta6; return !!playerGta6Cache[pseudo]; }
 function prestigeCount(pseudo){ const p = playerPrestigeCache[pseudo]; return (p && p.count) || 0; }
 function effXp(pseudo, xp){
   const p = playerPrestigeCache[pseudo];
@@ -5568,7 +5630,8 @@ const TIER_BANNERS = {
   rubis: 'images/banner-rubis.png',
   rubellite: 'images/banner-rubellite.png',
   amethyste: 'images/banner-amethyste.png',
-  arcenciel: 'images/banner-arcenciel.png'
+  arcenciel: 'images/banner-arcenciel.png',
+  gta6: 'images/banner-gta6.png'
 };
 const TIER_BANNERS_WEBP = {
   debutant: 'images/banner-debutant.webp',
@@ -5580,7 +5643,8 @@ const TIER_BANNERS_WEBP = {
   rubis: 'images/banner-rubis.webp',
   rubellite: 'images/banner-rubellite.webp',
   amethyste: 'images/banner-amethyste.webp',
-  arcenciel: 'images/banner-arcenciel.webp'
+  arcenciel: 'images/banner-arcenciel.webp',
+  gta6: 'images/banner-gta6.webp'
 };
 // Repli en cascade pour une bannière image : PNG -> WEBP -> bannière or.
 function bannerImgFallback(img){
@@ -5617,7 +5681,8 @@ const TIER_BANNER_VIDEOS = {
   rubis: 'images/rubis_banniere_transparente.webm',
   rubellite: 'images/rubellite_banniere_transparente.webm',
   amethyste: 'images/amethyste_banniere_transparente.webm',
-  arcenciel: 'images/arcenciel_banniere_transparente.webm'
+  arcenciel: 'images/arcenciel_banniere_transparente.webm',
+  gta6: 'images/gta6_banniere_transparente.webm'
 };
 
 // Bannières animées (WebM) — interrupteur :
@@ -5648,11 +5713,12 @@ function pseudoTier(level){
 function playerBannerCardHTML(pseudo, level, extra){
   extra = extra || {};
   const pr = prestigeCount(pseudo);
-  const tier = pseudoTier(level); // même rang pour tous ; seuls les Prestige ont la version animée
+  const gta6 = gta6On(pseudo);
+  const tier = gta6 ? 'gta6' : pseudoTier(level); // même rang pour tous ; seuls les Prestige ont la version animée (GTA VI : toujours animée)
   const safe = escapeHtml(pseudo);
   const subHTML = (extra.subHTML || '') + (pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : '');
   // Prestige : la bannière de son rang en WebM animé. Les autres : le PNG, comme avant.
-  const useVideo = (pr > 0 && BANNERS_ANIMEES && TIER_BANNER_VIDEOS[tier]);
+  const useVideo = ((pr > 0 || gta6) && BANNERS_ANIMEES && TIER_BANNER_VIDEOS[tier]);
   const bannerMedia = useVideo
     ? `<video class="player-banner-video" autoplay loop muted playsinline preload="auto" data-tier="${tier}" aria-label="${tier}"><source src="${TIER_BANNER_VIDEOS[tier]}" type="video/webm" onerror="bannerVideoFallback(this)"></video>`
     : `<img class="player-banner-img" data-tier="${tier}" src="${TIER_BANNERS[tier]}" alt="${tier}" onerror="bannerImgFallback(this)">`;
@@ -5680,7 +5746,7 @@ function renderDuelBanners(){
   if(!myEl || !oppEl || !myPseudo) return;
   const myLevel = plvl(myPseudo).level;
   const oppLevel = opponentPseudo ? plvl(opponentPseudo).level : 1;
-  const key = `${myPseudo}|${myLevel}|${opponentPseudo}|${oppLevel}`;
+  const key = `${myPseudo}|${myLevel}|${opponentPseudo}|${oppLevel}|${gta6On(myPseudo)}|${gta6On(opponentPseudo)}`;
   if(key === duelBannerKey) return; // évite de recharger les images à chaque coup joué
   duelBannerKey = key;
   myEl.innerHTML = playerBannerCardHTML(myPseudo, myLevel, { isMe: true, subHTML: `Nv ${myLevel}` });
@@ -5692,7 +5758,7 @@ function decoratedPseudoHTML(pseudo){
   const safe = escapeHtml(pseudo);
   const pr = prestigeCount(pseudo); // ★ étoile de prestige visible partout (historiques, défis, puzzle…)
   const star = pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : '';
-  const tier = pseudoTier(level);
+  const tier = gta6On(pseudo) ? 'gta6' : pseudoTier(level);
   if(!tier) return safe + star;
   return `<span class="pseudo-frame pseudo-frame-${tier}" title="Niveau ${level}">${safe}${star}</span>`;
 }
@@ -6494,10 +6560,24 @@ function setupPlayersXpListener(){
     const data = snap.val() || {};
     playerXpCache = {};
     playerPrestigeCache = {};
+    playerGta6Cache = {};
     Object.entries(data).forEach(([pseudo, p]) => {
       if(p && typeof p.xp === 'number') playerXpCache[pseudo] = p.xp;
       if(p && p.stats && p.stats.prestige) playerPrestigeCache[pseudo] = p.stats.prestige;
+      if(p && p.gta6 === true) playerGta6Cache[pseudo] = true;
     });
+    if(myPseudo && !gta6Writing){
+      const server = !!(data[myPseudo] && data[myPseudo].gta6 === true);
+      if(!gta6Initialized){
+        gta6Initialized = true;
+        // 1re synchro : si le thème était actif en local mais pas encore publié, on le publie.
+        if(myGta6 && !server) publishGta6();
+      } else if(!myGta6SyncBlocked && server !== myGta6){
+        myGta6 = server; try{ localStorage.setItem('brainmind_gta6', server ? '1' : '0'); }catch(e){}
+        refreshGta6Button(); reapplyGta6Theme();
+      }
+      if(myGta6) playerGta6Cache[myPseudo] = true;
+    }
     renderOnlinePlayers(lastPresenceData);
     updateMyLevelBadge();
     renderAttemptsPicker(); // les bonus d'essais dépendent du rang
@@ -6526,25 +6606,34 @@ const THEME_BG_IMAGES = {
   'theme-rubis': 'images/background-rubis.png',
   'theme-rubellite': 'images/background-rubellite.png',
   'theme-amethyste': 'images/background-amethyste.png',
-  'theme-arcenciel': 'images/background-arcenciel.png'
+  'theme-arcenciel': 'images/background-arcenciel.png',
+  // Affiche GTA VI : à nommer images/background-gta6.png (les autres noms ci-dessous servent de repli).
+  'theme-gta6': ['images/background-gta6.png', 'images/background-gta6.jpg', 'images/background-gta6.webp', 'images/gta6.png', 'images/gta6.jpg', 'images/gta6.webp', 'images/gta-vi.png', 'images/gta-vi.jpg', 'images/gta6-poster.png', 'images/gta6-poster.jpg']
 };
 function applyThemeBackground(wanted){
   document.body.style.removeProperty('--bg-landscape');
   document.body.style.removeProperty('--bg-portrait');
-  const src = THEME_BG_IMAGES[wanted];
-  if(!src) return;
-  const test = new Image();
-  test.onload = () => {
-    // Le thème n'a peut-être plus cours si le rang a changé entre-temps.
-    if(currentRankTheme !== wanted) return;
-    document.body.style.setProperty('--bg-landscape', `url('${src}')`);
-    document.body.style.setProperty('--bg-portrait', `url('${src}')`);
+  const entry = THEME_BG_IMAGES[wanted];
+  if(!entry) return;
+  const list = Array.isArray(entry) ? entry.slice() : [entry];
+  const tryNext = () => {
+    const src = list.shift();
+    if(!src) return;
+    const test = new Image();
+    test.onload = () => {
+      // Le thème n'a peut-être plus cours si le rang a changé entre-temps.
+      if(currentRankTheme !== wanted) return;
+      document.body.style.setProperty('--bg-landscape', `url('${src}')`);
+      document.body.style.setProperty('--bg-portrait', `url('${src}')`);
+    };
+    test.onerror = tryNext;
+    test.src = src;
   };
-  test.src = src;
+  tryNext();
 }
 
 function applyRankTheme(tier){
-  const wanted = rankIndex(tier) >= rankIndex('arcenciel') ? 'theme-arcenciel'
+  const rankWanted = rankIndex(tier) >= rankIndex('arcenciel') ? 'theme-arcenciel'
     : rankIndex(tier) >= rankIndex('amethyste') ? 'theme-amethyste'
     : rankIndex(tier) >= rankIndex('rubellite') ? 'theme-rubellite'
     : rankIndex(tier) >= rankIndex('rubis') ? 'theme-rubis'
@@ -6552,12 +6641,14 @@ function applyRankTheme(tier){
     : rankIndex(tier) >= rankIndex('emerald') ? 'theme-emerald'
     : rankIndex(tier) >= rankIndex('gold') ? 'theme-gold'
     : null;
+  const wanted = myGta6 ? 'theme-gta6' : rankWanted; // le thème GTA VI prime sur le thème de rang
   if(wanted === currentRankTheme) return;
-  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir', 'theme-rubis', 'theme-rubellite', 'theme-amethyste', 'theme-arcenciel');
+  document.body.classList.remove('theme-gold', 'theme-emerald', 'theme-saphir', 'theme-rubis', 'theme-rubellite', 'theme-amethyste', 'theme-arcenciel', 'theme-gta6');
   if(wanted) document.body.classList.add(wanted);
   currentRankTheme = wanted;
   applyThemeBackground(wanted);
-  document.title = wanted === 'theme-gold' ? 'BrainMind — Neo-Gold'
+  document.title = wanted === 'theme-gta6' ? 'BrainMind — GTA VI'
+    : wanted === 'theme-gold' ? 'BrainMind — Neo-Gold'
     : wanted === 'theme-emerald' ? 'BrainMind — Neo-Emerald'
     : wanted === 'theme-saphir' ? 'BrainMind — Neo-Saphir'
     : wanted === 'theme-rubis' ? 'BrainMind — Neo-Ruby'
@@ -6568,7 +6659,7 @@ function applyRankTheme(tier){
 
   const mainMusic = document.getElementById('bgMusic');
   if(!mainMusic) return;
-  const wantedSrc = wanted ? THEME_MUSIC_SRC : MAIN_MUSIC_SRC;
+  const wantedSrc = rankWanted ? THEME_MUSIC_SRC : MAIN_MUSIC_SRC; // la musique reste celle du rang
   if(mainMusic.dataset.currentSrc === wantedSrc) return;
   const wasPlaying = !mainMusic.paused && !mainMusic.ended;
   const volume = mainMusic.volume || 0.35;
@@ -6589,6 +6680,49 @@ function applyRankTheme(tier){
     if(soundOn) mainMusic.play().catch(() => {});
   });
 }
+
+// ── GTA VI : bouton, synchro Firebase, rafraîchissement ──
+function reapplyGta6Theme(){
+  currentRankTheme = '__refresh__';
+  updateMyLevelBadge();
+  myBannerKey = ''; renderMyBanner();
+  renderOnlinePlayers(lastPresenceData);
+  if(currentDuelId){ duelBannerKey = ''; renderDuelBanners(); }
+}
+function refreshGta6Button(){
+  const b = document.getElementById('gta6Btn');
+  if(!b) return;
+  b.classList.toggle('on', !!myGta6);
+  b.setAttribute('aria-pressed', myGta6 ? 'true' : 'false');
+}
+function gta6Toast(msg){
+  let t = document.getElementById('gta6Toast');
+  if(!t){ t = document.createElement('div'); t.id = 'gta6Toast'; t.className = 'gta6-toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(gta6Toast._t); gta6Toast._t = setTimeout(() => t.classList.remove('show'), 3500);
+}
+async function publishGta6(){
+  if(!myPseudo) return;
+  gta6Writing = true;
+  try{
+    await set(ref(db, `players/${myPseudo}/gta6`), myGta6 ? true : null);
+    myGta6SyncBlocked = false;
+  }catch(e){
+    myGta6SyncBlocked = true;
+    gta6Toast('GTA VI activé chez toi, mais pas visible des autres (règles Firebase).');
+  }finally{ gta6Writing = false; }
+}
+async function toggleGta6(){
+  if(!myPseudo){ gta6Toast('Choisis d’abord un pseudo.'); return; }
+  myGta6 = !myGta6;
+  try{ localStorage.setItem('brainmind_gta6', myGta6 ? '1' : '0'); }catch(e){}
+  refreshGta6Button();
+  if(myGta6) playerGta6Cache[myPseudo] = true; else delete playerGta6Cache[myPseudo];
+  reapplyGta6Theme();
+  await publishGta6();
+}
+window.toggleGta6 = toggleGta6;
+window.addEventListener('load', refreshGta6Button);
 
 function updateMyLevelBadge(){
   const badge = document.getElementById('myLevelBadge');
@@ -6615,7 +6749,7 @@ function renderMyBanner(){
   const pr = prestigeCount(myPseudo);
   const canPrestige = info.level >= 50;
   const subHTML = `Nv ${info.level}${pr > 0 ? ` <span class="prestige-star">★${pr}</span>` : ''}${canPrestige ? ` <button class="prestige-btn" onclick="window.openPrestigeModal()" title="Mode Prestige : en savoir plus">⭐</button>` : ''}`;
-  const key = `${myPseudo}|${info.level}|${pr}|${canPrestige}`;
+  const key = `${myPseudo}|${info.level}|${pr}|${canPrestige}|${myGta6}`;
   if(key === myBannerKey){
     // Même joueur/même état : on met juste le texte à jour, sans recharger la vidéo/l'image
     // (évite le clignotement à chaque tick XP d'un joueur en ligne, quel qu'il soit).

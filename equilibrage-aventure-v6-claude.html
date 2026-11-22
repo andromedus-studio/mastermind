@@ -1,0 +1,974 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mode Aventure — Équilibrage v6 (plan de Dam)</title>
+<style>
+  :root{ font-family: system-ui, sans-serif; color:#e8e8f0; background:#0d0e14; }
+  body{ margin:0; padding:24px; background:#0d0e14; }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ font-size:25px; margin:0 0 4px; color:#ffd700; }
+  h2{ font-size:19px; margin:34px 0 10px; color:#ffd700; border-bottom:1px solid rgba(255,215,0,.3); padding-bottom:6px; }
+  h3{ font-size:15px; margin:18px 0 8px; color:#8ab4ff; }
+  p, li{ font-size:13.5px; line-height:1.6; color:#c9cbe0; }
+  .muted{ color:#8b8ea8; font-size:12px; }
+  .card{ background:#151723; border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:16px 18px; margin:12px 0; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; margin:10px 0; }
+  th{ background:#1c1f30; color:#ffd700; text-align:left; padding:6px 9px; border-bottom:2px solid rgba(255,215,0,.25); font-size:10.5px; letter-spacing:.05em; }
+  th.grp-jeu{ color:#ff9660; } th.grp-cl{ color:#6fe0cc; }
+  td{ padding:6px 9px; border-bottom:1px solid rgba(255,255,255,.06); color:#c9cbe0; vertical-align:top; }
+  td.warn{ color:#ff8a80; font-weight:700; }
+  tr.tot td{ background:#1b1f31; font-weight:700; color:#ffd700; }
+  .theme{ display:inline-block; padding:4px 14px; border-radius:20px; font-weight:800; letter-spacing:.05em; margin:6px 0; font-size:12.5px; }
+  .th-essais{ background:rgba(255,150,50,.15); color:#ff9660; border:1px solid rgba(255,150,50,.4); }
+  .th-temps{ background:rgba(200,210,220,.12); color:#c8d2dc; border:1px solid rgba(200,210,220,.4); }
+  .th-challenge{ background:rgba(255,80,60,.12); color:#ff7a5c; border:1px solid rgba(255,80,60,.4); }
+  .th-ombre{ background:rgba(150,120,220,.12); color:#b9a6f0; border:1px solid rgba(150,120,220,.4); }
+  .th-mirage{ background:rgba(80,220,200,.12); color:#6fe0cc; border:1px solid rgba(80,220,200,.4); }
+  .th-brouillard{ background:rgba(160,180,210,.12); color:#aebfd6; border:1px solid rgba(160,180,210,.4); }
+  .th-autre{ background:rgba(255,215,0,.12); color:#ffd700; border:1px solid rgba(255,215,0,.4); }
+  .floor{ font-size:14px; font-weight:800; color:#ffd700; margin:14px 0 4px; }
+  .opt{ background:#1b1f31; border-radius:6px; padding:7px 10px; margin:6px 0; font-size:12.5px; line-height:1.55; border-left:3px solid #555; }
+  .opt .optline{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .opt .optline .lab{ color:#fff; font-weight:800; }
+  .opt .opttexts{ flex:1 1 300px; min-width:240px; }
+  .opt .sim{ display:block; margin-top:6px; padding-top:5px; border-top:1px solid rgba(255,255,255,.08); font-size:11.5px; line-height:1.5; }
+  .opt .pctcell{ display:inline-flex; align-items:center; gap:3px; }
+  .opt .pctcell .pcs{ color:#8b8ea8; font-size:11px; margin-right:4px; }
+  .opt.t-green{ border-left-color:#8cffaa; } .opt.t-red{ border-left-color:#ff8a80; } .opt.t-blue{ border-left-color:#6ab7ff; } .opt.t-gold{ border-left-color:#ffd24a; }
+  .opt.checked{ background:#20302a; }
+  .bonusTxt{ color:#8cffaa; font-weight:700; }
+  .malusTxt{ color:#ff8a80; }
+  .bonusTxt:focus, .malusTxt:focus{ outline:1px dashed rgba(255,215,0,.6); border-radius:4px; background:#151a2b; }
+  select, input[type=number]{ background:#10131f; color:#e8e8f0; border:1px solid rgba(255,255,255,.18); border-radius:5px; padding:3px 5px; font-size:11.5px; }
+  input[type=number]{ width:54px; }
+  input[type=checkbox]{ width:16px; height:16px; accent-color:#ffd700; cursor:pointer; }
+  .t-green{ border-left:3px solid #8cffaa; }
+  .t-red{ border-left:3px solid #ff8a80; }
+  .t-blue{ border-left:3px solid #6ab7ff; }
+  .t-gold{ border-left:3px solid #ffd24a; }
+  #cmpPanel table{ border-collapse:collapse; width:100%; font-size:13px; } #cmpPanel th,#cmpPanel td{ border:1px solid rgba(255,255,255,.12); padding:5px 8px; text-align:right; } #cmpPanel th:first-child,#cmpPanel td:first-child{ text-align:left; }
+  .note{ background:#10131f; border:1px dashed rgba(255,215,0,.45); border-radius:8px; padding:8px 10px; margin:8px 0; min-height:32px; font-size:12.5px; color:#ffd700; }
+  .note:empty::before{ content:attr(data-ph); color:#6b6e88; font-style:italic; }
+  .note:focus{ outline:2px solid rgba(255,215,0,.6); background:#151a2b; }
+  [contenteditable]{ caret-color:#ffd700; }
+  .hint{ background:rgba(138,180,255,.08); border-left:3px solid #8ab4ff; padding:8px 12px; font-size:12.5px; border-radius:6px; margin:10px 0; color:#aebde0; }
+  .lg-g{ color:#8cffaa; font-weight:800; } .lg-r{ color:#ff8a80; font-weight:800; } .lg-b{ color:#6ab7ff; font-weight:800; }
+  .ev-good{ color:#8cffaa; font-weight:700; } .ev-bad{ color:#ff8a80; font-weight:700; }
+  .ctl{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; background:#151723; border:1px solid rgba(255,255,255,.12); border-radius:10px; padding:12px 14px; margin:14px 0; font-size:12.5px; }
+  .ctl label{ color:#8b8ea8; font-size:11px; letter-spacing:.04em; }
+  .runbar{ background:linear-gradient(90deg,#1d2a1f,#20302a); border:1px solid rgba(140,255,170,.35); border-radius:10px; padding:12px 16px; margin:10px 0; font-size:14px; line-height:1.7; }
+  .runbar b{ color:#8cffaa; font-size:15px; }
+  .btn{ background:#ffd700; color:#111; font-weight:800; border:none; border-radius:8px; padding:9px 16px; cursor:pointer; font-size:13px; }
+  .btn:hover{ filter:brightness(1.1); }
+  .btn2{ background:#252a3d; color:#c9cbe0; font-weight:700; border:1px solid rgba(255,255,255,.15); border-radius:7px; padding:5px 10px; cursor:pointer; font-size:11.5px; margin-top:4px; }
+  .btn2:hover{ border-color:#ffd700; color:#ffd700; }
+  textarea{ width:100%; min-height:220px; background:#10131f; color:#c9cbe0; border:1px solid rgba(255,255,255,.18); border-radius:8px; font-family:ui-monospace,monospace; font-size:11px; padding:10px; box-sizing:border-box; }
+  .badge{ display:inline-block; background:#ffd700; color:#111; font-size:10px; font-weight:800; border-radius:10px; padding:2px 8px; margin-left:8px; vertical-align:middle; }
+  .badge.cl{ background:#6fe0cc; }
+  .bluehint{ color:#6ab7ff; font-size:11px; }
+  .shopitem{ display:grid; grid-template-columns: 22px 34px 1fr auto auto auto; gap:8px; align-items:center; padding:6px 10px; background:#1b1e2e; border-radius:8px; margin:6px 0; font-size:12.5px; }
+  .shopitem .price{ color:#ffd700; font-weight:700; white-space:nowrap; }
+  .shopitem .itemsim{ font-size:11px; color:#8b8ea8; }
+  .del{ background:none; border:none; color:#6b6e88; cursor:pointer; font-size:13px; padding:0 4px; }
+  .del:hover{ color:#ff8a80; }
+  .models dt{ color:#6fe0cc; font-weight:800; font-size:12.5px; margin-top:8px; }
+  .models dd{ margin:2px 0 0 0; font-size:12.5px; color:#c9cbe0; line-height:1.55; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🗺️ Mode Aventure — Équilibrage v6 <span class="badge cl">🧪 BANC D'ESSAI CLAUDE</span> <span class="badge">📊 EV + XP/min</span> <span class="badge cl">🟨 BONUS DE RUN</span> <span class="badge">⚖️ PRUDENT vs RISQUE</span></h1>
+<p class="muted">Même outil que la v3 (cases à cocher, simulateur, boutiques, export) + <b>4 modèles à basculer</b> pour comparer le jeu actuel à mes propositions, une <b>probabilité de réussite par option</b> avec valeur attendue, un calcul <b>XP/min</b> contre « Joueur vs Ordi », et la tour étendue à <b>50 étages</b>. Rien n'est modifié dans le jeu : tout se teste ici.</p>
+
+<div class="card">
+  <h3>🎯 Code couleur des options</h3>
+  <p>
+    <span class="lg-g">🟩 +% VERT</span> — augmente le % du <b>gain d'étage</b> (prochain étage, remis à zéro au choix suivant).<br>
+    <span class="lg-r">🟥 −% ROUGE</span> — malus de %, <b>mais effet bonus</b> en échange (tranquillité, temps, masques révélés…).<br>
+    <span class="lg-b">🟦 ++% BLEU</span> — multiplie la <b>réserve d'XP</b> (appliqué au choix) : gain d'étage NEUTRE en échange.<br>
+    🚪 <b>Sortie en boutique</b> : B1 ×0.5 · B2 ×0.75 · B3 ×1.0 · B4 ×1.15 · B5+ ×1.25 (modèle « jeu ») — le modèle Claude continue la pente après B5.
+  </p>
+</div>
+
+<div class="card" style="border-color:rgba(111,224,204,.45);">
+  <h3>🧪 Modèles testés — change-les et regarde la run et le tableau bouger</h3>
+  <div class="ctl" style="margin:8px 0;">
+    <label>PRESET <select id="presetSel"><option value="jeu">Jeu actuel</option><option value="claude">Proposition Claude complète</option><option value="dam">⭐ Plan Dam (XP Claude + plan étages 1-4 + sortie ×0,25→×2,5)</option><option value="custom">Personnalisé</option></select></label>
+    <label>XP D'ÉTAGE <select id="modelSel"><option value="jeu">Jeu (palier × rang)</option><option value="claude">Claude (courbe lisse 1,06^étage)</option></select></label>
+    <label>CONSOLATION DÉFAITE <select id="consolSel"><option value="jeu">Jeu (10 % + 5 %/assurance)</option><option value="claude">Claude (10 % + 1 %/étage + 5 %/assur.)</option></select></label>
+    <label>PLAFOND 🟦 <select id="bluecapSel"><option value="none">Aucun</option><option value="x3">Max 3 × le gain d'étage</option></select></label>
+    <label>SORTIE EN BOUTIQUE <select id="exitSel"><option value="jeu">Jeu (×1.25 dès B5)</option><option value="claude">Claude (+0.05 par boutique après B5)</option><option value="plan">Plan Dam (×0,25 par palier : ×0,25 → ×2,5)</option></select></label>
+    <label>🟨 BONUS DE RUN (ÉTAGES 2–5) <select id="runSel"><option value="none">Aucun (options du jeu)</option><option value="on">Pari de run (Claude) : +3/+5/+8 %</option><option value="plan">Plan Dam : étages 1–3 + 3 niveaux à l'étage 4</option></select></label>
+    <label>PLAFOND BONUS DE RUN % <input type="number" id="runCapInp" value="15" min="0" max="100" step="5"></label>
+    <label>RISQUE (🟩 positifs) <select id="riskSel"><option value="jeu">Jeu (% du gain d'étage seulement)</option><option value="reserve">Payé aussi sur la réserve</option></select></label>
+    <label>% RÉSERVE PAR POINT D'OPTION <input type="number" id="riskKInp" value="0.1" min="0" max="2" step="0.1"></label>
+  </div>
+  <dl class="models">
+    <dt>⭐ Plan Dam</dt>
+    <dd><b>Étages 2–4 (choix après 1, 2, 3)</b> : A = −25 % d'XP mais plus d'essais sur ce palier ; B = XP classique avec moins d'essais. <b>Étage 5 (choix après l'étage 4)</b> : A 14 essais, <b>−25 %</b> sur tous les gains de la run ; B 12 essais, XP classique (0 %) ; C 8 essais, gros bonus (+25 %, réglable). Les essais sont permanents (boutique : +1 essai permanent). Sortie : ×0,25 × (n° de palier) → ×2,5 au palier 10.</dd>
+    <dt>🟨 Bonus de run (étages 2 à 5)</dt>
+    <dd>Aux étages 2–5, la réserve est minuscule : perdre un pari coûte presque rien. Chaque option 🟨 donne un bonus <b>permanent pour la run</b> (+3 % prudent, +5 % moyen, +8 % risqué à l'étage 5), cumulable jusqu'au plafond, appliqué à tous les gains d'étage suivants. Le gain de l'étage choisi reste neutre.</dd>
+    <dt>Risque payé sur la réserve</dt>
+    <dd>Une option 🟩 positive de +N % rapporte en plus N × (réglage) % de la réserve tout de suite. Ça corrige le défaut du jeu : on risque toute la réserve pour gagner un % d'un seul étage.</dd>
+  </dl>
+  <dl class="models">
+    <dt>XP d'étage « Claude »</dt>
+    <dd>gain = 8 × 1,06^(étage−1) × facteur coups × (1 + bonus rang) × (1 + % du choix). Facteur coups : 4 → ×1.3, 5 → ×1.15, <b>6 → ×1 (référence)</b>, 7 → ×0.85, 8 → ×0.7. Bonus rang : +2,5 % par rang, max +25 % (au lieu d'un bonus plat qui valait 3× la base). Valable jusqu'à l'étage 50 et au-delà, sans falaise au palier 7.</dd>
+    <dt>Consolation « Claude »</dt>
+    <dd>Plus tu es haut, moins une défaite est écrasante : 10 % + 1 % par étage franchi + 5 % par assurance, plafonnée à 50 %. Ça fait baisser la « réussite minimale rentable » en profondeur.</dd>
+    <dt>Plafond 🟦</dt>
+    <dd>Le boost de réserve est limité à 3 fois le gain d'étage : sans ça, +15 % sur une grosse réserve dépasse un étage entier et l'option devient dominante.</dd>
+    <dt>Valeur attendue (EV) et « réussite mini rentable »</dt>
+    <dd>Chaque option a une probabilité de réussite (modifiable). Le simulateur affiche l'EV de l'option et la réussite minimale à partir de laquelle continuer bat l'arrêt immédiat. Si ta réussite estimée est dessous : ⚠️ option perdante en moyenne.</dd>
+  </dl>
+</div>
+
+<div class="ctl">
+  <label>RANG DU JOUEUR <select id="rankSel"></select></label>
+  <label>COUPS POUR RÉUSSIR UN ÉTAGE <select id="coupsSel"></select></label>
+  <label>MINUTES PAR ÉTAGE <input type="number" id="minInp" value="3" min="0.5" step="0.5"></label>
+  <label>RÉUSSITE ÉTAGE SANS CHOIX % <input type="number" id="entryPInp" value="97" min="1" max="100" step="1"></label>
+</div>
+<div class="ctl">
+  <label><button class="btn" id="exportBtn">📤 Exporter mes modifs</button></label>
+  <label><button class="btn2" id="resetRunBtn">↺ Vider la run (décocher tout)</button></label>
+  <label><button class="btn2" id="resetSaveBtn">⟲ Réinitialiser le document</button></label>
+</div>
+<div class="runbar" id="runBar"></div>
+<div class="card" id="cmpPanel" style="border-color:rgba(255,210,74,.45);"></div>
+
+<h2>📊 XP d'étage — jeu actuel vs proposition Claude (calculé sur ton rang)</h2>
+<div class="card" id="refTable"></div>
+
+<div id="floors"></div>
+
+<div class="card" style="border:1px dashed rgba(255,215,0,.45);">
+  <h3>➕ Pour la suite (au-delà de l'étage 50)</h3>
+  <p><button class="btn" id="addPalierBtn">➕ Ajouter un palier (5 étages + boutique)</button> <button class="btn2" id="addFloorBtn">➕ Ajouter 1 étage au dernier palier</button></p>
+  <p class="muted">Les paliers 7 à 10 (étages 31 à 50) sont des copies du cycle 1 (essais → temps → challenge → ombre) : à durcir à la main.</p>
+</div>
+
+<h2>📤 Exporter tes modifications</h2>
+<div class="card">
+  <p>Le récapitulatif liste le modèle utilisé, chaque option (avec % et réussite), tes choix cochés, la valeur attendue et le XP/min. Copie-colle-le dans le chat.</p>
+  <textarea id="exportArea" placeholder="Le texte d'export apparaîtra ici…"></textarea>
+</div>
+
+<div class="hint">💾 Sauvegarde automatique dans ce navigateur (localStorage). 🛠️ Correction vs v3 : les étages d'entrée de palier (6, 11, 16…) rapportent maintenant leur gain neutre dans la simulation (ils étaient ignorés).</div>
+
+</div>
+
+<script>
+// ===== Barèmes du JEU (index.html) =====
+var XP_TIERS = [50, 40, 30, 20, 10];
+var PALIER_MULT = { 1:1, 2:1.5, 3:2, 4:2.5, 5:3, 6:3.5 };
+var CASHOUT_MULT = { 1:0.5, 2:0.75, 3:1.0, 4:1.15, 5:1.25 };
+var XP_FALLBACK = 5;
+// idx = position dans l'échelle des rangs ; limOther = bonus d'XP « limite 6/8/10 essais » du jeu
+var RANKS = {
+  debutant:  { name:'Débutant',    winBonus:0,  idx:0, limOther:0 },
+  bronze:    { name:'Bronze',      winBonus:2,  idx:1, limOther:0 },
+  silver:    { name:'Argent',      winBonus:4,  idx:2, limOther:5 },
+  gold:      { name:'Or',          winBonus:6,  idx:3, limOther:10 },
+  emerald:   { name:'Émeraude',    winBonus:8,  idx:4, limOther:15 },
+  saphir:    { name:'Saphir',      winBonus:10, idx:5, limOther:20 },
+  rubis:     { name:'Rubis',       winBonus:12, idx:6, limOther:25 },
+  rubellite: { name:'Rubellite',   winBonus:14, idx:7, limOther:30 },
+  amethyste: { name:'Améthyste',   winBonus:16, idx:8, limOther:35 },
+  arcenciel: { name:'Arc-en-ciel', winBonus:18, idx:9, limOther:40 }
+};
+var FLOOR_TRIES = { 1:18, 2:16, 3:14, 4:12 };
+var GREED_TRIES = { 1:16, 2:14, 3:12, 4:10 };
+var GREED_PCT   = { 1:15, 2:15, 3:20, 4:20 };
+var TEMPS_BLUE  = { 1:5, 2:5, 3:10, 4:10 };
+var THEMES = ['essais','temps','challenge','ombre','mirage','brouillard'];
+var THEMES_FR = { essais:'LES ESSAIS', temps:'LE TEMPS', challenge:'CHALLENGE', ombre:'L\u2019OMBRE', mirage:'LE MIRAGE', brouillard:'LE BROUILLARD', autre:'NOUVEAU THÈME' };
+var COUP_F = { 1:1.45, 2:1.45, 3:1.45, 4:1.3, 5:1.15, 6:1, 7:0.85, 8:0.7 };
+var DEFAULT_P = { green:90, red:97, blue:88, gold:92 };
+var S = { model:'claude', consol:'claude', bluecap:'x3', exit:'plan', minutes:3, entryP:97, runbonus:'plan', runcap:15, risk:'reserve', riskK:0.1, cmpUpto:30 };
+var RUNB = 0;
+
+function palierOf(floor){ return Math.floor((floor - 1) / 5) + 1; }
+function themeOf(floor){ return THEMES[Math.floor((floor - 1) / 5) % 6]; }
+
+// DOM refs (créés tôt car les formules lisent le rang)
+var rankSel = document.getElementById('rankSel');
+var coupsSel = document.getElementById('coupsSel');
+var presetSel = document.getElementById('presetSel');
+var modelSel = document.getElementById('modelSel');
+var consolSel = document.getElementById('consolSel');
+var bluecapSel = document.getElementById('bluecapSel');
+var exitSel = document.getElementById('exitSel');
+var runSel = document.getElementById('runSel');
+var runCapInp = document.getElementById('runCapInp');
+var riskSel = document.getElementById('riskSel');
+var riskKInp = document.getElementById('riskKInp');
+var minInp = document.getElementById('minInp');
+var entryPInp = document.getElementById('entryPInp');
+var floorsHost = document.getElementById('floors');
+var runBar = document.getElementById('runBar');
+for(var rk in RANKS){ var ro = document.createElement('option'); ro.value = rk; ro.textContent = RANKS[rk].name + ' (+' + RANKS[rk].winBonus + ' XP/victoire)'; if(rk === 'saphir') ro.selected = true; rankSel.appendChild(ro); }
+for(var c = 1; c <= 8; c++){ var co = document.createElement('option'); co.value = c; co.textContent = c + (c === 6 ? ' (cible)' : ''); if(c === 6) co.selected = true; coupsSel.appendChild(co); }
+
+// ===== Gain d'étage : les deux modèles =====
+function stageGainM(model, coups, floor, pct){
+  var rk = RANKS[rankSel.value];
+  var m = 1 + (pct || 0) / 100;
+  if(model === 'claude'){
+    var cf = COUP_F[coups] || 0.55;
+    var curve = 8 * Math.pow(1.06, floor - 1);
+    var rb = Math.min(0.25, 0.025 * rk.idx);
+    return Math.max(1, Math.round(curve * cf * (1 + rb) * m));
+  }
+  var p = palierOf(floor);
+  var cap = (p === 1) ? 10 : 14;
+  var base = Math.min(Math.max(coups >= 1 && coups <= XP_TIERS.length ? XP_TIERS[coups - 1] : XP_FALLBACK, 5), cap);
+  var mult = PALIER_MULT[p] !== undefined ? PALIER_MULT[p] : p; // falaise du jeu : ×7, ×8… au palier 7+
+  return Math.max(1, Math.round((base + rk.winBonus) * mult * m));
+}
+function stageGain(coups, floor, pct){ return Math.max(1, Math.round(stageGainM(S.model, coups, floor, pct) * (1 + RUNB / 100))); }
+// Résultat d'une option : nouvelle réserve, gain d'étage, bonus de run ajouté
+function outcome(opt, R, floor, coups){
+  var R2 = R, gain, runAdd = 0;
+  if(opt.type === 'blue'){ R2 = R + blueBoost(R, opt.pct, floor, coups); gain = stageGain(coups, floor, 0); }
+  else if(opt.type === 'gold'){ gain = stageGain(coups, floor, 0); runAdd = opt.pct; }
+  else {
+    gain = stageGain(coups, floor, opt.pct);
+    if(S.risk === 'reserve' && opt.type === 'green' && opt.pct > 0) R2 = R + Math.round(R * opt.pct * S.riskK / 100);
+  }
+  return { R2: R2, gain: gain, runAdd: runAdd };
+}
+function addRun(cur, add){ return Math.max(-90, Math.min(S.runcap, cur + add)); }
+function gold1Opts(after){
+  var k = ((after - 1) % 5) + 1;
+  var o = [
+    { l:'A', type:'gold', pct:3, p:95, bonus:'🟨 +3% sur tous les gains suivants (run)', malus:FLOOR_TRIES[k] + ' essais max' },
+    { l:'B', type:'gold', pct:5, p:90, bonus:'🟨 +5% sur tous les gains suivants (run)', malus:GREED_TRIES[k] + ' essais max' }
+  ];
+  if(k === 4) o.push({ l:'C', type:'gold', pct:8, p:80, bonus:'🟨 +8% sur tous les gains suivants (run)', malus:'8 essais max' });
+  return o;
+}
+function planOpts(after){
+  var k = ((after - 1) % 5) + 1;
+  if(k <= 3) return [
+    { l:'A', type:'red', pct:-25, p:97, bonus:'−25% sur le gain d\u2019étage', malus:FLOOR_TRIES[k] + ' essais max (palier)' },
+    { l:'B', type:'green', pct:0, p:93, bonus:'XP classique', malus:GREED_TRIES[k] + ' essais max (palier)' }
+  ];
+  return [
+    { l:'A', type:'gold', pct:-25, p:97, bonus:'🟨 −25% sur tous les gains suivants (run)', malus:'14 essais (permanent)' },
+    { l:'B', type:'gold', pct:0, p:93, bonus:'🟨 XP classique (0 %) pour la suite', malus:'12 essais (permanent)' },
+    { l:'C', type:'gold', pct:25, p:80, bonus:'🟨 gros bonus +25% sur tous les gains suivants (run)', malus:'8 essais (permanent)' }
+  ];
+}
+function applyRunBonusMode(){
+  var pal = PALS[0];
+  pal.floors.forEach(function(f){
+    f.opts = (S.runbonus === 'plan') ? planOpts(f.after) : (S.runbonus === 'on') ? gold1Opts(f.after) : essaisOpts(f.after);
+  });
+}
+function cashoutMult(n){
+  if(S.exit === 'plan') return Math.round(0.25 * n * 100) / 100;
+  var base = CASHOUT_MULT[n] !== undefined ? CASHOUT_MULT[n] : 1.25;
+  if(S.exit === 'claude' && n > 5) return Math.round((1.25 + 0.05 * (n - 5)) * 100) / 100;
+  return base;
+}
+function consolation(floorDone, assur){
+  var c = (S.consol === 'claude') ? 0.10 + 0.01 * floorDone + 0.05 * assur : 0.10 + 0.05 * assur;
+  return Math.min(0.5, c);
+}
+function blueBoost(R, pct, floor, coups){
+  var b = R * pct / 100;
+  if(S.bluecap === 'x3') b = Math.min(b, 3 * stageGain(coups, floor, 0));
+  return Math.round(b);
+}
+function optP(o){
+  return (o.p !== undefined && o.p !== null && o.p !== '' && !isNaN(o.p)) ? Math.min(1, Math.max(0.01, o.p / 100)) : DEFAULT_P[o.type] / 100;
+}
+// Repère : une partie « Joueur vs Ordi » limite 6 essais gagnée en `coups` coups
+function vsOrdiXp(coups){
+  if(coups > 6) return 0;
+  var rk = RANKS[rankSel.value];
+  var base = (coups >= 1 && coups <= 5) ? XP_TIERS[coups - 1] : XP_FALLBACK;
+  return base + 15 + rk.limOther + rk.winBonus;
+}
+
+// ===== Options actuelles du jeu =====
+function essaisOpts(after){
+  var k = ((after - 1) % 5) + 1;
+  var o = [
+    { l:'A', type:'green', pct:10, bonus:'+10% sur le gain d\u2019étage', malus:FLOOR_TRIES[k] + ' essais max' },
+    { l:'B', type:'blue', pct:GREED_PCT[k], bonus:'++' + GREED_PCT[k] + '% de réserve (immédiat)', malus:GREED_TRIES[k] + ' essais max' }
+  ];
+  if(k === 4) o.push({ l:'C', type:'blue', pct:40, bonus:'++40% de réserve (immédiat)', malus:'8 essais max' });
+  return o;
+}
+function tempsOpts(after){
+  var k = ((after - 1) % 5) + 1;
+  return [
+    { l:'A', type:'green', pct:5, bonus:'+5% sur le gain d\u2019étage', malus:'−30 s sur l\u2019horloge du palier' },
+    { l:'B', type:'blue', pct:TEMPS_BLUE[k], bonus:'++' + TEMPS_BLUE[k] + '% de réserve (immédiat)', malus:'−1 min sur l\u2019horloge du palier' },
+    { l:'C', type:'red', pct:-50, bonus:'aucun malus', malus:'−50% sur le gain d\u2019étage' },
+    { l:'D', type:'red', pct:-75, bonus:'+30 s sur l\u2019horloge du palier', malus:'−75% sur le gain d\u2019étage' }
+  ];
+}
+var CHALLENGE_OPTS = {
+  12: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir en moins de 3:30'},
+        {l:'B',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir avec 2 essais de moins'},
+        {l:'C',type:'green',pct:5,bonus:'+5% sur le gain',malus:'finir en moins de 4:30'} ],
+  13: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir en moins de 3:00'},
+        {l:'B',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir avec 3 essais de moins'},
+        {l:'C',type:'green',pct:5,bonus:'+5% sur le gain',malus:'moins de 4:00 ET 1 essai de moins'},
+        {l:'D',type:'red',pct:-100,bonus:'+3 min sur la pendule totale',malus:'−100% sur le gain'} ],
+  14: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir en moins de 2:30'},
+        {l:'B',type:'blue',pct:10,bonus:'++10% de réserve (immédiat)',malus:'2 essais de moins ET −1 essai permanent'},
+        {l:'C',type:'green',pct:5,bonus:'+5% sur le gain',malus:'moins de 3:30 ET 1 essai de moins'},
+        {l:'D',type:'red',pct:-100,bonus:'geler la pendule totale pendant l\u2019étage 15',malus:'−100% sur le gain'} ],
+  15: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir en moins de 2:00'},
+        {l:'B',type:'green',pct:10,bonus:'+10% sur le gain',malus:'finir avec 3 essais de moins'},
+        {l:'C',type:'green',pct:5,bonus:'+5% sur le gain',malus:'moins de 2:30 ET 1 essai de moins'} ]
+};
+var SHADOW_OPTS = {
+  17: [ {l:'A',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 couleur masquée par ligne'},
+        {l:'B',type:'green',pct:25,bonus:'+25% sur le gain',malus:'2 couleurs masquées par ligne',blueHint:true},
+        {l:'C',type:'red',pct:-25,bonus:'aucune couleur masquée',malus:'−25% sur le gain'} ],
+  18: [ {l:'A',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 couleur masquée par ligne'},
+        {l:'B',type:'green',pct:30,bonus:'+30% sur le gain',malus:'2 couleurs masquées par ligne',blueHint:true},
+        {l:'C',type:'red',pct:-25,bonus:'aucune couleur masquée',malus:'−25% sur le gain'},
+        {l:'D',type:'red',pct:-15,bonus:'masques révélés au 5ᵉ essai',malus:'−15% sur le gain'} ],
+  19: [ {l:'A',type:'green',pct:20,bonus:'+20% sur le gain',malus:'2 couleurs masquées par ligne'},
+        {l:'B',type:'green',pct:35,bonus:'+35% sur le gain',malus:'2 masquées, position fixe cachée',blueHint:true},
+        {l:'C',type:'red',pct:-15,bonus:'1 couleur masquée seulement',malus:'−15% sur le gain'},
+        {l:'D',type:'red',pct:-10,bonus:'masques révélés au 7ᵉ essai',malus:'−10% sur le gain'} ],
+  20: [ {l:'A',type:'green',pct:25,bonus:'+25% sur le gain',malus:'2 masquées, position fixe cachée'},
+        {l:'B',type:'green',pct:40,bonus:'+40% sur le gain',malus:'3 couleurs masquées',blueHint:true},
+        {l:'C',type:'red',pct:-15,bonus:'1 couleur masquée seulement',malus:'−15% sur le gain'},
+        {l:'D',type:'red',pct:-10,bonus:'masques révélés au 8ᵉ essai',malus:'−10% sur le gain'} ]
+};
+var MIRAGE_OPTS = {
+  22: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'1 miroir/coup — consomme 1 essai, 1 couleur BIEN placée'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 miroir/coup — consomme 1 essai, couleurs aléatoires',blueHint:true},
+        {l:'C',type:'red',pct:-10,bonus:'3 miroirs GRATUITS après chaque coup',malus:'−10% sur le gain'} ],
+  23: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'1 miroir/coup (essai consommé) — 4× la même couleur'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 miroir/coup (essai consommé) — 4 couleurs distinctes',blueHint:true},
+        {l:'C',type:'red',pct:-10,bonus:'2 miroirs gratuits après chaque coup',malus:'−10% sur le gain'} ],
+  24: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'1 miroir/coup (essai consommé) — 1 couleur MAL placée'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 miroir/coup (essai consommé) — 2 couleurs en doublon',blueHint:true},
+        {l:'C',type:'red',pct:-10,bonus:'1 miroir gratuit après chaque coup',malus:'−10% sur le gain'} ],
+  25: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'1 miroir/coup (essai consommé) — 1 couleur du miroir CACHÉE'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'1 miroir/coup (essai consommé) — 2 couleurs cachées',blueHint:true},
+        {l:'C',type:'red',pct:-5,bonus:'miroir classique (essai consommé)',malus:'−5% sur le gain'} ]
+};
+var BROUILLARD_OPTS = {
+  27: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'4 lignes nettes puis 1 floue — cachées dès la 6ᵉ'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'3 nettes, floue 4ᵉ — cachées dès la 5ᵉ',blueHint:true},
+        {l:'C',type:'red',pct:-15,bonus:'5 nettes, floue 6ᵉ, cachées dès la 7ᵉ',malus:'−15% sur le gain'} ],
+  28: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'2 nettes + 1 floue — cachées dès la 4ᵉ'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'2 nettes, pas de flou — cachées dès la 3ᵉ',blueHint:true},
+        {l:'C',type:'red',pct:-15,bonus:'4 nettes + 2 floues — cachées dès la 7ᵉ',malus:'−15% sur le gain'} ],
+  29: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'le flou devient illisible (blur total)'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'flou illisible ET corrections ⚫⚪ cachées',blueHint:true},
+        {l:'C',type:'red',pct:-10,bonus:'corrections ⚫⚪ visibles sur les lignes cachées',malus:'−10% sur le gain'} ],
+  30: [ {l:'A',type:'green',pct:10,bonus:'+10% sur le gain',malus:'3 nettes, 1 floue illisible — cachées dès la 5ᵉ'},
+        {l:'B',type:'green',pct:15,bonus:'+15% sur le gain',malus:'CAUCHEMAR : 2 nettes, cachées dès la 3ᵉ',blueHint:true},
+        {l:'C',type:'red',pct:-5,bonus:'3 nettes, 1 floue lisible — cachées dès la 5ᵉ',malus:'−5% sur le gain'} ]
+};
+
+// ===== Structure : paliers → étages (choix) → boutique =====
+function shopItemsFor(p){
+  var items = [
+    { icon:'🛡️', label:'+5% de réserve en cas de défaite (permanent, cumulable)', costPct:10 },
+    { icon:'➕', label:(p <= 3 ? '+1 essai (permanent)' : '+2 essais (permanent)'), costPct:20 }
+  ];
+  if(p >= 2){
+    items.push({ icon:'⏱️', label:'+50% du temps restant', costPct:30 });
+    items.push({ icon:'⏱️', label:(p <= 3 ? '+5 minutes sur la pendule totale' : '+3 minutes sur la pendule totale'), costPct:20 });
+  }
+  if(p >= 4) items.push({ icon:'➕', label:'+1 essai (permanent)', costPct:15 });
+  if(p >= 3) items.push({ icon:'😇', label:'Anneau de l\u2019ange — rejoue l\u2019étage perdu au lieu de tout perdre (un seul à la fois)', costPct:30 });
+  items.push({ icon:'🎲', label:'+20% de réserve… mais malus aléatoire au prochain palier (annulé si on sort)', costPct:0 });
+  return items;
+}
+// Options d'un étage visé. Étages 31+ : copie du cycle 1 (target − 30).
+function optsFor(theme, target, after, ext){
+  var t = ext ? target - 30 : target;
+  var o = null;
+  if(theme === 'essais') o = essaisOpts(after);
+  else if(theme === 'temps') o = tempsOpts(after);
+  else if(theme === 'challenge') o = CHALLENGE_OPTS[t];
+  else if(theme === 'ombre') o = SHADOW_OPTS[t];
+  else if(theme === 'mirage') o = MIRAGE_OPTS[t];
+  else if(theme === 'brouillard') o = BROUILLARD_OPTS[t];
+  return o ? JSON.parse(JSON.stringify(o)) : null;
+}
+function buildBase(){
+  var pals = [];
+  for(var p = 1; p <= 10; p++){
+    var ext = p > 6;
+    var start = (p - 1) * 5 + 1;
+    var theme = THEMES[(p - 1) % 6];
+    var floors = [];
+    for(var after = start; after < start + 5; after++){
+      if(after === 50) break;
+      var target = after + 1;
+      if((target - 1) % 5 === 0 && target > 1) continue; // entrée de palier : directe, sans choix
+      var opts = optsFor(theme, target, after, ext);
+      if(opts && opts.length) floors.push({ after: after, target: target, opts: opts, note: '' });
+    }
+    if(ext && floors.length) floors[0].note = '✍️ Copie du cycle 1 (étage ' + (floors[0].target - 30) + ') : contraintes à durcir pour compenser la réserve plus grosse.';
+    pals.push({ num: p, theme: theme, custom: false, ext: ext, floors: floors,
+      shop: { after: start + 4, items: shopItemsFor(p), note: '' } });
+  }
+  return pals;
+}
+var PALS = buildBase();
+applyRunBonusMode();
+
+function fmt(n){ return Math.round(n).toLocaleString('fr-FR'); }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+// ===== Simulation de run (meilleur cas + valeur attendue) =====
+function simulate(){
+  var coups = Number(coupsSel.value);
+  RUNB = 0;
+  var reserve = stageGain(coups, 1, 0);          // étage 1 : manche d'entrée, sans risque
+  var surv = 1, evDeath = 0, assur = 0, lastTarget = 1;
+  var pEntry = S.entryP / 100;
+  var snapshots = [], snapAssur = [], snapRun = [], shopSnaps = {}, chosenLog = [];
+  PALS.forEach(function(pal, pi){
+    var anyChk = pal.floors.some(function(f){ return f.opts.some(function(o){ return o.checked; }); });
+    if(pi > 0 && anyChk && pal.floors.length){
+      var eT = pal.floors[0].after;
+      evDeath += surv * (1 - pEntry) * consolation(eT - 1, assur) * reserve;
+      surv *= pEntry;
+      reserve += stageGain(coups, eT, 0);
+      lastTarget = eT;
+    }
+    pal.floors.forEach(function(fl){
+      snapshots.push(reserve);
+      snapAssur.push(assur);
+      snapRun.push(RUNB);
+      var chosen = fl.opts.filter(function(o){ return o.checked; })[0];
+      if(chosen){
+        var oc = outcome(chosen, reserve, fl.target, coups);
+        var p = optP(chosen);
+        evDeath += surv * (1 - p) * consolation(fl.after, assur) * oc.R2;
+        surv *= p;
+        reserve = oc.R2 + oc.gain;
+        RUNB = addRun(RUNB, oc.runAdd);
+        lastTarget = fl.target;
+        chosenLog.push({ target: fl.target, letter: chosen.l, gain: oc.gain, pct: chosen.pct, type: chosen.type, p: p });
+      }
+    });
+    shopSnaps[pi] = reserve;
+    pal.shop.items.forEach(function(it){
+      if(it.checked){
+        if(it.costPct > 0){
+          reserve -= Math.max(1, Math.floor(reserve * it.costPct / 100));
+          if(String(it.icon).indexOf('🛡') !== -1) assur++;
+        } else reserve = Math.round(reserve * 1.2);
+      }
+    });
+  });
+  var finalRun = RUNB;
+  RUNB = 0;
+  return { reserve: reserve, ev: evDeath + surv * reserve, surv: surv, lastTarget: lastTarget, runBonus: finalRun,
+           snapshots: snapshots, snapAssur: snapAssur, snapRun: snapRun, shopSnaps: shopSnaps, chosenLog: chosenLog };
+}
+
+// ===== Comparaison automatique : prudent vs risque max vs meilleur EV (sans toucher aux cases cochées) =====
+function runStrategy(kind, upto){
+  var coups = Number(coupsSel.value);
+  var pBase = S.entryP / 100;
+  var floorByTarget = {};
+  PALS.forEach(function(pal){ pal.floors.forEach(function(f){ floorByTarget[f.target] = f; }); });
+  RUNB = 0;
+  var R = stageGain(coups, 1, 0), surv = 1, evDeath = 0, nRisk = 0;
+  for(var t = 2; t <= upto; t++){
+    var fl = floorByTarget[t];
+    var cands;
+    if(kind === 'safe' && fl && S.runbonus === 'plan' && t <= 5){
+      cands = [fl.opts.slice().sort(function(a, b){ return optP(b) - optP(a); })[0]];
+    }
+    else if(!fl || kind === 'safe') cands = [{ type:'green', pct:0, p:S.entryP, l:'—' }];
+    else cands = fl.opts.concat([{ type:'green', pct:0, p:S.entryP, l:'—' }]);
+    var best = null, bestScore = -Infinity;
+    cands.forEach(function(o){
+      var oc = outcome(o, R, t, coups), p = optP(o), c = consolation(t - 1, 0);
+      var score = (kind === 'max') ? (oc.R2 + oc.gain + (oc.runAdd ? oc.runAdd * 3 : 0)) : (p * (oc.R2 + oc.gain) + (1 - p) * c * oc.R2 + (oc.runAdd ? oc.runAdd * 3 : 0));
+      if(kind === 'max' && !fl) score = 0;
+      if(score > bestScore){ bestScore = score; best = { o: o, oc: oc, p: p }; }
+    });
+    if(!fl){ best.p = pBase; }
+    evDeath += surv * (1 - best.p) * consolation(t - 1, 0) * best.oc.R2;
+    surv *= best.p;
+    R = best.oc.R2 + best.oc.gain;
+    RUNB = addRun(RUNB, best.oc.runAdd);
+    if(best.o.pct !== 0) nRisk++;
+  }
+  var run = RUNB; RUNB = 0;
+  return { win: R, surv: surv, ev: evDeath + surv * R, run: run, nRisk: nRisk };
+}
+function renderCmp(){
+  var el = document.getElementById('cmpPanel');
+  var upto = Math.max(2, Math.min(50, Number(S.cmpUpto) || 30));
+  var safe = runStrategy('safe', upto), mx = runStrategy('max', upto), ev = runStrategy('ev', upto);
+  function row(name, r, ref){
+    var dW = ref ? ' <span class="muted">(' + (r.win >= ref.win ? '+' : '') + Math.round((r.win / ref.win - 1) * 100) + '%)</span>' : '';
+    var dE = ref ? ' <span class="muted">(' + (r.ev >= ref.ev ? '+' : '') + Math.round((r.ev / ref.ev - 1) * 100) + '%)</span>' : '';
+    return '<tr><td><b>' + name + '</b></td><td>' + fmt(r.win) + ' XP' + dW + '</td><td>' + (r.surv * 100).toFixed(0) + ' %</td><td class="' + (ref && r.ev < ref.ev ? 'ev-bad' : 'ev-good') + '">' + fmt(r.ev) + ' XP' + dE + '</td><td>' + (r.run ? (r.run > 0 ? '+' : '') + r.run + ' %' : '—') + '</td></tr>';
+  }
+  var html = '<h3 style="margin:0 0 6px;">⚖️ Prudent vs risque — jusqu\u2019à l\u2019étage <input type="number" id="cmpUptoInp" value="' + upto + '" min="2" max="50" step="1" style="width:56px;"> · ' + coups() + ' coups/étage · rang ' + RANKS[rankSel.value].name + '</h3>' +
+    '<table><tr><th>Stratégie</th><th>XP si tout réussit</th><th>Chance d\u2019y arriver</th><th>Valeur attendue (EV)</th><th>Bonus de run</th></tr>' +
+    row('🛡️ Prudent (' + (S.runbonus === 'plan' ? 'options les plus sûres aux étages 1–5, puis aucune' : 'aucune option') + ')', safe, null) +
+    row('🔥 Risque max (toujours la plus grosse récompense)', mx, safe) +
+    row('🧠 Malin (meilleure EV étage par étage)', ev, safe) + '</table>' +
+    '<p class="muted" style="margin:6px 0 0;">« Récompense du risque » = écart des colonnes 1 et 4 avec le prudent. Objectif de design : risque max ≈ +40 à +60 % si tout réussit, et EV du risque ≥ EV du prudent (sinon prendre des risques ne paie pas). Boutiques ignorées ; prudent = étage sans choix à ' + S.entryP + ' % de réussite.</p>';
+  el.innerHTML = html;
+  var inp = document.getElementById('cmpUptoInp');
+  inp.addEventListener('change', function(){ S.cmpUpto = Number(inp.value) || 30; renderCmp(); save(); });
+}
+function coups(){ return Number(coupsSel.value); }
+
+function renderRef(){
+  var el = document.getElementById('refTable');
+  var cps = [4,5,6,7];
+  var html = '<table><tr><th rowspan="2">Palier</th><th rowspan="2">Étages</th><th rowspan="2">Thème</th>' +
+    '<th colspan="4" class="grp-jeu">JEU ACTUEL' + (S.model === 'jeu' ? ' ◀ actif' : '') + '</th>' +
+    '<th colspan="4" class="grp-cl">PROPOSITION CLAUDE (étage du milieu)' + (S.model === 'claude' ? ' ◀ actif' : '') + '</th></tr><tr>';
+  cps.forEach(function(c){ html += '<th class="grp-jeu">' + c + ' c.</th>'; });
+  cps.forEach(function(c){ html += '<th class="grp-cl">' + c + ' c.</th>'; });
+  html += '</tr>';
+  for(var p = 1; p <= 10; p++){
+    var start = (p - 1) * 5 + 1, mid = start + 2;
+    html += '<tr><td><b>' + p + '</b></td><td>' + start + '–' + (start + 4) + '</td><td>' + THEMES_FR[THEMES[(p - 1) % 6]] + '</td>';
+    cps.forEach(function(c){
+      html += '<td' + (p > 6 ? ' class="warn" title="Falaise : le jeu retombe sur ×palier brut"' : '') + '>' + stageGainM('jeu', c, start, 0) + (p > 6 ? ' ⚠️' : '') + '</td>';
+    });
+    cps.forEach(function(c){ html += '<td>' + stageGainM('claude', c, mid, 0) + '</td>'; });
+    html += '</tr>';
+  }
+  // Cumul neutre à 6 coups
+  var coups = Number(coupsSel.value);
+  function cum(model, n){ var t = 0; for(var f = 1; f <= n; f++) t += stageGainM(model, coups, f, 0); return t; }
+  html += '<tr class="tot"><td colspan="3">Cumul neutre à ' + coups + ' coups (sans choix) jusqu\u2019à l\u2019étage…</td><td colspan="4">';
+  html += [10,20,30,40,50].map(function(n){ return n + ' : <span class="warn" style="color:#ff9660">' + fmt(cum('jeu', n)) + '</span>'; }).join(' · ');
+  html += '</td><td colspan="4">';
+  html += [10,20,30,40,50].map(function(n){ return n + ' : <span style="color:#6fe0cc">' + fmt(cum('claude', n)) + '</span>'; }).join(' · ');
+  html += '</td></tr></table>';
+  html += '<p class="muted">Gain neutre (sans % de choix), rang ' + RANKS[rankSel.value].name + '. <b>Jeu</b> : (plafond de rapidité + bonus de rang) × multiplicateur de palier (×1 à ×3.5, puis ×7, ×8… au palier 7+ : falaise). <b>Claude</b> : 8 × 1,06^(étage−1) × facteur coups × (1 + bonus rang ≤ 25 %). Repère « Joueur vs Ordi » limite 6, victoire en ' + coups + ' coups : <b>' + (coups > 6 ? '—' : vsOrdiXp(coups) + ' XP') + '</b>.</p>';
+  el.innerHTML = html;
+}
+
+function renderRunBar(){
+  var sim = simulate();
+  var coups = Number(coupsSel.value);
+  var nChk = sim.chosenLog.length;
+  var nOpt = 0; PALS.forEach(function(p){ nOpt += p.floors.length; });
+  var html = '▶ <b>RUN SIMULÉE</b> — rang ' + RANKS[rankSel.value].name + ', ' + coups + ' coups/étage : ' +
+    '<b>' + fmt(sim.reserve) + ' XP</b> de réserve à l\u2019étage ' + sim.lastTarget + ' <span class="muted">(meilleur cas · ' + nChk + ' option' + (nChk > 1 ? 's' : '') + ' cochée' + (nChk > 1 ? 's' : '') + ' sur ' + nOpt + ')</span>';
+  if(nChk > 0){
+    var mins = sim.lastTarget * S.minutes;
+    var ordi = vsOrdiXp(coups);
+    html += '<br>🎲 Probabilité d\u2019arriver au bout : <b>' + (sim.surv * 100).toFixed(0) + '%</b> · valeur attendue : <b>' + fmt(sim.ev) + ' XP</b>';
+    html += '<br>⏱ ' + fmt(mins) + ' min (' + sim.lastTarget + ' étages × ' + S.minutes + ' min) → <b>' + (sim.reserve / mins).toFixed(1) + ' XP/min</b> meilleur cas · <b>' + (sim.ev / mins).toFixed(1) + ' XP/min</b> attendu' +
+      ' <span class="muted">· repère Joueur vs Ordi (limite 6) : ' + (ordi ? ordi + ' XP/partie → ' + (ordi / S.minutes).toFixed(1) + ' XP/min' : '—') + '</span>';
+  } else {
+    html += '<br><span class="muted">Coche une option par étage ci-dessous pour construire ta run. Les étages d\u2019entrée de palier comptent dès qu\u2019une option du palier est cochée.</span>';
+  }
+  if(sim.runBonus) html += '<br>🟨 Bonus de run acquis : <b>' + (sim.runBonus > 0 ? '+' : '') + sim.runBonus + ' %</b> sur tous les gains suivants (plafond ' + S.runcap + ' %)';
+  runBar.innerHTML = html;
+  renderCmp();
+}
+
+// ===== Mise à jour EN TEMPS RÉEL =====
+var LIVE = { sims: [], cumuls: [], shops: [], cashouts: [] };
+function simText(entry, opt, reserveBefore, assurBefore, runBefore){
+  var coups = Number(coupsSel.value);
+  RUNB = runBefore || 0;
+  var oc = outcome(opt, reserveBefore, entry.target, coups);
+  RUNB = 0;
+  var R2 = oc.R2, g = oc.gain;
+  var fin = R2 + g;
+  var c = consolation(entry.after, assurBefore);
+  var p = optP(opt);
+  var denom = R2 + g - c * R2;
+  var pmin = denom > 0 ? Math.max(0, (reserveBefore - c * R2) / denom) : 1;
+  var ev = p * fin + (1 - p) * c * R2 - reserveBefore;
+  var capNote = (opt.type === 'blue' && S.bluecap === 'x3' && R2 - reserveBefore >= 3 * g - 1) ? ' <span class="bluehint">(plafonné ×3)</span>' : '';
+  var goldNote = opt.type === 'gold' ? ' · <b style="color:#ffd24a;">🟨 ' + (opt.pct > 0 ? '+' : '') + opt.pct + ' % sur les gains suivants</b>' : '';
+  var resNote = (S.risk === 'reserve' && opt.type === 'green' && opt.pct > 0) ? ' <span class="bluehint">(+' + fmt(R2 - reserveBefore) + ' XP de réserve)</span>' : '';
+  return '💛 à la fin de l\u2019étage : <b>' + fmt(reserveBefore) + ' → ' + fmt(fin) + ' XP</b>' + capNote + resNote + goldNote +
+    ' · gain ' + (reserveBefore > 0 ? (g / reserveBefore * 100).toFixed(0) : '—') + '% de la réserve' +
+    ' · EV <span class="' + (ev >= 0 ? 'ev-good' : 'ev-bad') + '">' + (ev >= 0 ? '+' : '') + fmt(ev) + ' XP</span>' +
+    ' · réussite mini rentable <b>' + (pmin * 100).toFixed(0) + '%</b> ' +
+    (p >= pmin ? '<span class="ev-good">✅ (tu es à ' + Math.round(p * 100) + '%)</span>' : '<span class="ev-bad">⚠️ −EV (tu es à ' + Math.round(p * 100) + '%)</span>');
+}
+function refreshLive(){
+  var sim = simulate();
+  var idxOf = {};
+  var j = 0;
+  PALS.forEach(function(p){ p.floors.forEach(function(fl){ idxOf[fl.target] = j; j++; }); });
+  LIVE.sims.forEach(function(r){
+    var idx = idxOf[r.entry.target];
+    var before = (idx !== undefined && sim.snapshots[idx] !== undefined) ? sim.snapshots[idx] : 0;
+    var ass = (idx !== undefined && sim.snapAssur[idx] !== undefined) ? sim.snapAssur[idx] : 0;
+    var rb = (idx !== undefined && sim.snapRun[idx] !== undefined) ? sim.snapRun[idx] : 0;
+    r.el.innerHTML = '<span class="sim">' + simText(r.entry, r.opt, before, ass, rb) + '</span>';
+  });
+  LIVE.cumuls.forEach(function(r){
+    var idx = idxOf[r.entry.target];
+    var before = (idx !== undefined && sim.snapshots[idx] !== undefined) ? sim.snapshots[idx] : 0;
+    var chosen = r.entry.opts.some(function(o){ return o.checked; });
+    r.el.innerHTML = ' 💰 en arrivant à l\u2019étage ' + r.entry.target + ' : <b style="color:#ffd700;">' + fmt(before) + ' XP</b>' + (chosen ? ' <span style="color:#8cffaa;">✔️ choix fait</span>' : ' <span class="muted">(pas encore choisi)</span>');
+  });
+  PALS.forEach(function(pal, pi){
+    var r = sim.shopSnaps[pi] !== undefined ? sim.shopSnaps[pi] : 0;
+    LIVE.shops.forEach(function(s){
+      if(s.pal !== pal) return;
+      var eff;
+      if(s.item.costPct > 0) eff = 'coût −' + fmt(Math.max(1, Math.floor(r * s.item.costPct / 100))) + ' XP → réserve ' + fmt(Math.max(0, r - Math.max(1, Math.floor(r * s.item.costPct / 100)))) + ' XP';
+      else eff = '🎲 +20% de réserve en continuant → ' + fmt(Math.round(r * 1.2)) + ' XP';
+      s.el.innerHTML = s.item.checked ? '<b style="color:#ffd700;">✔️ acheté : ' + eff + '</b>' : '<span class="muted">' + eff + ' — coche pour appliquer</span>';
+      if(s.item.checked){
+        if(s.item.costPct > 0) r -= Math.max(1, Math.floor(r * s.item.costPct / 100));
+        else r = Math.round(r * 1.2);
+      }
+    });
+    var cm = cashoutMult(pal.num);
+    var cash = Math.round(Math.max(0, r) * cm);
+    LIVE.cashouts.forEach(function(co){
+      if(co.pal !== pal) return;
+      co.el.innerHTML = '🚪 <b>Sortir ici</b> : ' +
+        (cm < 1 ? '<b style="color:#ff8a80;">frais de sortie ×' + cm + '</b>' : cm > 1 ? '<b style="color:#ffd700;">bonus de profondeur ×' + cm + '</b>' : '<b>plein pot ×1</b>') +
+        ' → <b style="color:#ffd700;">' + fmt(cash) + ' XP encaissés</b>';
+    });
+  });
+  renderRunBar();
+}
+
+function optRow(entry, opt){
+  var row = document.createElement('div');
+  function rowCls(){ return 'opt t-' + opt.type + (opt.checked ? ' checked' : ''); }
+  row.className = rowCls();
+  var chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = !!opt.checked;
+  chk.title = 'Valider cette option : le cumul d\u2019XP se propage sur tous les étages en dessous';
+  chk.addEventListener('change', function(){
+    if(chk.checked) entry.opts.forEach(function(o){ o.checked = false; });
+    opt.checked = chk.checked;
+    row.className = rowCls();
+    refreshLive(); save();
+  });
+  var lab = document.createElement('div'); lab.className = 'lab'; lab.textContent = opt.l + ')';
+  var typeSel = document.createElement('select');
+  [['green','🟩 vert'],['red','🟥 rouge'],['blue','🟦 bleu'],['gold','🟨 run']].forEach(function(t){
+    var o = document.createElement('option'); o.value = t[0]; o.textContent = t[1]; if(opt.type === t[0]) o.selected = true; typeSel.appendChild(o);
+  });
+  var pIn = document.createElement('input'); pIn.type = 'number'; pIn.min = 1; pIn.max = 100; pIn.step = 1;
+  pIn.value = Math.round(optP(opt) * 100);
+  pIn.title = 'Probabilité de réussir l\u2019étage avec cette option (sert à la valeur attendue)';
+  typeSel.addEventListener('change', function(){
+    opt.type = typeSel.value; row.className = rowCls();
+    if(opt.p === undefined) pIn.value = DEFAULT_P[opt.type];
+    refreshLive(); save();
+  });
+  pIn.addEventListener('input', function(){ opt.p = Number(pIn.value) || 1; refreshLive(); save(); });
+  var pctInp = document.createElement('input'); pctInp.type = 'number'; pctInp.value = opt.pct; pctInp.step = 5;
+  pctInp.addEventListener('input', function(){ opt.pct = Number(pctInp.value) || 0; refreshLive(); save(); });
+  var txt = document.createElement('div'); txt.className = 'opttexts';
+  var bSpan = document.createElement('span'); bSpan.className = 'bonusTxt'; bSpan.contentEditable = 'true'; bSpan.innerText = opt.bonus;
+  bSpan.addEventListener('input', function(){ opt.bonus = bSpan.innerText; save(); });
+  var mSpan = document.createElement('span'); mSpan.className = 'malusTxt'; mSpan.contentEditable = 'true'; mSpan.innerText = ' — ' + opt.malus;
+  mSpan.addEventListener('input', function(){ opt.malus = mSpan.innerText.replace(/^\s*—\s*/, ''); save(); });
+  txt.appendChild(bSpan); txt.appendChild(mSpan);
+  if(opt.blueHint){ var bh = document.createElement('span'); bh.className = 'bluehint'; bh.textContent = ' 💡 candidat 🟦'; txt.appendChild(bh); }
+  var simEl = document.createElement('div');
+  LIVE.sims.push({ el: simEl, entry: entry, opt: opt });
+  var line = document.createElement('span'); line.className = 'optline';
+  line.appendChild(chk); line.appendChild(lab); line.appendChild(typeSel);
+  var pctCell = document.createElement('span'); pctCell.className = 'pctcell';
+  pctCell.appendChild(pctInp);
+  var pctLbl = document.createElement('span'); pctLbl.className = 'pcs'; pctLbl.textContent = '%';
+  pctCell.appendChild(pctLbl);
+  var pCell = document.createElement('span'); pCell.className = 'pctcell';
+  pCell.appendChild(pIn);
+  var pLbl = document.createElement('span'); pLbl.className = 'pcs'; pLbl.textContent = 'réuss. %';
+  pCell.appendChild(pLbl);
+  line.appendChild(pctCell); line.appendChild(pCell); line.appendChild(txt);
+  row.appendChild(line); row.appendChild(simEl);
+  return row;
+}
+
+function shopCard(pal, isCustom){
+  var shop = pal.shop;
+  var card = document.createElement('div'); card.className = 'card';
+  card.style.borderColor = 'rgba(255,215,0,.35)';
+  var h = document.createElement('h3'); h.style.margin = '0 0 6px';
+  h.textContent = '🏬 Boutique ' + pal.num + ' (après l\u2019étage ' + shop.after + ')';
+  card.appendChild(h);
+  var cashP = document.createElement('p'); cashP.className = 'muted'; cashP.style.margin = '2px 0 8px';
+  var cashSpan = document.createElement('span');
+  cashP.appendChild(cashSpan);
+  LIVE.cashouts.push({ el: cashSpan, pal: pal });
+  card.appendChild(cashP);
+  var itemsHost = document.createElement('div');
+  function renderItem(it){
+    var rowEl = document.createElement('div'); rowEl.className = 'shopitem';
+    var chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = !!it.checked;
+    chk.title = 'Cocher = acheter dans la run simulée (le coût est déduit de la réserve)';
+    chk.addEventListener('change', function(){ it.checked = chk.checked; refreshLive(); save(); });
+    var ic = document.createElement('span'); ic.contentEditable = 'true'; ic.innerText = it.icon;
+    ic.addEventListener('input', function(){ it.icon = ic.innerText.trim(); save(); });
+    var lbl = document.createElement('span'); lbl.contentEditable = 'true'; lbl.innerHTML = esc(it.label);
+    lbl.addEventListener('input', function(){ it.label = lbl.innerText; save(); });
+    var prWrap = document.createElement('span'); prWrap.className = 'price';
+    var prIn = document.createElement('input'); prIn.type = 'number'; prIn.value = it.costPct; prIn.step = 5; prIn.style.width = '44px';
+    prIn.addEventListener('input', function(){ it.costPct = Number(prIn.value) || 0; refreshLive(); save(); });
+    prWrap.appendChild(document.createTextNode('−')); prWrap.appendChild(prIn); prWrap.appendChild(document.createTextNode('% réserve'));
+    var simEl = document.createElement('span'); simEl.className = 'itemsim';
+    LIVE.shops.push({ el: simEl, pal: pal, item: it });
+    var del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = 'Retirer cet item';
+    del.addEventListener('click', function(){ shop.items = shop.items.filter(function(x){ return x !== it; }); refreshAll(); });
+    rowEl.appendChild(chk); rowEl.appendChild(ic); rowEl.appendChild(lbl); rowEl.appendChild(prWrap); rowEl.appendChild(simEl); rowEl.appendChild(del);
+    itemsHost.appendChild(rowEl);
+  }
+  shop.items.forEach(renderItem);
+  var addBtn = document.createElement('button'); addBtn.className = 'btn2'; addBtn.textContent = '➕ Ajouter un item à cette boutique';
+  addBtn.addEventListener('click', function(){
+    shop.items.push({ icon:'✨', label:'✍️ nouvel item (description à écrire)', costPct:10 });
+    refreshAll();
+  });
+  card.appendChild(itemsHost);
+  card.appendChild(addBtn);
+  var note = document.createElement('div'); note.className = 'note'; note.contentEditable = 'true';
+  note.setAttribute('data-ph', '✍️ Remarques sur la boutique ' + pal.num + '…');
+  note.addEventListener('input', function(){ shop.note = note.innerText; save(); });
+  if(shop.note) note.innerText = shop.note;
+  card.appendChild(note);
+  if(isCustom){
+    var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = '✕ Supprimer ce palier';
+    dl.addEventListener('click', function(){
+      if(confirm('Supprimer le palier ' + pal.num + ' ?')){ PALS = PALS.filter(function(x){ return x !== pal; }); renumber(); refreshAll(); }
+    });
+    card.appendChild(dl);
+  }
+  return card;
+}
+
+function renumber(){
+  var floor = 1;
+  PALS.forEach(function(pal, i){
+    pal.num = i + 1;
+    var fs = [];
+    pal.floors.forEach(function(fl){
+      fl.after = floor; fl.target = floor + 1; fs.push(fl); floor++;
+    });
+    pal.floors = fs;
+    pal.shop.after = floor;
+    floor++;
+  });
+}
+
+function addPalier(){
+  var startFloor = PALS.length ? PALS[PALS.length - 1].shop.after + 1 : 1;
+  var floors = [];
+  for(var i = 0; i < 4; i++){
+    floors.push({ after: startFloor + i, target: startFloor + i + 1, note: '',
+      opts: [
+        { l:'A', type:'green', pct:10, bonus:'✍️ à équilibrer…', malus:'✍️ à équilibrer…' },
+        { l:'B', type:'green', pct:15, bonus:'✍️ à équilibrer…', malus:'✍️ à équilibrer… (candidat 🟦 ?)', blueHint:true },
+        { l:'C', type:'red', pct:-10, bonus:'✍️ effet tranquillité…', malus:'−10% sur le gain' },
+        { l:'D', type:'red', pct:-15, bonus:'✍️ effet bonus…', malus:'−15% sur le gain' }
+      ] });
+  }
+  PALS.push({ num: PALS.length + 1, theme: 'autre', custom: true, ext: false, floors: floors,
+    shop: { after: startFloor + 4, items: [{ icon:'✨', label:'✍️ item à définir', costPct:10 }], note: '' } });
+  refreshAll();
+  window.scrollTo(0, document.body.scrollHeight);
+}
+document.getElementById('addPalierBtn').addEventListener('click', addPalier);
+document.getElementById('addFloorBtn').addEventListener('click', function(){
+  if(!PALS.length) return;
+  var pal = PALS[PALS.length - 1];
+  var after = pal.floors.length ? pal.floors[pal.floors.length - 1].target : pal.shop.after;
+  pal.floors.push({ after: after, target: after + 1, note: '',
+    opts: [ { l:'A', type:'green', pct:10, bonus:'✍️ à équilibrer…', malus:'✍️ à équilibrer…' },
+            { l:'B', type:'red', pct:-10, bonus:'✍️ effet bonus…', malus:'−10% sur le gain' } ] });
+  pal.shop.after = pal.floors[pal.floors.length - 1].target;
+  refreshAll();
+});
+
+function renderFloors(){
+  LIVE = { sims: [], cumuls: [], shops: [], cashouts: [] };
+  floorsHost.innerHTML = '';
+  PALS.forEach(function(pal){
+    var title = document.createElement('h2');
+    var th = pal.theme;
+    title.innerHTML = '🏔️ PALIER ' + pal.num + ' (étages ' + ((pal.num - 1) * 5 + 1) + '–' + pal.shop.after + ') — « ' + THEMES_FR[th] + ' »' +
+      ' <span class="theme th-' + th + '">' + THEMES_FR[th] + '</span>' +
+      (pal.custom ? ' <span class="badge">PROPOSITION — à équilibrer</span>' : '') +
+      (pal.ext ? ' <span class="badge cl">31+ · copie du cycle — à durcir</span>' : '');
+    floorsHost.appendChild(title);
+    if(pal.custom){
+      var thSel = document.createElement('select');
+      THEMES.concat(['autre']).forEach(function(t){
+        var o = document.createElement('option'); o.value = t; o.textContent = THEMES_FR[t]; if(pal.theme === t) o.selected = true; thSel.appendChild(o);
+      });
+      thSel.addEventListener('change', function(){ pal.theme = thSel.value; renderFloors(); save(); });
+      var thWrap = document.createElement('p'); thWrap.className = 'muted';
+      thWrap.textContent = 'Thème du palier : '; thWrap.appendChild(thSel);
+      floorsHost.appendChild(thWrap);
+    }
+    var c = document.createElement('div'); c.className = 'card';
+    var firstF = (pal.num - 1) * 5 + 1;
+    var gainTxt = S.model === 'claude'
+      ? '<b>Gain d\u2019étage ici (modèle Claude, ' + coupsSel.value + ' coups) :</b> ' + stageGain(Number(coupsSel.value), firstF, 0) + ' XP à l\u2019étage ' + firstF + ' → ' + stageGain(Number(coupsSel.value), pal.shop.after, 0) + ' XP à l\u2019étage ' + pal.shop.after + '.'
+      : '<b>Gain d\u2019étage ici (modèle jeu) :</b> plafond ' + (pal.num === 1 ? '10' : '14') + ' XP + bonus de rang, × ' + (PALIER_MULT[pal.num] !== undefined ? PALIER_MULT[pal.num] : pal.num + ' ⚠️ falaise') + ' (palier).';
+    c.innerHTML = '<p>' + gainTxt + (pal.num === 1 ? ' Pas de limite de temps ni d\u2019essais.' : ' Pendule totale = temps définitif (recharge en boutique uniquement).') + '</p>';
+    floorsHost.appendChild(c);
+    if(pal.num === 1) floorsHost.insertAdjacentHTML('beforeend', '<p class="muted" style="margin:10px 0;">🚪 <b>Étage 1 : manche d\u2019entrée</b> — aucun choix, gain neutre (' + stageGain(Number(coupsSel.value), 1, 0) + ' XP avec les réglages actuels). La run démarre ici.</p>');
+    pal.floors.forEach(function(fl){
+      var block = document.createElement('div');
+      var f = document.createElement('div'); f.className = 'floor';
+      f.appendChild(document.createTextNode('Après l\u2019étage ' + fl.after + ' → choix pour l\u2019étage ' + fl.target + (pal.custom ? '' : ' (' + THEMES_FR[themeOf(fl.target)] + ')')));
+      var cumul = document.createElement('span');
+      cumul.style.cssText = 'font-size:11.5px;font-weight:400;color:#8b8ea8;display:block;margin-top:2px;';
+      f.appendChild(cumul);
+      LIVE.cumuls.push({ el: cumul, entry: fl });
+      block.appendChild(f);
+      fl.opts.forEach(function(opt){ block.appendChild(optRow(fl, opt)); });
+      var note = document.createElement('div'); note.className = 'note'; note.contentEditable = 'true';
+      note.setAttribute('data-ph', '✍️ Remarques pour l\u2019étage ' + fl.target + '…');
+      note.addEventListener('input', function(){ fl.note = note.innerText; save(); });
+      if(fl.note) note.innerText = fl.note;
+      block.appendChild(note);
+      if(pal.custom){
+        var dl = document.createElement('button'); dl.className = 'del'; dl.textContent = '✕ Supprimer ce bloc d\u2019étage';
+        dl.addEventListener('click', function(){ pal.floors = pal.floors.filter(function(x){ return x !== fl; }); renumber(); refreshAll(); });
+        block.appendChild(dl);
+      }
+      floorsHost.appendChild(block);
+    });
+    floorsHost.appendChild(shopCard(pal, pal.custom));
+  });
+  refreshLive();
+}
+
+function readS(){
+  S.model = modelSel.value; S.consol = consolSel.value; S.bluecap = bluecapSel.value; S.exit = exitSel.value;
+  S.minutes = Math.max(0.5, Number(minInp.value) || 3);
+  S.entryP = Math.min(100, Math.max(1, Number(entryPInp.value) || 97));
+  S.runbonus = runSel.value; S.runcap = Math.max(0, Number(runCapInp.value) || 0); S.risk = riskSel.value;
+  S.riskK = Math.max(0, Number(riskKInp.value) || 0);
+}
+function refreshAll(){ readS(); renderRef(); renderFloors(); save(); }
+
+// ===== Presets =====
+function applyPreset(v){
+  if(v === 'jeu'){ modelSel.value = 'jeu'; consolSel.value = 'jeu'; bluecapSel.value = 'none'; exitSel.value = 'jeu'; runSel.value = 'none'; riskSel.value = 'jeu'; }
+  else if(v === 'claude'){ modelSel.value = 'claude'; consolSel.value = 'claude'; bluecapSel.value = 'x3'; exitSel.value = 'claude'; runSel.value = 'on'; riskSel.value = 'reserve'; }
+  else if(v === 'dam'){ modelSel.value = 'claude'; consolSel.value = 'claude'; bluecapSel.value = 'x3'; exitSel.value = 'plan'; runSel.value = 'plan'; riskSel.value = 'reserve'; }
+  readS(); applyRunBonusMode();
+}
+function detectPreset(){
+  var a = [modelSel.value, consolSel.value, bluecapSel.value, exitSel.value, runSel.value, riskSel.value].join('|');
+  presetSel.value = a === 'jeu|jeu|none|jeu|none|jeu' ? 'jeu' : a === 'claude|claude|x3|claude|on|reserve' ? 'claude' : a === 'claude|claude|x3|plan|plan|reserve' ? 'dam' : 'custom';
+}
+presetSel.addEventListener('change', function(){ if(presetSel.value !== 'custom') applyPreset(presetSel.value); refreshAll(); });
+[modelSel, consolSel, bluecapSel, exitSel, riskSel].forEach(function(s){ s.addEventListener('change', function(){ detectPreset(); refreshAll(); }); });
+runSel.addEventListener('change', function(){ readS(); applyRunBonusMode(); detectPreset(); refreshAll(); });
+[runCapInp, riskKInp].forEach(function(i){ i.addEventListener('input', function(){ readS(); refreshLive(); save(); }); });
+[minInp, entryPInp].forEach(function(i){ i.addEventListener('input', function(){ readS(); refreshLive(); save(); }); });
+rankSel.addEventListener('change', function(){ renderRef(); refreshAll(); });
+coupsSel.addEventListener('change', function(){ renderRef(); refreshAll(); });
+
+// ===== Export =====
+document.getElementById('exportBtn').addEventListener('click', function(){
+  try {
+    readS();
+    var coups = Number(coupsSel.value);
+    var sim = simulate();
+    var out = [];
+    out.push('=== ÉQUILIBRAGE MODE AVENTURE v6 — mes modifs ===');
+    out.push('Joueur : rang ' + RANKS[rankSel.value].name + ' · hypothèse ' + coups + ' coups/étage · ' + S.minutes + ' min/étage · réussite étage sans choix ' + S.entryP + '%');
+    out.push('Modèles : XP=' + S.model + ' · consolation=' + S.consol + ' · plafond bleu=' + S.bluecap + ' · sortie=' + S.exit + ' · bonus de run=' + S.runbonus + ' (plafond ' + S.runcap + '%) · risque=' + S.risk + ' (k=' + S.riskK + ') (preset : ' + presetSel.value + ')');
+    out.push('RUN COCHÉE : ' + fmt(sim.reserve) + ' XP de réserve à l\u2019étage ' + sim.lastTarget + ' (' + sim.chosenLog.length + ' options cochées) · survie ' + (sim.surv * 100).toFixed(0) + '% · valeur attendue ' + fmt(sim.ev) + ' XP');
+    if(sim.chosenLog.length){ var mins = sim.lastTarget * S.minutes; out.push('XP/min : ' + (sim.reserve / mins).toFixed(1) + ' (meilleur cas) / ' + (sim.ev / mins).toFixed(1) + ' (attendu) · repère Joueur vs Ordi limite 6 : ' + (vsOrdiXp(coups) ? (vsOrdiXp(coups) / S.minutes).toFixed(1) : '—')); }
+    out.push('');
+    PALS.forEach(function(pal){
+      out.push('--- PALIER ' + pal.num + ' — ' + THEMES_FR[pal.theme] + (pal.custom ? ' (PROPOSITION)' : '') + (pal.ext ? ' (31+ copie du cycle 1)' : '') + ' ---');
+      pal.floors.forEach(function(fl){
+        out.push('Étage ' + fl.target + ' :');
+        fl.opts.forEach(function(o){
+          var icon = o.type === 'green' ? '🟩' : (o.type === 'blue' ? '🟦' : '🟥');
+          var mark = o.checked ? ' ✔️ COCHÉ' : '';
+          var simTxt = (o.type === 'blue') ? 'boost réserve ×' + (1 + o.pct / 100).toFixed(2) : 'gain ' + stageGain(coups, fl.target, o.pct) + ' XP';
+          out.push('  ' + o.l + ') ' + icon + ' ' + o.pct + '% — ' + o.bonus + ' — ' + o.malus + '   [sim : ' + simTxt + ' · réussite ' + Math.round(optP(o) * 100) + '%]' + mark);
+        });
+        if(fl.note && fl.note.trim()) out.push('  ✍️ Note : ' + fl.note.trim());
+      });
+      out.push('Boutique ' + pal.num + ' (après étage ' + pal.shop.after + ', sortie ×' + cashoutMult(pal.num) + ') :');
+      pal.shop.items.forEach(function(it){
+        out.push('  ' + (it.checked ? '✔️ ACHETÉ : ' : '') + it.icon + ' ' + it.label + ' — −' + it.costPct + '% réserve');
+      });
+      if(pal.shop.note && pal.shop.note.trim()) out.push('  ✍️ Note boutique : ' + pal.shop.note.trim());
+      out.push('');
+    });
+    out.push('(Copie tout ce bloc dans le chat pour report dans le jeu.)');
+    var area = document.getElementById('exportArea');
+    area.value = out.join('\n');
+    area.style.borderColor = '#ffd700';
+    area.style.boxShadow = '0 0 14px rgba(255,215,0,.45)';
+    area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    area.select();
+    try { document.execCommand('copy'); } catch(err) {}
+  } catch(exp){
+    var area2 = document.getElementById('exportArea');
+    if(area2){ area2.value = 'ERREUR à l\u2019export : ' + exp.message; }
+    alert('Erreur à l\u2019export : ' + exp.message);
+  }
+});
+
+// ===== Persistance =====
+var LS_KEY = 'bm_equilibrage_v6b';
+function save(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ p: PALS, s: S, rank: rankSel.value, coups: coupsSel.value })); } catch(err) {}
+}
+(function load(){
+  try {
+    var raw = localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    var d = JSON.parse(raw);
+    if(d.p && d.p.length) PALS = d.p;
+    if(d.s){ for(var k in S){ if(d.s[k] !== undefined) S[k] = d.s[k]; } }
+    if(d.rank && RANKS[d.rank]) rankSel.value = d.rank;
+    if(d.coups) coupsSel.value = d.coups;
+  } catch(err) {}
+})();
+modelSel.value = S.model; consolSel.value = S.consol; bluecapSel.value = S.bluecap; exitSel.value = S.exit;
+minInp.value = S.minutes; entryPInp.value = S.entryP;
+runSel.value = S.runbonus; runCapInp.value = S.runcap; riskSel.value = S.risk; riskKInp.value = S.riskK;
+detectPreset();
+
+document.getElementById('resetRunBtn').addEventListener('click', function(){
+  PALS.forEach(function(p){ p.floors.forEach(function(f){ f.opts.forEach(function(o){ o.checked = false; }); }); p.shop.items.forEach(function(it){ it.checked = false; }); });
+  refreshAll();
+});
+document.getElementById('resetSaveBtn').addEventListener('click', function(){
+  if(!confirm('Réinitialiser le document (perte des modifs et annotations) ?')) return;
+  try { localStorage.removeItem(LS_KEY); } catch(err) {}
+  PALS = buildBase();
+  S.model = 'claude'; S.consol = 'claude'; S.bluecap = 'x3'; S.exit = 'plan'; S.minutes = 3; S.entryP = 97; S.runbonus = 'plan'; S.runcap = 15; S.risk = 'reserve'; S.riskK = 0.1;
+  applyRunBonusMode();
+  runSel.value = 'plan'; runCapInp.value = 15; riskSel.value = 'reserve'; riskKInp.value = 0.1;
+  modelSel.value = 'claude'; consolSel.value = 'claude'; bluecapSel.value = 'x3'; exitSel.value = 'plan';
+  minInp.value = 3; entryPInp.value = 97;
+  detectPreset();
+  refreshAll();
+});
+refreshAll();
+</script>
+</body>
+</html>
