@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🌀 Banc d'essai — Palier 7 « Le Chaos »</title>
+<style>
+  :root{
+    --c0:#e0453f; --c1:#f4efe4; --c2:#f2c94c; --c3:#ee8a2f;
+    --c4:#3f7ec9; --c5:#3f9e6d; --c6:#8a4fc9; --c7:#ee6fa0;
+    --bg:#0d0b14; --panel:#171321; --gold:#ffd700; --pink:#ff2d78; --cyan:#41e6ff;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:Inter,system-ui,sans-serif; background:radial-gradient(1200px 600px at 50% -10%, #241a3a, var(--bg));
+    color:#f0eef6; display:flex; flex-direction:column; align-items:center; min-height:100vh; padding:18px 12px 40px;
+  }
+  h1{ font-size:20px; letter-spacing:1px; }
+  h1 .n{ color:var(--pink); text-shadow:0 0 10px rgba(255,45,120,.6); }
+  .sub{ color:#b0a8d0; font-size:12.5px; margin:4px 0 14px; text-align:center; }
+  .floors{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:14px; }
+  .floor-btn{
+    background:var(--panel); border:1px solid rgba(255,255,255,.14); color:#f0eef6; border-radius:10px;
+    padding:9px 14px; cursor:pointer; font-size:13px; transition:all .15s;
+  }
+  .floor-btn:hover{ border-color:var(--cyan); }
+  .floor-btn.active{ border-color:var(--pink); box-shadow:0 0 10px rgba(255,45,120,.35); color:#fff; }
+  .card{
+    background:var(--panel); border:1px solid rgba(255,255,255,.1); border-radius:14px;
+    padding:16px; width:min(560px, 96vw);
+  }
+  .banner{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .chip{ font-size:11px; padding:3px 9px; border-radius:999px; border:1px solid; }
+  .clock{ font-size:15px; font-weight:700; margin-bottom:8px; }
+  .clock.low{ color:#ff6b5e; }
+  .history{ display:flex; flex-direction:column; gap:6px; margin-bottom:12px; min-height:40px; max-height:230px; overflow-y:auto; }
+  .hrow{ display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.03); border-radius:8px; padding:5px 8px; }
+  .hrow .num{ color:#8f87b0; font-size:11px; width:18px; text-align:right; }
+  .pegs{ display:flex; gap:6px; }
+  .peg{ width:26px; height:26px; border-radius:50%; background:#2e2e2e; border:2px solid rgba(255,255,255,.15); }
+  .peg.dim{ filter:brightness(.55) saturate(.55); }
+  .fpegs{ display:flex; gap:5px; margin-left:auto; }
+  .fpeg{ width:12px; height:12px; border-radius:50%; background:#3a3750; }
+  .fpeg.black{ background:#f5f5f5; box-shadow:0 0 0 1.5px #000, 0 0 6px rgba(255,255,255,.5); }
+  .fpeg.white{ background:transparent; border:2px solid #fff; }
+  .slots{ display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+  .slot{ width:38px; height:38px; border-radius:50%; background:#2e2e2e; border:2px dashed rgba(255,255,255,.25); cursor:pointer; transition:all .12s; }
+  .slot.filled{ border-style:solid; border-color:rgba(255,255,255,.4); }
+  .slot.sel{ border-color:var(--cyan); box-shadow:0 0 10px rgba(65,230,255,.5); }
+  .palette{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+  .swatch{ width:34px; height:34px; border-radius:50%; cursor:pointer; border:2px solid rgba(255,255,255,.2); transition:transform .1s; position:relative; }
+  .swatch:hover{ transform:scale(1.12); }
+  .swatch.dim{ filter:brightness(.55) saturate(.55); }
+  .swatch.cameleon{ animation:cam 0.4s; }
+  @keyframes cam{ 0%{ transform:scale(1); } 50%{ transform:scale(1.25) rotate(20deg); } 100%{ transform:scale(1); } }
+  .swatch::after{
+    content:attr(data-name); position:absolute; bottom:-16px; left:50%; transform:translateX(-50%);
+    font-size:9px; color:#b0a8d0; white-space:nowrap;
+  }
+  .btn{
+    background:linear-gradient(90deg, var(--pink), #b41d63); border:none; color:#fff; font-weight:700;
+    padding:10px 18px; border-radius:10px; cursor:pointer; font-size:14px; width:100%;
+  }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,.25); font-weight:400; width:auto; padding:8px 14px; }
+  .status{ font-size:13px; color:#c9c3e0; margin-top:10px; min-height:18px; }
+  .status.warn{ color:#ff8a80; }
+  .status.good{ color:#8cffaa; }
+  .overlay{
+    position:fixed; inset:0; background:rgba(6,4,12,.82); display:flex; align-items:center; justify-content:center; z-index:50; padding:16px;
+  }
+  .overlay.hidden{ display:none; }
+  .modal{
+    background:#1c1628; border:1px solid rgba(255,45,120,.4); border-radius:16px; padding:22px;
+    width:min(480px, 94vw); box-shadow:0 0 40px rgba(255,45,120,.25); max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{ font-size:17px; color:var(--gold); margin-bottom:8px; }
+  .modal p{ font-size:13.5px; line-height:1.55; color:#d8d3ea; margin-bottom:12px; }
+  .modal .opt{
+    display:block; width:100%; text-align:left; background:#241d36; border:1px solid rgba(255,255,255,.15);
+    color:#f0eef6; border-radius:10px; padding:11px 13px; margin-top:8px; cursor:pointer; font-size:13.5px;
+  }
+  .modal .opt:hover{ border-color:var(--cyan); }
+  .modal .opt b{ color:var(--gold); }
+  .modal .opt .pct{ float:right; font-weight:700; }
+  .muted{ color:#8f87b0; font-size:11.5px; }
+  .score{ margin-top:6px; font-size:12.5px; color:#ffd700; }
+</style>
+</head>
+<body>
+<h1>🌀 BANC D'ESSAI — Palier 7 <span class="n">« Le Chaos »</span></h1>
+<p class="sub">Version de test autonome, hors du jeu. Aucun XP réel, rien n'est sauvegardé.<br>Choisis un étage, puis une option A / B / C.</p>
+
+<div class="floors" id="floorBtns"></div>
+
+<div class="card" id="board" style="display:none;">
+  <div class="banner" id="banner"></div>
+  <div class="clock" id="clock">⏳ --:--</div>
+  <div class="history" id="history"></div>
+  <div class="slots" id="slots"></div>
+  <div class="palette" id="palette"></div>
+  <button class="btn" id="submitBtn" disabled>Valider l'essai</button>
+  <div class="status" id="status"></div>
+  <div class="score" id="score"></div>
+</div>
+
+<div class="overlay hidden" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+// ===== Données du jeu (identiques à BrainMind) =====
+const COLORS = [
+  {name:'Rouge',  css:'var(--c0)'},
+  {name:'Blanc',  css:'var(--c1)'},
+  {name:'Jaune',  css:'var(--c2)'},
+  {name:'Orange', css:'var(--c3)'},
+  {name:'Bleu',   css:'var(--c4)'},
+  {name:'Vert',   css:'var(--c5)'},
+  {name:'Violet', css:'var(--c6)'},
+  {name:'Rose',   css:'var(--c7)'},
+];
+function hex(ci){ // vraie couleur (pour les jumelles / conflits)
+  return ['#e0453f','#f4efe4','#f2c94c','#ee8a2f','#3f7ec9','#3f9e6d','#8a4fc9','#ee6fa0'][ci];
+}
+
+// ===== Spécification du palier 7 (à partir de l'étage 30 : doubles et TRIPLES possibles) =====
+const FLOORS = {
+  30: { capMs: 4*60000, tries: 7, doubles: true,
+        intro: 'ALERTE TOUR : à partir de l\'étage 30, le code secret peut contenir des <b>doublons et même des TRIPLES</b>. Un « blanc » ne veut plus dire « cette couleur est ailleurs » seulement… elle peut y être DEUX fois. Adapte ta lecture des indices !' },
+  31: { capMs: 4*60000, tries: 7, doubles: true,
+        intro: 'Bienvenue dans <b>Le Chaos</b> 🌀 : la palette du bas est mélangée. Tu dois CHERCHER où est arrivé le rouge, le blanc… Réfléchis vite, le chrono tourne.' },
+  32: { capMs: 4*60000, tries: 7, doubles: true,
+        intro: 'Le Chaos continue 🌀 — et à l\'étage 32, deux couleurs de la palette deviennent des <b>jumelles</b> : elles se ressemblent presque. Lis bien avant de cliquer.' },
+  33: { capMs: 4*60000, tries: 7, doubles: true,
+        intro: 'Étage 33 : le Chaos va encore plus loin. Certaines options dérèglent aussi la <b>pendule</b>… voire l\'affichage des corrections ⚫⚪. Garde la tête froide.' },
+  34: { capMs: 4*60000, tries: 7, doubles: true,
+        intro: 'Étage 34 : la palette devient <b>caméléon</b> dans les options les plus risquées. Une couleur peut te montrer un faux visage quelques secondes… 🦎' },
+  35: { capMs: 4*60000, tries: 8, doubles: true,
+        intro: '<b>Sommet du palier 7</b> : 1 essai de plus, et l\'option A cumule (en version allégée) tous les effets du Chaos. Bonne chance.' },
+};
+
+// Options A/B/C par étage — mêmes conventions que le jeu :
+// A = risqué mais bien payé, B = le plus dur, C = le confort.
+// shuffleEach : palette re-mélangée à CHAQUE essai · shuffleFloor : une fois par étage
+// twins : 2 couleurs quasi identiques · dim : couleurs délavées
+// swapped : corrections ⚫⚪ affichées échangées · timeCut : pendule raccourcie de X s
+// cameleon : une couleur de la palette change de visage ~1,5 s à chaque rendu
+const OPTIONS = {
+  30: [
+    {l:'A', pct:10, shuffleFloor:true},
+    {l:'B', pct:15, shuffleEach:true},
+    {l:'C', pct:5},
+  ],
+  31: [
+    {l:'A', pct:15, shuffleEach:true},
+    {l:'B', pct:20, shuffleEach:true, dim:true},
+    {l:'C', pct:5,  shuffleFloor:true},
+  ],
+  32: [
+    {l:'A', pct:15, shuffleEach:true, twins:[5,6]},        // Vert & Violet cousins
+    {l:'B', pct:20, shuffleEach:true, twins:[5,6], dim:true},
+    {l:'C', pct:5,  shuffleFloor:true, twins:[5,6]},
+  ],
+  33: [
+    {l:'A', pct:15, shuffleEach:true, timeCut:45},
+    {l:'B', pct:20, shuffleEach:true, timeCut:45, swapped:true},
+    {l:'C', pct:10, shuffleFloor:true},
+  ],
+  34: [
+    {l:'A', pct:15, shuffleEach:true, cameleon:true},
+    {l:'B', pct:20, shuffleEach:true, cameleon:true, dim:true},
+    {l:'C', pct:10, shuffleFloor:true, twins:[5,6]},
+  ],
+  35: [
+    {l:'A', pct:25, shuffleEach:true, twins:[5,6], cameleon:true, dim:true, timeCut:20},
+    {l:'B', pct:20, shuffleEach:true, cameleon:true, dim:true},
+    {l:'C', pct:5,  shuffleFloor:true},
+  ],
+};
+
+// Jumelles : à l'étage 32+, le Violet s'affiche avec une teinte très proche du Vert.
+const TWIN_OVERRIDE = { 6:'#4c8a68', }; // Violet rdv #3f9e6d (Vert) → quasi identiques
+
+// ===== État =====
+let curFloor = null, opt = null, paletteOrder = [], paletteTwins = null;
+let secret = null, history = [], curGuess = [null,null,null,null], sel = 0;
+let deadline = 0, clockTimer = null, running = false;
+let reserve = 0; // réserve simulée sur la « run » de test
+let cameleonTimer = null, cameleonIdx = -1, cameleonFake = -1;
+
+const $ = id => document.getElementById(id);
+
+// ===== Logique Mastermind (avec doublons) =====
+function feedback(guess, code){
+  let black = 0; const g = [], s = [];
+  for(let i = 0; i < 4; i++){
+    if(guess[i] === code[i]) black++; else { g.push(guess[i]); s.push(code[i]); }
+  }
+  let white = 0; const s2 = s.slice();
+  g.forEach(c => { const k = s2.indexOf(c); if(k > -1){ white++; s2.splice(k, 1); } });
+  return { black, white };
+}
+function drawSecret(){
+  const c = [];
+  for(let i = 0; i < 4; i++) c.push(Math.floor(Math.random() * 8)); // étage 30+ :doublons et triples libres
+  return c;
+}
+
+// ===== Palette =====
+function shuffled(){ const a = [0,1,2,3,4,5,6,7]; for(let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function startCameleon(){
+  clearInterval(cameleonTimer);
+  if(!opt.cameleon){ cameleonIdx = -1; renderPalette(); return; }
+  cameleonTimer = setInterval(() => {
+    camPick(); renderPalette();
+    setTimeout(() => { cameleonIdx = -1; renderPalette(); }, 1500);
+  }, 4000);
+  camPick();
+}
+function camPick(){
+  cameleonIdx = paletteOrder[Math.floor(Math.random()*paletteOrder.length)];
+  do { cameleonFake = Math.floor(Math.random()*8); } while(cameleonFake === cameleonIdx);
+}
+
+function renderPalette(){
+  const el = $('palette');
+  el.innerHTML = paletteOrder.map(ci => {
+    const isTwin = paletteTwins && paletteTwins.includes(ci);
+    const shown = (ci === cameleonIdx) ? cameleonFake : ci;
+    const css = (isTwin && TWIN_OVERRIDE[ci]) ? TWIN_OVERRIDE[ci] : hex(shown);
+    return `<div class="swatch${opt.dim ? ' dim' : ''}" style="background:${css};"
+              data-name="${COLORS[shown].name}${isTwin ? ' ✦' : ''}"
+              onclick="pick(${ci})" title="${COLORS[ci].name}"></div>`;
+  }).join('');
+}
+function renderSlots(){
+  $('slots').innerHTML = curGuess.map((ci, i) =>
+    `<div class="slot${ci !== null ? ' filled' : ''}${i === sel ? ' sel' : ''}"
+          style="${ci !== null ? `background:${hex(ci)};` : ''}" onclick="selectSlot(${i})"></div>`
+  ).join('');
+  $('submitBtn').disabled = curGuess.some(c => c === null) || !running;
+}
+function renderHistory(){
+  $('history').innerHTML = history.map((h, i) => {
+    const showBlack = opt.swapped ? h.white : h.black;
+    const showWhite = opt.swapped ? h.black : h.white;
+    const fp = [];
+    for(let k = 0; k < 4; k++){
+      if(k < showBlack) fp.push('<div class="fpeg black"></div>');
+      else if(k < showBlack + showWhite) fp.push('<div class="fpeg white"></div>');
+      else fp.push('<div class="fpeg"></div>');
+    }
+    const pegs = h.guess.map(ci => `<div class="peg${opt.dim ? ' dim' : ''}" style="background:${hex(ci)};"></div>`).join('');
+    return `<div class="hrow"><span class="num">${i+1}</span><div class="pegs">${pegs}</div><div class="fpegs">${fp.join('')}</div></div>`;
+  }).join('');
+}
+function renderBanner(){
+  const chips = [];
+  chips.push(`<span class="chip" style="border-color:var(--cyan);color:var(--cyan);">🌀 Étage ${curFloor}</span>`);
+  if(opt.shuffleEach) chips.push('<span class="chip" style="border-color:var(--pink);color:var(--pink);">🌀 palette mélangée à CHAQUE essai</span>');
+  if(opt.shuffleFloor && !opt.shuffleEach) chips.push('<span class="chip" style="border-color:var(--pink);color:var(--pink);">🌀 palette mélangée (une fois)</span>');
+  if(opt.twins) chips.push('<span class="chip" style="border-color:var(--gold);color:var(--gold);">✦ couleurs jumelles (Vert/Violet presque identiques)</span>');
+  if(opt.dim) chips.push('<span class="chip" style="border-color:#b0a8d0;color:#b0a8d0;">🎨 couleurs délavées</span>');
+  if(opt.swapped) chips.push('<span class="chip" style="border-color:var(--gold);color:var(--gold);">🔄 corrections ⚫⚪ INVERSÉES à l\'affichage</span>');
+  if(opt.cameleon) chips.push('<span class="chip" style="border-color:var(--gold);color:var(--gold);">🦎 palette caméléon</span>');
+  if(FLOORS[curFloor].doubles) chips.push('<span class="chip" style="border-color:var(--pink);color:var(--pink);">⚠️ doubles / TRIPLES possibles dans le code</span>');
+  if(opt.timeCut) chips.push(`<span class="chip" style="border-color:#ff6b5e;color:#ff6b5e;">⏱️ pendule −${opt.timeCut}s</span>`);
+  chips.push(`<span class="chip" style="border-color:var(--gold);color:var(--gold);">🎯 option ${opt.l} : +${opt.pct}%</span>`);
+  $('banner').innerHTML = chips.join('');
+}
+function tick(){
+  const left = deadline - Date.now();
+  if(left <= 0){ clearInterval(clockTimer); lose('temps écoulé'); return; }
+  const m = Math.floor(left/60000), s = Math.floor((left%60000)/1000);
+  $('clock').textContent = `⏳ ${m}:${String(s).padStart(2,'0')}`;
+  $('clock').classList.toggle('low', left < 30000);
+  if(left <= 0){ lose('temps écoulé'); }
+}
+
+// ===== Déroulé d'un étage =====
+function openFloor(n){
+  curFloor = n;
+  document.querySelectorAll('.floor-btn').forEach(b => b.classList.toggle('active', +b.dataset.f === n));
+  const f = FLOORS[n];
+  const modal = $('modal');
+  modal.innerHTML = `<h2>🌀 Étage ${n} — « Le Chaos »</h2>
+    <p>${f.intro}</p>
+    <p class="muted">Choisis ton option (gain d'XP simulé si tu réussis) :</p>
+    ${OPTIONS[n].map(o => optionLabel(o)).join('')}`;
+  $('overlay').classList.remove('hidden');
+}
+function optionLabel(o){
+  let d = '';
+  if(o.shuffleEach) d += '🌀 palette re-mélangée à chaque essai · ';
+  if(o.shuffleFloor) d += '🌀 palette mélangée une seule fois · ';
+  if(o.twins) d += '✦ couleurs jumelles · ';
+  if(o.dim) d += '🎨 couleurs délavées · ';
+  if(o.swapped) d += '🔄 corrections affichées inversées · ';
+  if(o.cameleon) d += '🦎 palette caméléon · ';
+  if(o.timeCut) d += `⏱️ pendule −${o.timeCut}s · `;
+  return `<button class="opt" onclick="chooseOption('${o.l}')"><b>Option ${o.l}</b><span class="pct">+${o.pct}%</span><br><span class="muted">${d || 'Étage standard, seule l\'option de base.'}</span></button>`;
+}
+function chooseOption(l){
+  opt = OPTIONS[curFloor].find(o => o.l === l);
+  $('overlay').classList.add('hidden');
+  startFloor();
+}
+function startFloor(){
+  const f = FLOORS[curFloor];
+  secret = drawSecret();
+  history = []; curGuess = [null,null,null,null]; sel = 0; running = true;
+  paletteTwins = opt.twins || null;
+  paletteOrder = shuffled();
+  $('board').style.display = '';
+  renderBanner(); renderPalette(); renderSlots(); renderHistory();
+  $('status').textContent = ''; $('status').className = 'status';
+  const cap = f.capMs - (opt.timeCut ? opt.timeCut*1000 : 0);
+  deadline = Date.now() + cap;
+  clearInterval(clockTimer);
+  clockTimer = setInterval(tick, 250);
+  startCameleon();
+  updateScore();
+}
+function pick(ci){ curGuess[sel] = ci; if(sel < 3) sel++; renderSlots(); }
+function selectSlot(i){ sel = i; renderSlots(); }
+function updateScore(){
+  $('score').textContent = reserve > 0 ? `💛 Réserve simulée de la run : ${reserve} XP (aucun XP réel)` : '';
+}
+
+function submitGuess(){
+  if(!running || curGuess.some(c => c === null)) return;
+  const fb = feedback(curGuess, secret);
+  history.push({ guess: curGuess.slice(), black: fb.black, white: fb.white });
+  if(fb.black === 4){ win(); return; }
+  if(history.length >= FLOORS[curFloor].tries){ lose('essais épuisés'); return; }
+  renderHistory();
+  let msg = `Essai ${history.length} : ${fb.black} bien placé(s), ${fb.white} mal placé(s).`;
+  if(opt.swapped) msg += ' (affichage échangé : compte à l\'envers !)';
+  const st = $('status'); st.textContent = msg; st.className = 'status' + (opt.swapped ? ' warn' : '');
+  curGuess = [null,null,null,null]; sel = 0; renderSlots();
+  if(opt.shuffleEach){ paletteOrder = shuffled(); startCameleon(); renderPalette(); }
+}
+function win(){
+  running = false; clearInterval(clockTimer); clearInterval(cameleonTimer);
+  const left = Math.max(0, deadline - Date.now());
+  const bonusTemps = Math.round(left/ 6000); // ~1 XP par 6 s restantes (simulation)
+  const gain = Math.round(50 * (1 + opt.pct/100)) + bonusTemps;
+  reserve += gain; updateScore();
+  $('status').textContent = ''; $('status').className = 'status good';
+  $('status').textContent = `🎉 Étage ${curFloor} réussi en ${history.length + 1} essai(s) !`;
+  $('modal').innerHTML = `<h2>✅ Étage ${curFloor} réussi !</h2>
+    <p>Le code était : ${secret.map(ci => `<b>${COLORS[ci].name}</b>`).join(', ')}.</p>
+    <p class="muted">Simulation d'XP : 50 × (1 + ${opt.pct}%) + bonus temps restant ≈ <b style="color:var(--gold);">+${gain} XP simulés</b>.</p>
+    <button class="opt" onclick="closeModal()">Fermer (prochain étage dans le vrai menu)</button>`;
+  $('overlay').classList.remove('hidden');
+}
+function lose(reason){
+  if(!running && reason === 'temps écoulé') return;
+  running = false; clearInterval(clockTimer); clearInterval(cameleonTimer);
+  $('status').textContent = ''; $('status').className = 'status warn';
+  $('status').textContent = `💀 Échec (${reason}).`;
+  $('modal').innerHTML = `<h2>💀 Étage ${curFloor} manqué</h2>
+    <p>${reason === 'temps écoulé' ? 'Le temps est écoulé.' : 'Tu as épuisé tes essais.'}</p>
+    <p>Le code était : ${secret.map(ci => `<b>${COLORS[ci].name}</b>`).join(', ')}.</p>
+    <button class="opt" onclick="closeModal()">Fermer</button>`;
+  $('overlay').classList.remove('hidden');
+}
+function closeModal(){ $('overlay').classList.add('hidden'); }
+
+// ===== Init =====
+$('floorBtns').innerHTML = Object.keys(FLOORS).map(n =>
+  `<button class="floor-btn" data-f="${n}" onclick="openFloor(${n})">Étage ${n}</button>`).join('');
+$('submitBtn').onclick = submitGuess;
+</script>
+</body>
+</html>

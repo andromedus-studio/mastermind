@@ -7469,12 +7469,16 @@ const ALL_CODES_8 = (() => {
 })();
 
 const PUZZLE_MAX_LINES = 5; // nombre max de lignes déjà jouées données au joueur
-const PUZZLE_XP_WIN = 60;   // récompense pour la ligne finale trouvée (essai unique)
+const PUZZLE_XP_WIN = 60;       // récompense si trouvé du premier coup
+const PUZZLE_XP_SECOND = 30;    // récompense si trouvé au 2e essai
+const PUZZLE_MAX_GUESSES = 2;   // nombre d'essais pour la ligne finale
 
 // Puzzle Éclair : puzzle personnel et aléatoire (pas la même grille pour tout le monde).
 // Une fois la réponse donnée (trouvée ou non), le mode se verrouille 3h pour ce joueur.
 const FLASH_LOCK_HOURS = 3;
-const FLASH_XP_WIN = 100; // récompense pour la ligne finale trouvée (essai unique) : bien plus payant que la partie contre l'ordi, car un seul essai et 3h d'attente.
+const FLASH_XP_WIN = 100;       // récompense si trouvé du premier coup
+const FLASH_XP_SECOND = 50;     // récompense si trouvé au 2e essai
+const FLASH_MAX_GUESSES = 2;    // nombre d'essais pour la ligne finale
 
 // Génère un code secret + un jeu de lignes déjà jouées (avec leur feedback) dont
 // la combinaison réduit les candidats possibles à exactement 1 (le secret).
@@ -7524,6 +7528,7 @@ let puzzleLines = [];
 let puzzleGuess = [null,null,null,null];
 let puzzleSelectedSlot = 0;
 let puzzleFinished = false;
+let puzzleFailLines = []; // 🔵 essais ratés (à réafficher au-dessus de la ligne en cours)
 let puzzleStartedAt = null;
 let puzzleLeaderboardRef = null;
 
@@ -7602,6 +7607,14 @@ async function loadMyPuzzleProgress(){
   puzzleFinished = false;
   puzzleGuess = [null,null,null,null];
   puzzleSelectedSlot = 0;
+  // 🔵 Restauration des essais déjà ratés (si la page a été fermée entre les 2 essais).
+  puzzleFailLines = [];
+  if(data && data.attempts){
+    puzzleFailLines = Object.keys(data.attempts).sort((a, b) => a - b).map(k => data.attempts[k]).filter(a => a && Array.isArray(a.guess));
+    if(puzzleFailLines.length){
+      document.getElementById('puzzleSub').innerHTML = `<span style="color:#ff8a80;">Essai déjà raté sur cet appareil ou un autre — il te reste <b>1 essai</b> !</span>`;
+    }
+  }
   puzzleStartedAt = resolveStartTime('puzzle', puzzleDateKey, data && data.startedAt, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/startedAt`);
 
   document.getElementById('puzzlePlayArea').classList.remove('hidden');
@@ -7613,14 +7626,16 @@ async function loadMyPuzzleProgress(){
 
 function renderPuzzleGivenLines(){
   const el = document.getElementById('puzzleGivenLines');
-  el.innerHTML = puzzleLines.map((h, idx) => {
+  const rowHTML = (h, label, marker) => {
     const pegs = h.guess.map(ci => window.pegHTML(ci, 'peg')).join('');
     const fpegs = [];
     for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
     for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
     while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
-    return `<div class="row"><span class="num">${idx+1}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
-  }).join('');
+    return `<div class="row"><span class="num" ${marker ? 'style="color:#ffd700;"' : ''}>${marker ? '▶' : label}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
+  };
+  el.innerHTML = puzzleLines.map((h, idx) => rowHTML(h, idx + 1)).join('')
+    + puzzleFailLines.map((h, i) => rowHTML(h, i + 1, true)).join('');
 }
 
 function renderPuzzleSlots(){
@@ -7658,30 +7673,120 @@ function submitPuzzleGuess(){
   const guessSnapshot = puzzleGuess.slice();
   const fb = window.feedbackFor(guessSnapshot, puzzleSecret, 8);
   const solved = fb.black === 4;
-  const timeMs = serverNow().getTime() - puzzleStartedAt;
 
-  puzzleFinished = true;
-  const finishedData = { guess: guessSnapshot, solved, timeMs };
-  set(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/finished`), finishedData);
+  puzzleFailLines.push({ guess: guessSnapshot, black: fb.black, white: fb.white });
+  // 🔵 On garde l'essai raté en base : si le joueur ferme la page, il retrouve son essai.
+  set(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/attempts/${puzzleFailLines.length - 1}`), { guess: guessSnapshot, black: fb.black, white: fb.white }).catch(() => {});
 
   if(solved){
+    const timeMs = serverNow().getTime() - puzzleStartedAt;
+    puzzleFinished = true;
     const isGolden = isGoldenChallengeToday(puzzleDateKey);
-    const puzzleBaseXp = (PUZZLE_XP_WIN + rankWinBonus()) * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
+    const nb = puzzleFailLines.length; // 1 = trouvé du premier coup
+    const base = nb <= 1 ? PUZZLE_XP_WIN + rankWinBonus() : PUZZLE_XP_SECOND + Math.round(rankWinBonus() / 2);
+    const puzzleBaseXp = base * (isGolden ? GOLDEN_XP_MULTIPLIER : 1);
     const puzzleXp = addXp(puzzleBaseXp);
-    recordGameHistory({type: 'puzzle', result: 'gagné', attempts: 1, xp: puzzleXp});
-    finishedData.xp = puzzleXp;
+    recordGameHistory({type: 'puzzle', result: 'gagné', attempts: nb, xp: puzzleXp});
+    const finishedData = { guess: guessSnapshot, solved, timeMs, attempts: nb, xp: puzzleXp };
+    set(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/finished`), finishedData);
+    showPuzzleDoneState(finishedData);
+  } else if(puzzleFailLines.length >= PUZZLE_MAX_GUESSES){
+    const timeMs = serverNow().getTime() - puzzleStartedAt;
+    puzzleFinished = true;
+    recordGameHistory({type: 'puzzle', result: 'perdu', attempts: puzzleFailLines.length, xp: 0});
+    const finishedData = { guess: guessSnapshot, solved: false, timeMs, attempts: puzzleFailLines.length };
+    set(ref(db, `puzzleChallenge/${puzzleDateKey}/players/${myPseudo}/finished`), finishedData);
+    showPuzzleDoneState(finishedData);
   } else {
-    recordGameHistory({type: 'puzzle', result: 'perdu', attempts: 1, xp: 0});
+    // 🔵 Premier essai raté : on affiche la ligne ratée et on rejoue.
+    renderPuzzleGivenLines();
+    puzzleGuess = [null,null,null,null];
+    puzzleSelectedSlot = 0;
+    renderPuzzleSlots();
+    document.getElementById('puzzleSubmitBtn').disabled = true;
+    document.getElementById('puzzleSub').innerHTML = `<span style="color:#ff8a80;">😔 Essai raté — il te reste <b>1 essai</b> ! Ta proposition est affichée en bas des lignes.</span>`;
+    setStatus(`😔 Essai raté (${fb.black} bien placé(s), ${fb.white} mal placé(s)). Il te reste 1 essai !`, '');
   }
-  showPuzzleDoneState(finishedData);
+}
+
+// 🔍 Analyse pédagogique : explique chaque ligne donnée par rapport au code secret.
+function bmCountFeedback(guess, secret){
+  let black = 0;
+  const gs = [], ss = [];
+  for(let i = 0; i < 4; i++){
+    if(guess[i] === secret[i]) black++;
+    else { gs.push(guess[i]); ss.push(secret[i]); }
+  }
+  let white = 0;
+  const ss2 = ss.slice();
+  gs.forEach(c => { const k = ss2.indexOf(c); if(k > -1){ white++; ss2.splice(k, 1); } });
+  return { black, white };
+}
+function bmExplainLine(guess, secret, black, white){
+  const nm = ci => (window.COLORS && window.COLORS[ci]) ? window.COLORS[ci].name : ('couleur ' + (ci + 1));
+  const bpIdx = [], rem = {}, mpColors = [], mpSeen = {};
+  guess.forEach((c, i) => { if(c === secret[i]) bpIdx.push(i); else rem[c] = (rem[c] || 0) + 1; });
+  guess.forEach((c, i) => {
+    if(c !== secret[i] && rem[c] > 0){ rem[c]--; if(!mpSeen[c]){ mpSeen[c] = true; mpColors.push(c); } }
+  });
+  const parts = [`<b>${black}</b> bien placé${black > 1 ? 's' : ''}`, `<b>${white}</b> mal placé${white > 1 ? 's' : ''}`];
+  let detail = '';
+  if(bpIdx.length) detail += `Bien placés : ${bpIdx.map(i => `trou ${i + 1} ${nm(guess[i])}`).join(', ')}.`;
+  if(mpColors.length) detail += `${bpIdx.length ? ' ' : ''}Mal placés : ${mpColors.map(nm).join(', ')} (dans le code, mais pas à cette place).`;
+  return { line: parts.join(' · '), detail };
+}
+function bmAnalysisHTML(secret, lines, myGuess, myFails){
+  let html = `<div class="analysis-panel" style="margin-top:14px;text-align:left;">
+    <span class="a-title">🔍 Analyse — pourquoi chaque ligne disait ça</span>`;
+  (lines || []).forEach((l, i) => {
+    if(!l || !Array.isArray(l.guess)) return;
+    const e = bmExplainLine(l.guess, secret, l.black === undefined ? 0 : l.black, l.white === undefined ? 0 : l.white);
+    html += `<div style="margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="color:#b0a8d0;font-size:12px;">Ligne ${i + 1}</span>
+        <div class="pegs">${l.guess.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>
+        <span style="font-size:12.5px;">→ ${e.line}</span>
+      </div>
+      ${e.detail ? `<div class="small" style="margin-top:2px;">${e.detail}</div>` : ''}
+    </div>`;
+  });
+  (myFails || []).forEach((f, i) => {
+    if(!f || !Array.isArray(f.guess)) return;
+    const fbm = bmCountFeedback(f.guess, secret);
+    const e = bmExplainLine(f.guess, secret, fbm.black, fbm.white);
+    html += `<div style="margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="color:#ffd700;font-size:12px;">Ton essai ${i + 1}</span>
+        <div class="pegs">${f.guess.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>
+        <span style="font-size:12.5px;">→ ${e.line}</span>
+      </div>
+      ${e.detail ? `<div class="small" style="margin-top:2px;">${e.detail}</div>` : ''}
+    </div>`;
+  });
+  if(Array.isArray(myGuess) && myGuess.every(c => c !== null && c !== undefined)){
+    const fb = bmCountFeedback(myGuess, secret);
+    const e = bmExplainLine(myGuess, secret, fb.black, fb.white);
+    html += `<div style="margin-top:12px;border-top:1px solid rgba(255,215,0,0.25);padding-top:8px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="color:#ffd700;font-size:12px;">Ta proposition finale</span>
+        <div class="pegs">${myGuess.map(ci => window.pegHTML(ci, 'peg')).join('')}</div>
+        <span style="font-size:12.5px;">→ ${e.line}</span>
+      </div>
+      ${e.detail ? `<div class="small" style="margin-top:2px;">${e.detail}</div>` : ''}
+    </div>`;
+  }
+  html += `<div class="small" style="margin-top:8px;">💡 Rappel : une couleur peut apparaître plusieurs fois dans le code.</div>
+  </div>`;
+  return html;
 }
 
 function showPuzzleDoneState(finishedData){
   document.getElementById('puzzlePlayArea').classList.add('hidden');
   document.getElementById('puzzleDoneArea').classList.remove('hidden');
+  const nb = finishedData.attempts || 1;
   const msg = finishedData.solved
-    ? `🎉 Bien joué, tu as trouvé le code du premier coup !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens demain pour un nouveau puzzle.`
-    : `😔 Ce n'était pas le bon code. Reviens demain pour un nouveau puzzle.`;
+    ? `🎉 Bien joué, trouvé en ${nb} essai${nb > 1 ? 's' : ''} !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens demain pour un nouveau puzzle.`
+    : `😔 Pas trouvé en ${PUZZLE_MAX_GUESSES} essais. Reviens demain pour un nouveau puzzle.`;
   document.getElementById('puzzleDoneMessage').textContent = msg;
   const revealEl = document.getElementById('puzzleSecretReveal');
   if(!finishedData.solved && puzzleSecret){
@@ -7689,6 +7794,13 @@ function showPuzzleDoneState(finishedData){
     revealEl.classList.remove('hidden');
   } else {
     revealEl.classList.add('hidden');
+  }
+  // 🔍 Analyse détaillée en cas d'échec : chaque ligne donnée est expliquée.
+  const oldA = document.getElementById('bmPuzzleAnalysis');
+  if(oldA) oldA.remove();
+  if(!finishedData.solved && puzzleSecret){
+    revealEl.insertAdjacentHTML('afterend',
+      `<div id="bmPuzzleAnalysis">${bmAnalysisHTML(puzzleSecret, puzzleLines || [], finishedData.guess, puzzleFailLines)}</div>`);
   }
 }
 
@@ -7709,7 +7821,11 @@ function renderPuzzleLeaderboard(players){
 
   entries.sort((a, b) => {
     if(a.solved !== b.solved) return a.solved ? -1 : 1;
-    if(a.solved) return a.timeMs - b.timeMs;
+    if(a.solved){
+      const d = (a.attempts || 1) - (b.attempts || 1);
+      if(d) return d;
+      return a.timeMs - b.timeMs;
+    }
     return 0;
   });
 
@@ -7719,7 +7835,9 @@ function renderPuzzleLeaderboard(players){
   }
 
   el.innerHTML = entries.map((e) => {
-    const statusText = e.solved ? `✅ ${(e.timeMs/1000).toFixed(1)}s` : `❌ raté`;
+    const statusText = e.solved
+      ? `✅ ${(e.timeMs/1000).toFixed(1)}s · ${(e.attempts || 1)} essai${(e.attempts || 1) > 1 ? 's' : ''}`
+      : `❌ raté · ${(e.attempts || 2)} essai${(e.attempts || 2) > 1 ? 's' : ''}`;
     const isMe = e.pseudo === myPseudo;
     return `<div class="online-player-row${isMe ? ' leaderboard-me' : ''}">
       <span class="online-player-name">${decoratedPseudoHTML(e.pseudo)}</span>
@@ -7741,6 +7859,8 @@ let flashLines = [];
 let flashGuess = [null,null,null,null];
 let flashSelectedSlot = 0;
 let flashFinished = false;
+let flashData = null;  // 🔵 la grille en cours (pour sauvegarder les essais ratés)
+let flashFails = [];   // 🔵 essais déjà ratés sur cette grille
 let flashStartedAt = null;
 
 // Rafraîchit l'affichage de la tuile du menu (verrouillée + décompte, ou jouable).
@@ -7804,8 +7924,14 @@ async function openFlashPuzzle(){
     data.startedAt = serverNow().getTime();
     saveFlashCurrent(data);
   }
+  flashData = data;
   flashSecret = data.secret;
   flashLines = data.lines;
+  // 🔵 Restauration d'un 1er essai raté (même grille après fermeture de la page).
+  flashFails = Array.isArray(data.fails) ? data.fails.filter(f => f && Array.isArray(f.guess)) : [];
+  if(flashFails.length){
+    document.getElementById('flashSub').innerHTML = `<span style="color:#ff8a80;">Essai déjà raté sur cette grille — il te reste <b>1 essai</b> !</span>`;
+  }
   document.getElementById('flashColorHint').innerHTML = `🎨 Nombre de couleurs différentes dans le code : <b>${new Set(flashSecret).size}</b>`;
   flashFinished = false;
   flashGuess = [null,null,null,null];
@@ -7818,14 +7944,16 @@ async function openFlashPuzzle(){
 
 function renderFlashGivenLines(){
   const el = document.getElementById('flashGivenLines');
-  el.innerHTML = flashLines.map((h, idx) => {
+  const rowHTML = (h, label, marker) => {
     const pegs = h.guess.map(ci => window.pegHTML(ci, 'peg')).join('');
     const fpegs = [];
     for(let i=0;i<h.black;i++) fpegs.push('<div class="fpeg black"></div>');
     for(let i=0;i<h.white;i++) fpegs.push('<div class="fpeg white"></div>');
     while(fpegs.length < 4) fpegs.push('<div class="fpeg none"></div>');
-    return `<div class="row"><span class="num">${idx+1}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
-  }).join('');
+    return `<div class="row"><span class="num" ${marker ? 'style="color:#ffd700;"' : ''}>${marker ? '▶' : label}</span><div class="pegs">${pegs}</div><div class="feedback-mini">${fpegs.join('')}</div></div>`;
+  };
+  el.innerHTML = flashLines.map((h, idx) => rowHTML(h, idx + 1)).join('')
+    + flashFails.map((h, i) => rowHTML(h, i + 1, true)).join('');
 }
 
 function renderFlashSlots(){
@@ -7864,29 +7992,48 @@ function submitFlashGuess(){
   const fb = window.feedbackFor(guessSnapshot, flashSecret, 8);
   const solved = fb.black === 4;
 
-  flashFinished = true;
-  clearFlashCurrent(); // la grille est jouée : la prochaine ouverture (après la recharge) en génère une nouvelle
-  const lockUntil = Date.now() + FLASH_LOCK_HOURS * 3600 * 1000;
-  myFlashLockedUntil = lockUntil;
-  updateFlashTileUI();
-  set(ref(db, `players/${myPseudo}/flashLockedUntil`), lockUntil);
+  // 🔵 L'essai raté est mémorisé sur l'appareil (avec la grille).
+  flashFails.push({ guess: guessSnapshot, black: fb.black, white: fb.white });
+  if(flashData){ flashData.fails = flashFails; saveFlashCurrent(flashData); }
 
-  let xp = 0;
   if(solved){
-    xp = addXp(FLASH_XP_WIN + rankWinBonus());
-    recordGameHistory({type: 'flash', result: 'gagné', attempts: 1, xp});
+    flashFinished = true;
+    const nb = flashFails.length;
+    clearFlashCurrent();
+    const lockUntil = Date.now() + FLASH_LOCK_HOURS * 3600 * 1000;
+    myFlashLockedUntil = lockUntil;
+    updateFlashTileUI();
+    set(ref(db, `players/${myPseudo}/flashLockedUntil`), lockUntil);
+    const xp = addXp((nb <= 1 ? FLASH_XP_WIN : FLASH_XP_SECOND) + (nb <= 1 ? rankWinBonus() : Math.round(rankWinBonus() / 2)));
+    recordGameHistory({type: 'flash', result: 'gagné', attempts: nb, xp});
+    showFlashDoneState({ solved: true, xp, guess: guessSnapshot, attempts: nb });
+  } else if(flashFails.length >= FLASH_MAX_GUESSES){
+    flashFinished = true;
+    clearFlashCurrent();
+    const lockUntil = Date.now() + FLASH_LOCK_HOURS * 3600 * 1000;
+    myFlashLockedUntil = lockUntil;
+    updateFlashTileUI();
+    set(ref(db, `players/${myPseudo}/flashLockedUntil`), lockUntil);
+    recordGameHistory({type: 'flash', result: 'perdu', attempts: flashFails.length, xp: 0});
+    showFlashDoneState({ solved: false, xp: 0, guess: guessSnapshot, attempts: flashFails.length });
   } else {
-    recordGameHistory({type: 'flash', result: 'perdu', attempts: 1, xp: 0});
+    // 🔵 Premier essai raté : on affiche la ligne ratée et on rejoue (pas de verrouillage).
+    renderFlashGivenLines();
+    flashGuess = [null,null,null,null];
+    flashSelectedSlot = 0;
+    renderFlashSlots();
+    document.getElementById('flashSubmitBtn').disabled = true;
+    document.getElementById('flashSub').innerHTML = `<span style="color:#ff8a80;">😔 Essai raté (${fb.black} bien placé(s), ${fb.white} mal placé(s)) — il te reste <b>1 essai</b> !</span>`;
   }
-  showFlashDoneState({ solved, xp });
 }
 
 function showFlashDoneState(finishedData){
   document.getElementById('flashPlayArea').classList.add('hidden');
   document.getElementById('flashDoneArea').classList.remove('hidden');
+  const nb = finishedData.attempts || 1;
   const msg = finishedData.solved
-    ? `🎉 Bien joué, tu as trouvé le code du premier coup !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`
-    : `😔 Ce n'était pas le bon code. Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`;
+    ? `🎉 Bien joué, trouvé en ${nb} essai${nb > 1 ? 's' : ''} !${finishedData.xp ? ` (+${finishedData.xp} XP)` : ''} Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`
+    : `😔 Pas trouvé en ${FLASH_MAX_GUESSES} essais. Reviens dans ${FLASH_LOCK_HOURS}h pour une nouvelle grille.`;
   document.getElementById('flashDoneMessage').textContent = msg;
   const revealEl = document.getElementById('flashSecretReveal');
   if(!finishedData.solved && flashSecret){
@@ -7894,6 +8041,12 @@ function showFlashDoneState(finishedData){
     revealEl.classList.remove('hidden');
   } else {
     revealEl.classList.add('hidden');
+  }
+  const oldA = document.getElementById('bmFlashAnalysis');
+  if(oldA) oldA.remove();
+  if(!finishedData.solved && flashSecret){
+    revealEl.insertAdjacentHTML('afterend',
+      `<div id="bmFlashAnalysis">${bmAnalysisHTML(flashSecret, flashLines || [], finishedData.guess, flashFails)}</div>`);
   }
 }
 
