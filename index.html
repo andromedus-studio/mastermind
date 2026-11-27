@@ -892,6 +892,17 @@
   .serie-mind-choice .analysis-panel { text-align: center; }
   /* Choix fin de partie — Monde infini : nombre de manches en GRAND */
   .infinite-choice { margin-bottom: 14px; }
+  /* 🚪 Corrections v4 : les pop-ups de la Tour s'affichent EN VRAIES POP-UP (overlay centré),
+     plus « en haut » de la page. .hidden (display:none !important) reste prioritaire. */
+  #advExitPopup, #advCashConfirm, #advBuildPopup, #modeConfirm {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(8,6,12,0.9); display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  #advExitPopup .infinite-choice-panel, #advCashConfirm .infinite-choice-panel,
+  #advBuildPopup .infinite-choice-panel, #modeConfirm .infinite-choice-panel {
+    background: #1c1628; border: 1px solid rgba(255,215,0,0.35); max-width: 480px; width: 100%;
+    box-shadow: 0 0 40px rgba(255,45,120,.25); margin: 0;
+  }
   .infinite-choice-panel {
     text-align: center;
     background: rgba(255,255,255,0.06);
@@ -2737,7 +2748,7 @@ const ADV_BROUILLARD_OPTS = {
   28: [ { l: 'A', pct: 10, clear: 2, fog: 1, hiddenFrom: 4 },       // 2 nettes + 1 floue, cachées dès la 4ᵉ
         { l: 'B', pct: 15, clear: 2, fog: 0, hiddenFrom: 3 },       // 2 nettes, pas de flou, cachées dès la 3ᵉ
         { l: 'C', pct: -15, clear: 4, fog: 2, hiddenFrom: 7 } ],    // 4 nettes + 2 floues
-  29: [ { l: 'A', pct: 10, fogBlind: true },                        // le flou devient illisible (blur total)
+  29: [ { l: 'A', pct: 10, clear: 2, fog: 1, fogBlind: true, hiddenFrom: 4 },  // v4 durcie : 2 nettes, floue illisible 3ᵉ, cachées dès la 4ᵉ
         { l: 'B', pct: 15, fogBlind: true, hideCorr: true },        // flou illisible ET corrections ⚫⚪ cachées
         { l: 'C', pct: -10, keepCorr: true } ],                     // corrections ⚫⚪ visibles sur lignes cachées
   30: [ { l: 'A', pct: 10, clear: 3, fog: 1, fogBlind: true, hiddenFrom: 5 },  // 3 nettes, 1 floue illisible, cachées dès la 5ᵉ
@@ -3261,8 +3272,8 @@ const ADV_TEMPS_BLUE = { 1: 5, 2: 5, 3: 10, 4: 10 };  // 🟦 % du boost bleu B 
 const ADV_PALIER_MULT = { 1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3, 6: 3.5 };  // v3 : pente douce du gain de base par palier (Saphir/5 coups ≈ 20/30/40/50/60/70 XP)
 // 🚪 Frais de sortie (anti-farm) : encaisser en boutique 1-2 coûte cher, la
 // profondeur paie (boutiques 4+ = bonus). Tuer la boucle « farm 1→10 ».
-const ADV_CASHOUT_MULT = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.15, 5: 1.25 };
-function advCashoutMult(){ const b = advRound / 5; return ADV_CASHOUT_MULT[b] !== undefined ? ADV_CASHOUT_MULT[b] : 1.25; } // boutiques ≥ 6 : ×1.25
+const ADV_CASHOUT_MULT = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.15, 5: 1.25, 6: 1.5 };  // v4 : boutique 6 (étage 30) = ×1.5
+function advCashoutMult(){ const b = advRound / 5; return ADV_CASHOUT_MULT[b] !== undefined ? ADV_CASHOUT_MULT[b] : 1.5; } // boutiques ≥ 6 : ×1.5
 // Palier 3 « Challenge » — table des défis, indexée sur l'ÉTAGE VISÉ.
 // pct : % sur le gain d'étage (négatif = malus) · capMs : pendule du défi · tries : finir
 // avec N essais de moins (essais du défi, pas les totaux) · permTry : baisse
@@ -3731,11 +3742,34 @@ function showAdvShop(){
   const offers = advShopOffers();
   document.getElementById('advShopRound').textContent = advRound;
   const mult = advShopMultiplier();
+  const shopMult = advShopMultiplier(), shopFee = advCashoutMult();
+  const shopPalName = ['Les Limites', 'Le Temps', 'Challenge', 'L\'Ombre', 'Le Mirage', 'Le Brouillard', 'Le Chaos'][(advPalier() - 1) % 7] || 'Inconnu';
+  // 📋 v4 : bonus/malus en cours listés dans le récap (ce qui était éparpillé en haut).
+  const shopEffects = [];
+  if(advMalus && advMalusUntil >= advRound) shopEffects.push(`⚠️ Malus de palier actif : <b>${advMalus.label}</b> (jusqu'à l'étage ${advMalusUntil})`);
+  if(!advDistinct) shopEffects.push('⚠️ Doubles / TRIPLES possibles dans le code');
+  if(advNumbersMode) shopEffects.push('🔢 Couleurs remplacées par des chiffres');
+  if(advMirage && advMirage.count > 0) shopEffects.push(`🪞 Mirage : ${advMirage.count} miroir${advMirage.count > 1 ? 's' : ''} par coup${advMirage.free ? ' (gratuits)' : ''}`);
+  if(advBrouillard) shopEffects.push('🌫️ Brouillard actif sur l\'historique');
+  if(advShadow) shopEffects.push('🌑 Ombre active (couleurs masquées)');
+  if(advInsuranceCount > 0) shopEffects.push(`🛡️ Assurance : ${ADV_GO_BASE_PCT + 5 * advInsuranceCount}% de la réserve en cas de défaite`);
+  if(advRunPct) shopEffects.push(`🟨 Bonus de run : +${advRunPct}% sur les gains`);
+  if(advFloorPct) shopEffects.push(`🎯 Bonus d'étage : ${advFloorPct > 0 ? '+' : ''}${advFloorPct}%`);
+  if(advShopPendingPct) shopEffects.push(`🎁 Bonus en attente : +${advShopPendingPct}% au prochain étage terminé (annulé si tu sors maintenant)`);
+  if(advAngelRing) shopEffects.push('😇 Anneau de l\'ange équipé (annule une défaite)');
   document.getElementById('advShopMsg').innerHTML =
     `<div style="margin:2px 0 4px;">Boutique ${advShopVisited + 1}${advClockTheme(advTheme()) ? ` · ⏱ ${advFormatClock(advPalierMs)} restant` : ''}</div>
      <div style="padding:10px 12px;border:2px solid #ffd700;border-radius:12px;background:rgba(255,215,0,.10);text-align:center;">
        <div style="font-size:12px;opacity:.85;">🏢 Étage ${advRound} · 💰 Réserve actuelle</div>
        <div style="font-size:26px;font-weight:800;color:#ffd700;line-height:1.2;">${advReserve} XP</div>
+     </div>
+     <div style="margin-top:10px;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:10px 12px;text-align:left;font-size:12.5px;line-height:1.75;background:rgba(255,255,255,.04);">
+       <div style="font-size:11px;letter-spacing:.2em;color:#b0a8d0;font-weight:700;margin-bottom:4px;">📋 RÉCAP DE PROGRESSION</div>
+       🏆 Étage atteint : <b>${advRound}</b> · Palier ${advPalier()} « ${shopPalName} »<br>
+       🏢 Boutiques franchies : <b>${advShopVisited}</b> · 💛 Gain de base par étage : ×${ADV_PALIER_MULT[advPalier()] !== undefined ? ADV_PALIER_MULT[advPalier()] : advPalier()}<br>
+       ⏱️ Temps par étage : <b>${advFormatClock(advPalierMs)}</b> · 🎯 Essais par étage : <b>${advMaxTries === null ? 'illimité' : advMaxTries}</b><br>
+       🚪 Encaissement ici : réserve <b style="color:#ffd700;">${advReserve} XP</b> × ${shopFee} = <b style="color:#ffd700;">${Math.round(advReserve * shopFee * shopMult)} XP</b>
+       ${shopEffects.length ? `<div style="margin-top:6px;border-top:1px solid rgba(255,255,255,.1);padding-top:6px;">${shopEffects.join('<br>')}</div>` : ''}
      </div>
      <div id="advShopBuild"></div>`;
   document.getElementById('advShopItems').innerHTML = offers.map(o => {
