@@ -2748,12 +2748,14 @@ const ADV_BROUILLARD_OPTS = {
   28: [ { l: 'A', pct: 10, clear: 2, fog: 1, hiddenFrom: 4 },       // 2 nettes + 1 floue, cachées dès la 4ᵉ
         { l: 'B', pct: 15, clear: 2, fog: 0, hiddenFrom: 3 },       // 2 nettes, pas de flou, cachées dès la 3ᵉ
         { l: 'C', pct: -15, clear: 4, fog: 2, hiddenFrom: 7 } ],    // 4 nettes + 2 floues
-  29: [ { l: 'A', pct: 10, clear: 2, fog: 1, fogBlind: true, hiddenFrom: 4 },  // v4 durcie : 2 nettes, floue illisible 3ᵉ, cachées dès la 4ᵉ
-        { l: 'B', pct: 15, fogBlind: true, hideCorr: true },        // flou illisible ET corrections ⚫⚪ cachées
-        { l: 'C', pct: -10, keepCorr: true } ],                     // corrections ⚫⚪ visibles sur lignes cachées
-  30: [ { l: 'A', pct: 10, clear: 3, fog: 1, fogBlind: true, hiddenFrom: 5 },  // 3 nettes, 1 floue illisible, cachées dès la 5ᵉ
-        { l: 'B', pct: 15, clear: 2, fog: 0, fogBlind: true, hiddenFrom: 3 },  // cauchemar : 2 nettes, cachées dès la 3ᵉ
-        { l: 'C', pct: -5, clear: 3, fog: 1, fogBlind: false, hiddenFrom: 5 } ], // standard : 3 nettes, 1 floue lisible
+  // v4 : 29 et 30 décrivent TOUS la fenêtre complète (fini les options qui héritent
+  // silencieusement de la fenêtre précédente — c'était la source de A ≈ C).
+  29: [ { l: 'A', pct: 10, clear: 2, fog: 1, fogBlind: true, hiddenFrom: 4 },   // 2 nettes, 3ᵉ floue illisible, tout caché dès la 4ᵉ
+        { l: 'B', pct: 15, clear: 1, fog: 1, fogBlind: true, hideCorr: true, hiddenFrom: 3 }, // 1 nette, floue illisible SANS corrections, cachées dès la 3ᵉ
+        { l: 'C', pct: -10, clear: 3, fog: 1, keepCorr: true, hiddenFrom: 5 } ], // confort : 3 nettes, 1 floue lisible, corrections visibles partout
+  30: [ { l: 'A', pct: 10, clear: 2, fog: 1, fogBlind: true, hiddenFrom: 4 },   // 2 nettes, 3ᵉ floue illisible, cachées dès la 4ᵉ
+        { l: 'B', pct: 15, clear: 1, fog: 0, fogBlind: true, hideCorr: true, hiddenFrom: 3 }, // cauchemar : 1 nette, tout caché dès la 3ᵉ
+        { l: 'C', pct: -5, clear: 4, fog: 1, keepCorr: true, hiddenFrom: 6 } ],  // standard : 4 nettes, 1 floue, corrections visibles
 };
 // 🌑 Masques actifs pour l'affichage ? (faux si l'option « révélation » a débloqué les masques)
 function advShadowActive(){
@@ -3272,7 +3274,7 @@ const ADV_TEMPS_BLUE = { 1: 5, 2: 5, 3: 10, 4: 10 };  // 🟦 % du boost bleu B 
 const ADV_PALIER_MULT = { 1: 1, 2: 1.5, 3: 2, 4: 2.5, 5: 3, 6: 3.5 };  // v3 : pente douce du gain de base par palier (Saphir/5 coups ≈ 20/30/40/50/60/70 XP)
 // 🚪 Frais de sortie (anti-farm) : encaisser en boutique 1-2 coûte cher, la
 // profondeur paie (boutiques 4+ = bonus). Tuer la boucle « farm 1→10 ».
-const ADV_CASHOUT_MULT = { 1: 0.5, 2: 0.75, 3: 1.0, 4: 1.15, 5: 1.25, 6: 1.5 };  // v4 : boutique 6 (étage 30) = ×1.5
+const ADV_CASHOUT_MULT = { 1: 0.25, 2: 0.5, 3: 0.75, 4: 1.0, 5: 1.25, 6: 1.5 };  // v4 : départ ×0.25, +0.25 par boutique
 function advCashoutMult(){ const b = advRound / 5; return ADV_CASHOUT_MULT[b] !== undefined ? ADV_CASHOUT_MULT[b] : 1.5; } // boutiques ≥ 6 : ×1.5
 // Palier 3 « Challenge » — table des défis, indexée sur l'ÉTAGE VISÉ.
 // pct : % sur le gain d'étage (négatif = malus) · capMs : pendule du défi · tries : finir
@@ -3661,18 +3663,27 @@ function showAdvChoices(){
         ⚠️ <b>Choix PERMANENT :</b> ton bonus ou malus de gain s'applique à <b>tous les étages suivants</b> de cette run, et la limite d'essais reste aussi pour la suite.</div>`;
   }
   document.getElementById('advChoiceBtns').innerHTML = opts.map(c => {
-    // 🟦 Le bonus IMMÉDIAT (boost de réserve) s'affiche en bleu, le reste en vert.
-    const isBlue = c.bonus.indexOf('réserve (immédiat)') !== -1;
-    const col = isBlue ? '#64c8ff' : '#8cffaa';
     // 💛 Aperçu jaune UNIFORME : pour CHAQUE option, l'XP qu'on aura À LA FIN de
     // l'étage visé (boost bleu appliqué immédiatement + gain estimé de l'étage,
     // hypothèse victoire en 5 coups). Même format partout.
     const gainPct = c.pct !== undefined ? c.pct : 0;
     const reserveDebut = c.blue ? Math.round(advReserve * (1 + c.blue / 100)) : advReserve;
     const fin = reserveDebut + advPreviewGain(gainPct);
-    const prev = ` <span style="color:#ffd700;">💛 à la fin de l'étage : ${advReserve} → ${fin} XP</span>`;
-    return `<button class="btn secondary" style="width:100%;text-align:left;" onclick="applyAdvChoice('${c.l}')">
-      <b style="color:${col};">${c.l}) ${c.bonus}</b>${c.malus ? ` <span style="color:#ff8a80;">— ${c.malus}</span>` : ''}${prev}
+    const prev = `💛 à la fin de l'étage : ${advReserve} → ${fin} XP`;
+    // 🎨 v4 : lisibilité des options — le % (ou l'effet clé) en COULEUR (vert = gain,
+    // bleu = réserve immédiate, rouge = malus), la description en BLANC, l'XP estimé en JAUNE.
+    const isBlue = !!c.blue;
+    const isRed = (gainPct < 0) || (c.malus && c.malus.indexOf('100%') !== -1);
+    const col = isBlue ? '#64c8ff' : isRed ? '#ff8a80' : '#8cffaa';
+    let tag;
+    if(isBlue) tag = `++${c.blue}% réserve`;
+    else if(c.bonus.indexOf('geler la pendule') !== -1) tag = '🧊 gel pendule';
+    else if(/\+(\d+) min sur la pendule/.test(c.bonus)) tag = c.bonus.match(/\+ ?(\d+) min sur la pendule/)[0];
+    else tag = `${gainPct > 0 ? '+' : ''}${gainPct}% gain`;
+    return `<button class="btn secondary" style="width:100%;text-align:left;line-height:1.6;" onclick="applyAdvChoice('${c.l}')">
+      <b style="color:${col};">${c.l}) ${tag}</b><span style="color:#f0eef6;"> — ${c.bonus}</span>
+      ${c.malus ? `<br><span style="color:#ff8a80;">⚠️ ${c.malus}</span>` : ''}
+      <br><span style="color:#ffd700;">${prev}</span>
     </button>`;}).join('');
   document.getElementById('advChoice').classList.remove('hidden');
 }
